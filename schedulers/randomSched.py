@@ -1,13 +1,10 @@
-#/usr/bin/python2
+from batsim.batsim import BatsimScheduler
 
-from batsim.batsim import BatsimScheduler, Batsim
-
-import sys
-import os
 from random import sample
-from sortedcontainers import SortedSet
+
 
 class RandomSched(BatsimScheduler):
+
     def __init__(self, options):
         self.options = options
 
@@ -25,7 +22,6 @@ class RandomSched(BatsimScheduler):
 
         # Iterating over all open jobs
         for job in set(self.openJobs):
-            nb_res_req = job.requested_resources
             self.jobs_res[job.id] = res
             scheduledJobs.append(job)
 

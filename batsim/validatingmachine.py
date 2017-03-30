@@ -1,7 +1,6 @@
-#!/usr/bin/python2
-
 from batsim import BatsimScheduler
 from sortedcontainers import SortedSet
+
 
 class ValidatingMachine(BatsimScheduler):
     """
@@ -14,6 +13,7 @@ class ValidatingMachine(BatsimScheduler):
     - a job is only started once
     - a job is launched after his submit time
     """
+
     def __init__(self, scheduler):
         self.scheduler = scheduler
 
@@ -23,7 +23,7 @@ class ValidatingMachine(BatsimScheduler):
         self.jobs_waiting = []
         self.previousAllocations = dict()
 
-        #intercept job start
+        # intercept job start
         self.bs_start_jobs_continuous = self.bs.start_jobs_continuous
         self.bs.start_jobs_continuous = self.start_jobs_continuous
         self.bs_start_jobs = self.bs.start_jobs
@@ -56,9 +56,9 @@ class ValidatingMachine(BatsimScheduler):
 
     def start_jobs_continuous(self, allocs):
         for (job, (first_res, last_res)) in allocs:
-            self.previousAllocations[job.id] = range(first_res, last_res+1)
+            self.previousAllocations[job.id] = range(first_res, last_res + 1)
             self.jobs_waiting.remove(job)
-            for r in range(first_res, last_res+1):
+            for r in range(first_res, last_res + 1):
                 self.availableResources.remove(r)
         self.bs_start_jobs_continuous(allocs)
 
