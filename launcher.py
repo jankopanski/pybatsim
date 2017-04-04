@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 '''
 Run PyBatsim Sschedulers.
 
@@ -19,7 +20,6 @@ Options:
 from batsim.docopt import docopt
 import sys
 import json
-import string
 import time
 from batsim.batsim import Batsim
 from batsim.validatingmachine import ValidatingMachine
@@ -32,7 +32,7 @@ def module_to_class(module):
     """
     transform fooBar to FooBar
     """
-    return string.upper(module[0]) + module[1:]
+    return (module[0]).upper() + module[1:]
 
 
 def filename_to_module(fn):

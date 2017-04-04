@@ -1,4 +1,4 @@
-from batsim import BatsimScheduler
+from batsim.batsim import BatsimScheduler
 from sortedcontainers import SortedSet
 
 
