@@ -457,7 +457,7 @@ class CpuSnapshot(object):
         print(s.diffstr(diff))
         s = s.list_next
         while s != None:
-            print s.diffstr(diff)
+            print(s.diffstr(diff))
             assert s.free_processors > s.list_prev
             s = s.list_next
 
