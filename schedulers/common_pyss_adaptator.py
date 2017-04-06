@@ -447,20 +447,19 @@ class CpuSnapshot(object):
 
     def printCpuSlices(self, str=None):
         if str is not None:
-        print(str)
+            print(str)
         print("start time | duration | #free processors | jobs")
         #for s in self.archive_of_old_slices:
         #    print s
         #print("-----------------------------------------------")
         s = self.slices.first
         diff = s.start_time
-        print s.diffstr(diff)
+        print(s.diffstr(diff))
         s = s.list_next
         while s != None:
             print s.diffstr(diff)
             assert s.free_processors > s.list_prev
             s = s.list_next
-        print
 
 
     def copy(self):
@@ -486,11 +485,13 @@ class CpuSnapshot(object):
             prev_time = time
 
             if s.free_processors < 0 or s.free_processors > self.total_processors:
-                print ">>> PROBLEM: number of free processors is either negative or huge", s
+                print(">>> PROBLEM: number of free processors is either
+                      negative or huge", s)
                 return False
 
             if s.start_time != prev_time + prev_duration:
-                print ">>> PROBLEM: non successive slices", s.start_time, prev_time
+                print(">>> PROBLEM: non successive slices", s.start_time,
+                      prev_time)
                 return False
 
             duration = s.duration
@@ -509,11 +510,13 @@ class CpuSnapshot(object):
             prev_time = time
 
             if s.free_processors != self.total_processors:
-                print ">>> PROBLEM: number of free processors is not the total processors", s
+                print(">>> PROBLEM: number of free processors is not the total
+                      processors", s)
                 return False
 
             if s.start_time != prev_time + prev_duration:
-                print ">>> PROBLEM: non successive slices", s.start_time, prev_time
+                print(">>> PROBLEM: non successive slices", s.start_time,
+                      prev_time)
                 return False
 
             duration = s.duration
