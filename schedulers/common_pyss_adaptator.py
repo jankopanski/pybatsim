@@ -44,7 +44,7 @@ class CpuTimeSlice(object):
 
 
     def updateStartTimeAndDuration(self, st, dur):
-	self.start_time = st
+        self.start_time = st
         self.duration = dur
         self.end_time = self.start_time + self.duration
 
@@ -116,11 +116,11 @@ class CpuTimeSlice(object):
 
 class CpuTimeSliceList:
 
-	def __init__(self, obj):
-		self.first = obj
-		self.last = obj
-		obj.list_prev = None
-		obj.list_next = None
+    def __init__(self, obj):
+        self.first = obj
+        self.last = obj
+        obj.list_prev = None
+        obj.list_next = None
 
 
 class CpuSnapshot(object):
@@ -189,8 +189,8 @@ class CpuSnapshot(object):
             self._append_time_slice(self.total_processors, start_time - self.snapshot_end_time)
             assert self.snapshot_end_time == start_time
 
-	# add a tail slice, duration is arbitrary whenever start_time >= self.snapshot_end_time
-	self._append_time_slice(self.total_processors, 1000)
+    # add a tail slice, duration is arbitrary whenever start_time >= self.snapshot_end_time
+    self._append_time_slice(self.total_processors, 1000)
 
 
     def _slice_starts_at(self, time):
@@ -324,14 +324,14 @@ class CpuSnapshot(object):
         assert self._slice_starts_at(start), "start time is: " + str(start)
         #assert self._slice_starts_at(end), "end time is: " + str(end) It should work without this... hopefullly...
 
-	s = self.slices.first
-	while s != None:
-		st = s.start_time
-		if st >= end:
-			break
-		if start <= st:
-			yield s
-		s = s.list_next
+    s = self.slices.first
+    while s != None:
+        st = s.start_time
+        if st >= end:
+            break
+        if start <= st:
+            yield s
+        s = s.list_next
 
 
     def delJobFromCpuSlices(self, job):
@@ -357,12 +357,12 @@ class CpuSnapshot(object):
             s.delJob(job)
 
     def assignTailofJobToTheCpuSlices(self, job, new_requested_time):
-	"""
-	This function extends the duration of a job, if the predicted duration is smaller
-	than the user estimated duration, then the function adds more slices to the job accordingly.
-	"""
-	assert isinstance(new_requested_time, int)
-	job_estimated_finish_time = job.start_to_run_at_time + new_requested_time
+        """
+        This function extends the duration of a job, if the predicted duration is smaller
+        than the user estimated duration, then the function adds more slices to the job accordingly.
+        """
+        assert isinstance(new_requested_time, int)
+        job_estimated_finish_time = job.start_to_run_at_time + new_requested_time
         self._ensure_a_slice_starts_at(job_estimated_finish_time)
         for s in self._slices_time_range(job.start_time+job.requested_time, job_estimated_finish_time):
             s.addJob(job)
@@ -399,41 +399,42 @@ class CpuSnapshot(object):
         assert self.slices
         self._ensure_a_slice_starts_at(current_time)
 
-	while self.slices.first.end_time <= current_time:
-		cur_slice = self.slices.first
-		self.slices.first = cur_slice.list_next
-		self.slices.first.list_prev = None
+    while self.slices.first.end_time <= current_time:
+        cur_slice = self.slices.first
+        self.slices.first = cur_slice.list_next
+        self.slices.first.list_prev = None
 
-		cur_slice.list_prev = None
-		cur_slice.list_next = None
-		if self.archive_snapshots:
-			self.archive_of_old_slices.append(cur_slice)
-		else:
-			del cur_slice
-	self.unify_slices()
+        cur_slice.list_prev = None
+        cur_slice.list_next = None
+        if self.archive_snapshots:
+            self.archive_of_old_slices.append(cur_slice)
+        else:
+            del cur_slice
+    self.unify_slices()
 
 
     def unify_slices(self):
-	assert self.slices
+        assert self.slices
 
-	prev_slice = self.slices.first
-	cur_slice = prev_slice.list_next
-	while cur_slice != None:
-                print cur_slice.start_time, prev_slice.start_time + prev_slice.duration
-		#assert cur_slice.start_time == prev_slice.start_time + prev_slice.duration not possible with floats!
-		if cur_slice.free_processors == prev_slice.free_processors and cur_slice.job_ids == prev_slice.job_ids:
-			prev_slice.updateDuration( prev_slice.duration + cur_slice.duration)
-			prev_slice.list_next = cur_slice.list_next
-			if cur_slice == self.slices.last:
-				self.slices.last = prev_slice
-			if cur_slice.list_next != None:
-				cur_slice.list_next.list_prev = prev_slice
-			cur_slice.list_prev = None
-			cur_slice.list_next = None
-			del cur_slice
-		else:
-			prev_slice = cur_slice
-		cur_slice = prev_slice.list_next
+        prev_slice = self.slices.first
+        cur_slice = prev_slice.list_next
+        while cur_slice != None:
+            print(cur_slice.start_time, prev_slice.start_time +
+                  prev_slice.duration)
+            #assert cur_slice.start_time == prev_slice.start_time + prev_slice.duration not possible with floats!
+            if cur_slice.free_processors == prev_slice.free_processors and cur_slice.job_ids == prev_slice.job_ids:
+                prev_slice.updateDuration( prev_slice.duration + cur_slice.duration)
+                prev_slice.list_next = cur_slice.list_next
+                if cur_slice == self.slices.last:
+                    self.slices.last = prev_slice
+                if cur_slice.list_next != None:
+                    cur_slice.list_next.list_prev = prev_slice
+                cur_slice.list_prev = None
+                cur_slice.list_next = None
+                del cur_slice
+            else:
+                prev_slice = cur_slice
+            cur_slice = prev_slice.list_next
 
 
     def _restore_old_slices(self):
@@ -446,11 +447,11 @@ class CpuSnapshot(object):
 
     def printCpuSlices(self, str=None):
         if str is not None:
-		print str
-        print "start time | duration | #free processors | jobs"
-	#for s in self.archive_of_old_slices:
-	#    print s
-	#print("-----------------------------------------------")
+        print(str)
+        print("start time | duration | #free processors | jobs")
+        #for s in self.archive_of_old_slices:
+        #    print s
+        #print("-----------------------------------------------")
         s = self.slices.first
         diff = s.start_time
         print s.diffstr(diff)
