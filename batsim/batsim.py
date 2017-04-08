@@ -90,9 +90,9 @@ class Batsim(object):
 
     def get_job(self, event):
         if self.redis_enabled:
-            job = self.redis.get_job(event["job_id"])
+            job = self.redis.get_job(event["data"]["job_id"])
         else:
-            job = event["job"]
+            job = event["data"]["job"]
         return job
 
     def request_consumed_energy(self):
@@ -176,23 +176,23 @@ class Batsim(object):
         for event in msg["events"]:
             event_type = event["type"]
             if event_type == "SIMULATION_BEGINS":
-                self.nb_res = event["nb_resources"]
+                self.nb_res = event["data"]["nb_resources"]
             elif event_type == "SIMULATION_ENDS":
                 print("All jobs have been submitted and completed!")
                 finished_received = True
             elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
-                job_id = event["job_id"]
+                job_id = event["data"]["job_id"]
                 self.jobs[job_id] = self.get_job_from_event(event)
                 self.scheduler.onJobSubmission(self.jobs[job_id])
                 self.nb_jobs_received += 1
             elif event_type == "JOB_COMPLETED":
-                job_id = event["job_id"]
+                job_id = event["data"]["job_id"]
                 j = self.jobs[job_id]
-                j.finish_time = event["timestamp"]
+                j.finish_time = event["data"]["timestamp"]
                 self.scheduler.onJobCompletion(j)
             elif event_type == "RESOURCE_STATE_CHANGED":
-                nodes = event["resources"].split("-")
+                nodes = event["data"]["resources"].split("-")
                 if len(nodes) == 1:
                     nodeInterval = (int(nodes[0]), int(nodes[0]))
                 elif len(nodes) == 2:
@@ -200,9 +200,9 @@ class Batsim(object):
                 else:
                     raise Exception("Multiple intervals are not supported")
                 self.scheduler.onMachinePStateChanged(
-                    nodeInterval, event["state"])
+                    nodeInterval, event["data"]["state"])
             elif event_type == "QUERY_REPLY":
-                consumed_energy = event["consumed_energy"]
+                consumed_energy = event["data"]["consumed_energy"]
                 self.scheduler.onReportEnergyConsumed(consumed_energy)
             else:
                 raise Exception("Unknow event type {}".format(event_type))
@@ -212,12 +212,12 @@ class Batsim(object):
             self._msgs_to_send = sorted(self._msgs_to_send, key="timestamp")
 
         new_msg = {
-            "now": self._time_to_str(self._current_time),
+            "now": float(self._time_to_str(self._current_time)),
             "events": self._msgs_to_send
         }
         if self.verbose > 0:
             print("[PYBATSIM]: BATSIM ---> DECISION\n {}".format(new_msg))
-        self._connection.send(json.dumps(new_msg))
+        self._connection.send_string(json.dumps(new_msg))
         return not finished_received
 
 
