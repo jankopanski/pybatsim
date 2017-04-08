@@ -183,7 +183,7 @@ class Batsim(object):
             elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
                 job_id = event["data"]["job_id"]
-                self.jobs[job_id] = self.get_job_from_event(event)
+                self.jobs[job_id] = self.redis.get_job(job_id)
                 self.scheduler.onJobSubmission(self.jobs[job_id])
                 self.nb_jobs_received += 1
             elif event_type == "JOB_COMPLETED":
