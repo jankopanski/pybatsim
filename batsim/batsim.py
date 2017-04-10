@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import json
-import re
+# import re
 import redis
 import sys
 import zmq
@@ -203,7 +203,7 @@ class Batsim(object):
             elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
                 job_id = event_data["job_id"]
-                self.jobs[job_id] = self.get_job_from_event(event)
+                self.jobs[job_id] = self.get_job(event)
                 self.scheduler.onJobSubmission(self.jobs[job_id])
                 self.nb_jobs_received += 1
             elif event_type == "JOB_COMPLETED":
