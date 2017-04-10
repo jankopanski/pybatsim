@@ -92,7 +92,7 @@ class Batsim(object):
                     "type": "EXEC",
                     "data": {
                         "job_id": job.id,
-                        "alloc": " ".join(res[job.id])
+                        "alloc": " ".join(str(res[job.id]))
                     }
                 }
             )
