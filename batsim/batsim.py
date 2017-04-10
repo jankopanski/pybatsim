@@ -76,7 +76,7 @@ class Batsim(object):
         for (job, (first_res, last_res)) in allocs:
             self._events_to_send.append({
                     "timestamp": self.time(),
-                    "type": "EXEC",
+                    "type": "EXECUTE_JOB",
                     "data": {
                         "job_id": job.id,
                         "alloc": "{}-{}".format(first_res, last_res)
@@ -89,7 +89,7 @@ class Batsim(object):
         for job in jobs:
             self._events_to_send.append({
                     "timestamp": self.time(),
-                    "type": "EXEC",
+                    "type": "EXECUTE_JOB",
                     "data": {
                         "job_id": job.id,
                         "alloc": " ".join(str(res[job.id]))
