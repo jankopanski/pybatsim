@@ -229,7 +229,7 @@ class Batsim(object):
         if len(self._events_to_send) > 0:
             # sort msgs by timestamp
             self._events_to_send = sorted(
-                self._events_to_send, key=attrgetter('timestamp'))
+                self._events_to_send, key=lambda event: event['timestamp'])
 
         new_msg = {
             "now": self._current_time,
