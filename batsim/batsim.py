@@ -59,7 +59,7 @@ class Batsim(object):
 
     def wake_me_up_at(self, time):
         self._events_to_send.append({
-                "timestamp": self.time,
+                "timestamp": self.time(),
                 "type": "CALL_ME_LATER",
                 "data": {"timestamp": time}
             }
@@ -76,7 +76,7 @@ class Batsim(object):
 
         for (job, (first_res, last_res)) in allocs:
             self._events_to_send.append({
-                    "timestamp": self.time,
+                    "timestamp": self.time(),
                     "type": "EXEC",
                     "data": {
                         "job_id": job.id,
@@ -89,7 +89,7 @@ class Batsim(object):
     def start_jobs(self, jobs, res):
         for job in jobs:
             self._events_to_send.append({
-                    "timestamp": self.time,
+                    "timestamp": self.time(),
                     "type": "EXEC",
                     "data": {
                         "job_id": job.id,
@@ -109,7 +109,7 @@ class Batsim(object):
     def request_consumed_energy(self):
         self._events_to_send.append(
             {
-                "timestamp": self.time,
+                "timestamp": self.time(),
                 "type": "QUERY_REQUEST",
                 "data": {
                     "requests": {"consumed_energy": {}}
@@ -229,7 +229,7 @@ class Batsim(object):
         if len(self._events_to_send) > 0:
             # sort msgs by timestamp
             self._events_to_send = sorted(
-                self._events_to_send, key=lambda event: event['timestamp'])
+                self._events_to_send, key=lambda event: event['timestamp'))
 
         new_msg = {
             "now": self._current_time,
