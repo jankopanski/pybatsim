@@ -5,6 +5,7 @@ import json
 import redis
 import sys
 import zmq
+from operator import attrgetter
 
 
 class Batsim(object):
@@ -60,7 +61,7 @@ class Batsim(object):
         self._events_to_send.append({
                 "timestamp": self.time,
                 "type": "CALL_ME_LATER",
-                "data": {"timestamp": str(time)}
+                "data": {"timestamp": time}
             }
         )
 
@@ -171,9 +172,6 @@ class Batsim(object):
         while cont:
             cont = self.do_next_event()
 
-    def _time_to_str(self, t):
-        return('%.*f' % (6, t))
-
     def _read_bat_msg(self):
         msg = json.loads(self._connection.recv().decode('utf-8'))
 
@@ -230,10 +228,11 @@ class Batsim(object):
 
         if len(self._events_to_send) > 0:
             # sort msgs by timestamp
-            self._events_to_send = sorted(self._events_to_send, key="timestamp")
+            self._events_to_send = sorted(
+                self._events_to_send, key=attrgetter('timestamp'))
 
         new_msg = {
-            "now": float(self._time_to_str(self._current_time)),
+            "now": self._current_time,
             "events": self._events_to_send
         }
         if self.verbose > 0:
