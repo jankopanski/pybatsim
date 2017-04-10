@@ -195,7 +195,7 @@ class Batsim(object):
             elif event_type == "JOB_COMPLETED":
                 job_id = event_data["job_id"]
                 j = self.jobs[job_id]
-                j.finish_time = event["data"]["timestamp"]
+                j.finish_time = event["timestamp"]
                 self.scheduler.onJobCompletion(j)
             elif event_type == "RESOURCE_STATE_CHANGED":
                 nodes = event_data["resources"].split("-")
