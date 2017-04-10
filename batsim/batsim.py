@@ -16,6 +16,7 @@ class Batsim(object):
                  socket_endpoint='tcp://*:28000', verbose=0):
         self.socket_endpoint = socket_endpoint
         self.verbose = verbose
+        self.redis_enabled = redis_enabled
 
         if redis_enabled:
             self.redis = DataStorage(redis_prefix, redis_hostname, redis_port)
