@@ -11,12 +11,15 @@ class Batsim(object):
 
     def __init__(self, scheduler, redis_prefix='default',
                  redis_hostname='localhost', redis_port=6379,
+                 redis_enabled=True,
                  validatingmachine=None,
                  socket_endpoint='tcp://*:28000', verbose=0):
         self.socket_endpoint = socket_endpoint
         self.verbose = verbose
 
-        self.redis = DataStorage(redis_prefix, redis_hostname, redis_port)
+        if redis_enabled:
+            self.redis = DataStorage(redis_prefix, redis_hostname, redis_port)
+
         self.jobs = dict()
 
         sys.setrecursionlimit(10000)
@@ -53,7 +56,12 @@ class Batsim(object):
         return self._current_time
 
     def wake_me_up_at(self, time):
-        self._msgs_to_send.append((self.time(), "n:" + str(time)))
+        self._msgs_to_send.append({
+                "timestamp": self.time,
+                "type": "CALL_ME_LATER",
+                "data": {"timestamp": str(time)}
+            }
+        )
 
     def start_jobs_continuous(self, allocs):
         """
@@ -84,6 +92,13 @@ class Batsim(object):
                 msg = msg[:-1] + ";"
             msg = msg[:-1]  # remove last semicolon
             self._msgs_to_send.append((self.time(), msg))
+
+    def get_job(self, event):
+        if self.redis_enabled:
+            job = self.redis.get_job(event["data"]["job_id"])
+        else:
+            job = event["data"]["job"]
+        return job
 
     def request_consumed_energy(self):
         self._msgs_to_send.append((self.time(), "E"))
@@ -145,81 +160,70 @@ class Batsim(object):
         return('%.*f' % (6, t))
 
     def _read_bat_msg(self):
-        msg = self._connection.recv().decode('utf-8')
+        msg = json.loads(self._connection.recv().decode('utf-8'))
 
         if self.verbose > 0:
-            print('[BATSIM]: from batsim (%r) : %r' % (msg,))
-        sub_msgs = msg.split('|')
-        data = sub_msgs[0].split(":")
-        version = int(data[0])
-        self.last_msg_recv_time = float(data[1])
-        self._current_time = float(data[1])
+            print('[PYBATSIM]: BATSIM ---> DECISION\n {}'.format(
+                json.dumps(msg, ident=2))
+            )
 
-        if self.verbose > 1:
-            print("[BATSIM]: version: %r  now: %r" % (version, self.time()))
+        self._current_time = msg["now"]
 
-        # [ (timestamp, txtDATA), ...]
+        if msg["events"] is []:
+            # No events in the message
+            self.scheduler.onNOP()
+            self.last_msg_recv_time = msg["events"][-1].timestamp
+
         self._msgs_to_send = []
-
-        # TODO: handle Z, f and F messages.
 
         finished_received = False
 
-        for i in range(1, len(sub_msgs)):
-            data = sub_msgs[i].split(':')
-            if data[1] == 'A':
-                self.nb_res = int(self.redis.get('nb_res'))
-            elif data[1] == 'Z':
+        for event in msg["events"]:
+            event_type = event["type"]
+            event_data = event.get("data", {})
+            if event_type == "SIMULATION_BEGINS":
+                self.nb_res = event_data["nb_resources"]
+            elif event_type == "SIMULATION_ENDS":
                 print("All jobs have been submitted and completed!")
                 finished_received = True
-            elif data[1] == 'R':
-                self.scheduler.onJobRejection()
-            elif data[1] == 'N':
-                self.scheduler.onNOP()
-            elif data[1] == 'S':
+            elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
-                job_id = data[2]
-                self.jobs[job_id] = self.redis.get_job(job_id)
+                job_id = event_data["job_id"]
+                self.jobs[job_id] = self.get_job_from_event(event)
                 self.scheduler.onJobSubmission(self.jobs[job_id])
                 self.nb_jobs_received += 1
-            elif data[1] == 'C':
-                job_id = data[2]
+            elif event_type == "JOB_COMPLETED":
+                job_id = event_data["job_id"]
                 j = self.jobs[job_id]
-                j.finish_time = float(data[0])
+                j.finish_time = event["data"]["timestamp"]
                 self.scheduler.onJobCompletion(j)
-            elif data[1] == 'p':
-                opts = data[2].split('=')
-                nodes = opts[0].split("-")
+            elif event_type == "RESOURCE_STATE_CHANGED":
+                nodes = event_data["resources"].split("-")
                 if len(nodes) == 1:
                     nodeInterval = (int(nodes[0]), int(nodes[0]))
                 elif len(nodes) == 2:
                     nodeInterval = (int(nodes[0]), int(nodes[1]))
                 else:
-                    raise Exception("Not supported")
+                    raise Exception("Multiple intervals are not supported")
                 self.scheduler.onMachinePStateChanged(
-                    nodeInterval, int(opts[1]))
-            elif data[1] == 'e':
-                consumed_energy = float(data[2])
+                    nodeInterval, event_data["state"])
+            elif event_type == "QUERY_REPLY":
+                consumed_energy = event_data["consumed_energy"]
                 self.scheduler.onReportEnergyConsumed(consumed_energy)
-            elif data[1] == 'J' or data[1] == 'P' or data[1] == 'E':
-                raise Exception(
-                    "Only the server can receive this kind of message")
             else:
-                raise Exception("Unknow submessage type " + data[1])
+                raise Exception("Unknow event type {}".format(event_type))
 
-        msg = "0:" + self._time_to_str(self._current_time) + "|"
         if len(self._msgs_to_send) > 0:
             # sort msgs by timestamp
-            self._msgs_to_send = sorted(self._msgs_to_send, key=lambda m: m[0])
-            for m in self._msgs_to_send:
-                msg += self._time_to_str(m[0]) + ":" + m[1] + "|"
-            msg = msg[:-1]  # remove the last "|"
-        else:
-            msg += self._time_to_str(self.time()) + ":N"
+            self._msgs_to_send = sorted(self._msgs_to_send, key="timestamp")
 
+        new_msg = {
+            "now": float(self._time_to_str(self._current_time)),
+            "events": self._msgs_to_send
+        }
         if self.verbose > 0:
-            print("[BATSIM]:  to  batsim : %r" % msg)
-        self._connection.send(msg.encode())
+            print("[PYBATSIM]: BATSIM ---> DECISION\n {}".format(new_msg))
+        self._connection.send_string(json.dumps(new_msg))
         return not finished_received
 
 
@@ -278,9 +282,6 @@ class BatsimScheduler(object):
     def onAfterBatsimInit(self):
         # You now have access to self.bs and all other functions
         pass
-
-    def onJobRejection(self):
-        raise Exception("not implemented")
 
     def onNOP(self):
         raise Exception("not implemented")
