@@ -5,7 +5,6 @@ import json
 import redis
 import sys
 import zmq
-from operator import attrgetter
 
 
 class Batsim(object):
@@ -136,8 +135,8 @@ class Batsim(object):
 
     # def change_pstate_merge(self, new_pstate, first_node, last_node):
     #     """
-    #     if the previous call of change_pstate_merge had the same new_pstate and
-    #     old.last_node+1 == new.first_node, then we merge the requests.
+    #     if the previous call of change_pstate_merge had the same new_pstate
+    #     and old.last_node+1 == new.first_node, then we merge the requests.
     #     """
     #     part = None
     #     if len(self._events_to_send) > 0:
@@ -229,7 +228,7 @@ class Batsim(object):
         if len(self._events_to_send) > 0:
             # sort msgs by timestamp
             self._events_to_send = sorted(
-                self._events_to_send, key=lambda event: event['timestamp'))
+                self._events_to_send, key=lambda event: event['timestamp'])
 
         new_msg = {
             "now": self._current_time,
