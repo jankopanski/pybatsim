@@ -56,7 +56,7 @@ class Batsim(object):
         return self._current_time
 
     def wake_me_up_at(self, time):
-        self._msgs_to_send.append({
+        self._events_to_send.append({
                 "timestamp": self.time,
                 "type": "CALL_ME_LATER",
                 "data": {"timestamp": str(time)}
@@ -69,29 +69,33 @@ class Batsim(object):
         [ (job, (first res, last res)), (job, (first res, last res)), ...]
         """
 
-        if len(allocs) > 0:
+        if len(allocs) == 0:
+            return
 
-            msg = "J:"
-            for (job, (first_res, last_res)) in allocs:
-                self.nb_jobs_scheduled += 1
-                msg += str(job.id) + "=" + str(first_res) + \
-                    "-" + str(last_res) + ";"
-
-            msg = msg[:-1]  # remove last semicolon
-            self._msgs_to_send.append((self.time(), msg))
+        for (job, (first_res, last_res)) in allocs:
+            self._events_to_send.append({
+                    "timestamp": self.time,
+                    "type": "EXEC",
+                    "data": {
+                        "job_id": job.id,
+                        "alloc": "{}-{}".format(first_res, last_res)
+                    }
+                }
+            )
+            self.nb_jobs_scheduled += 1
 
     def start_jobs(self, jobs, res):
-        if len(jobs) > 0:
-            msg = "J:"
-            for j in jobs:
-                self.nb_jobs_scheduled += 1
-                msg += str(j.id) + "="
-                for r in res[j.id]:
-                    msg += str(r) + ","
-                # replace last comma by a semicolon separator between jobs
-                msg = msg[:-1] + ";"
-            msg = msg[:-1]  # remove last semicolon
-            self._msgs_to_send.append((self.time(), msg))
+        for job in jobs:
+            self._events_to_send.append({
+                    "timestamp": self.time,
+                    "type": "EXEC",
+                    "data": {
+                        "job_id": job.id,
+                        "alloc": " ".join(res[job.id])
+                    }
+                }
+            )
+            self.nb_jobs_scheduled += 1
 
     def get_job(self, event):
         if self.redis_enabled:
@@ -101,52 +105,62 @@ class Batsim(object):
         return job
 
     def request_consumed_energy(self):
-        self._msgs_to_send.append((self.time(), "E"))
+        self._events_to_send.append(
+            {
+                "timestamp": self.time,
+                "type": "QUERY_REQUEST",
+                "data": {
+                    "requests": {"consumed_energy": {}}
+                }
+            }
+        )
 
-    def change_pstates(self, pstates_to_change):
-        """
-        should be [ (new_pstate, (first_node, last_node)),  ...]
-        """
-        if len(pstates_to_change) > 0:
-            parts = []
-            for (new_pstate, (ps, pe)) in pstates_to_change:
-                if ps == pe:
-                    parts.append(str(ps) + "=" + str(new_pstate))
-                else:
-                    parts.append(str(ps) + "-" + str(pe) +
-                                 "=" + str(new_pstate))
-            for part in parts:
-                self._msgs_to_send.append((self.time(), "P:" + part))
+    # def change_pstates(self, pstates_to_change):
+    #     """
+    #     should be [ (new_pstate, (first_node, last_node)),  ...]
+    #     """
+    #     if len(pstates_to_change) == 0:
+    #         return
 
-    def change_pstate_merge(self, new_pstate, first_node, last_node):
-        """
-        if the previous call of change_pstate_merge had the same new_pstate and
-        old.last_node+1 == new.first_node, then we merge the requests.
-        """
-        part = None
-        if len(self._msgs_to_send) > 0:
-            last_msg = self._msgs_to_send[-1]
-            if last_msg[0] == self.time():
-                resInter = re.split(
-                    "P:([0-9]+)-([0-9]+)=([0-9]+)", last_msg[1])
-                resUniq = re.split("P:([0-9]+)=([0-9]+)", last_msg[1])
-                if (len(resInter) == 5
-                        and int(resInter[3]) == new_pstate
-                        and int(resInter[2]) + 1 == first_node):
-                    self._msgs_to_send.pop(-1)
-                    part = str(resInter[1]) + "-" + \
-                        str(last_node) + "=" + str(new_pstate)
-                elif (len(resUniq) == 4
-                        and int(resUniq[2]) == new_pstate
-                        and int(resUniq[1]) + 1 == first_node):
-                    self._msgs_to_send.pop(-1)
-                    part = str(resUniq[1]) + "-" + \
-                        str(last_node) + "=" + str(new_pstate)
-        if part is None:
-            part = str(first_node) + "-" + \
-                str(last_node) + "=" + str(new_pstate)
+    #     parts = []
+    #     for (new_pstate, (first_res, last_res)) in pstates_to_change:
+    #         if first_res == last_res:
+    #             parts.append(str(first_res) + "=" + str(new_pstate))
+    #         else:
+    #             parts.append(str(first_res) + "-" + str(last_res) +
+    #                          "=" + str(new_pstate))
+    #     for part in parts:
+    #         self._events_to_send.append((self.time(), "P:" + part))
 
-        self._msgs_to_send.append((self.time(), "P:" + part))
+    # def change_pstate_merge(self, new_pstate, first_node, last_node):
+    #     """
+    #     if the previous call of change_pstate_merge had the same new_pstate and
+    #     old.last_node+1 == new.first_node, then we merge the requests.
+    #     """
+    #     part = None
+    #     if len(self._events_to_send) > 0:
+    #         last_msg = self._events_to_send[-1]
+    #         if last_msg[0] == self.time():
+    #             resInter = re.split(
+    #                 "P:([0-9]+)-([0-9]+)=([0-9]+)", last_msg[1])
+    #             resUniq = re.split("P:([0-9]+)=([0-9]+)", last_msg[1])
+    #             if (len(resInter) == 5
+    #                     and int(resInter[3]) == new_pstate
+    #                     and int(resInter[2]) + 1 == first_node):
+    #                 self._events_to_send.pop(-1)
+    #                 part = str(resInter[1]) + "-" + \
+    #                     str(last_node) + "=" + str(new_pstate)
+    #             elif (len(resUniq) == 4
+    #                     and int(resUniq[2]) == new_pstate
+    #                     and int(resUniq[1]) + 1 == first_node):
+    #                 self._events_to_send.pop(-1)
+    #                 part = str(resUniq[1]) + "-" + \
+    #                     str(last_node) + "=" + str(new_pstate)
+    #     if part is None:
+    #         part = str(first_node) + "-" + \
+    #             str(last_node) + "=" + str(new_pstate)
+
+    #     self._events_to_send.append((self.time(), "P:" + part))
 
     def do_next_event(self):
         return self._read_bat_msg()
@@ -174,7 +188,7 @@ class Batsim(object):
             self.scheduler.onNOP()
             self.last_msg_recv_time = msg["events"][-1].timestamp
 
-        self._msgs_to_send = []
+        self._events_to_send = []
 
         finished_received = False
 
@@ -213,13 +227,13 @@ class Batsim(object):
             else:
                 raise Exception("Unknow event type {}".format(event_type))
 
-        if len(self._msgs_to_send) > 0:
+        if len(self._events_to_send) > 0:
             # sort msgs by timestamp
-            self._msgs_to_send = sorted(self._msgs_to_send, key="timestamp")
+            self._events_to_send = sorted(self._events_to_send, key="timestamp")
 
         new_msg = {
             "now": float(self._time_to_str(self._current_time)),
-            "events": self._msgs_to_send
+            "events": self._events_to_send
         }
         if self.verbose > 0:
             print("[PYBATSIM]: BATSIM ---> DECISION\n {}".format(new_msg))
