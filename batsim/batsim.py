@@ -86,13 +86,15 @@ class Batsim(object):
             self.nb_jobs_scheduled += 1
 
     def start_jobs(self, jobs, res):
+        """ args:res: is list of int (resources ids) """
         for job in jobs:
             self._events_to_send.append({
                     "timestamp": self.time(),
                     "type": "EXECUTE_JOB",
                     "data": {
                         "job_id": job.id,
-                        "alloc": " ".join(str(res[job.id]))
+                        # FixMe do not send "[9]"
+                        "alloc": " ".join(map(str, res[job.id]))
                     }
                 }
             )
