@@ -1,5 +1,5 @@
-from easyBackfill import *
-from intervalContainer import *
+from schedulers.easyBackfill import *
+from schedulers.intervalContainer import *
 import math
 
 from enum import Enum
@@ -481,26 +481,26 @@ def nodes_states_SwitchingON_SwitchedON(self, start, end, fromState, toState):
     pass
 
 
-def nodes_states_SwitchedON_WantingToStartJob((self, alloc), start, end, fromState, toState):
+def nodes_states_SwitchedON_WantingToStartJob(self, alloc, start, end, fromState, toState):
     # wait job
     self.add_alloc_to_waiting_allocs(alloc)
     # changeState to SwitchedON
     self.nodes_states.changeState(start, end, State.SwitchedON, self)
 
 
-def nodes_states_SwitchingOFF_WantingToStartJob((self, alloc), start, end, fromState, toState):
+def nodes_states_SwitchingOFF_WantingToStartJob(self, alloc, start, end, fromState, toState):
     # wait job
     self.add_alloc_to_waiting_allocs(alloc)
 
 
-def nodes_states_SwitchedOFF_WantingToStartJob((self, alloc), start, end, fromState, toState):
+def nodes_states_SwitchedOFF_WantingToStartJob(self, alloc, start, end, fromState, toState):
     # send ON
     self.bs.change_pstate_merge(self.pstate_switchon, start, end)
     # wait job
     self.add_alloc_to_waiting_allocs(alloc)
 
 
-def nodes_states_SwitchingON_WantingToStartJob((self, alloc), start, end, fromState, toState):
+def nodes_states_SwitchingON_WantingToStartJob(self, alloc, start, end, fromState, toState):
     # wait job
     self.add_alloc_to_waiting_allocs(alloc)
 

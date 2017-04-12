@@ -1,47 +1,33 @@
 import subprocess
 import os
-import time
 import sys
-import random
 import json
 
 
-def socket_in_use(sock):
-    return sock in open('/proc/net/unix').read()
-
-
-def wait_for_batsim_to_open_connection(sock, timeout=99999999999):
-    while timeout > 0 and not socket_in_use(sock):
-        time.sleep(0.1)
-        timeout -= 0.1
-    return timeout > 0
-
-
-def prepare_batsim_cl(options, sock):
+def prepare_batsim_cl(options):
     batsim_cl = [options["batsim_bin"]]
 
-    batsim_cl.append('-e')
+    batsim_cl.append('--export')
     batsim_cl.append(options["output_dir"] + "/" + options["batsim"]["export"])
 
     if options["batsim"]["energy-plugin"]:
-        batsim_cl.append('-p')
+        batsim_cl.append('--energy')
 
     if options["batsim"]["disable-schedule-tracing"]:
-        batsim_cl.append('-T')
+        batsim_cl.append('--disable-schedule-tracing')
 
-    batsim_cl.append('-v')
+    batsim_cl.append('--verbosity')
     batsim_cl.append(options["batsim"]["verbosity"])
 
-    batsim_cl.append('-s')
-    batsim_cl.append(sock)
-
+    batsim_cl.append('--platform')
     batsim_cl.append(options["platform"])
+    batsim_cl.append('--workload')
     batsim_cl.append(options["workload"])
 
     return batsim_cl
 
 
-def prepare_pybatsim_cl(options, sock):
+def prepare_pybatsim_cl(options):
     interpreter = ["python"]
     if 'interpreter' in options["scheduler"]:
         if options["scheduler"]["interpreter"] == "coverage":
@@ -60,9 +46,6 @@ def prepare_pybatsim_cl(options, sock):
 
     sched_cl.append(options["workload"])
 
-    sched_cl.append("-s")
-    sched_cl.append(sock)
-
     sched_cl.append("-o")
     # no need to sanitize the json : each args are given as args in popen
     sched_cl.append(json.dumps(options["scheduler"]["options"]))
@@ -79,16 +62,15 @@ def launch_expe(options, verbose=True):
     if options["output_dir"] == "SELF":
         options["output_dir"] = os.path.dirname("./" + options["options_file"])
 
-    # does an another batsim is in use?
-    sock = '/tmp/bat_socket_' + str(random.randint(0, 2147483647))
-    while socket_in_use(sock):
-        sock = '/tmp/bat_socket_' + str(random.randint(0, 2147483647))
+    # use batsim in the PATH if it is not given in option
+    if "batsim_bin" not in options:
+        options["batsim_bin"] = "batsim"
 
-    batsim_cl = prepare_batsim_cl(options, sock)
+    batsim_cl = prepare_batsim_cl(options)
     batsim_stdout_file = open(options["output_dir"] + "/batsim.stdout", "w")
     batsim_stderr_file = open(options["output_dir"] + "/batsim.stderr", "w")
 
-    sched_cl = prepare_pybatsim_cl(options, sock)
+    sched_cl = prepare_pybatsim_cl(options)
     sched_stdout_file = open(options["output_dir"] + "/sched.stdout", "w")
     sched_stderr_file = open(options["output_dir"] + "/sched.stderr", "w")
 
@@ -97,20 +79,16 @@ def launch_expe(options, verbose=True):
         print(" ".join(batsim_cl + [">", str(batsim_stdout_file.name), "2>",
                                     str(batsim_stderr_file.name)]))
     batsim_exec = subprocess.Popen(
-        batsim_cl, stdout=batsim_stdout_file, stderr=batsim_stderr_file, shell=False)
-
-    print("Waiting batsim initialization")
-    success = wait_for_batsim_to_open_connection(sock, 20)
-    if not success:
-        assert False, "error on batsim"
-        exit()
+        batsim_cl, stdout=batsim_stdout_file, stderr=batsim_stderr_file,
+        shell=True)
 
     print("Starting scheduler")
     if verbose:
         print(" ".join(sched_cl + [">", str(sched_stdout_file.name), "2>",
                                    str(sched_stderr_file.name)]))
     sched_exec = subprocess.Popen(
-        sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file, shell=False)
+        sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file,
+        shell=True)
 
     print("Wait for the scheduler")
     sched_exec.wait()
