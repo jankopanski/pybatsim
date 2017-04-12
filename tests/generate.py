@@ -1,13 +1,8 @@
-
-import os, json, copy
-import glob
-
-
+import os
+import json
+import copy
 
 schedulers = []
-
-
-
 
 budgets = [0, 2, 0.5]
 
@@ -42,7 +37,7 @@ schedulers += [{
             "timeto_switchoff": 5,
             "timeto_switchon": 25
             }
-        } for b in budgets for allow in [(True, False), (True, True), (False, True)] for shut in [True,False]]
+        } for b in budgets for allow in [(True, False), (True, True), (False, True)] for shut in [True, False]]
 
 
 budgets = [1000*7*30+30*3*70, 1000*7*30]
@@ -68,7 +63,7 @@ schedulers += [{
             "timeto_switchoff": 5,
             "timeto_switchon": 25
             }
-        } for b in budgets for allow in [(True, False), (True, True), (False, True)] for shut in [True,False]]
+        } for b in budgets for allow in [(True, False), (True, True), (False, True)] for shut in [True, False]]
 
 
 
@@ -76,35 +71,31 @@ schedulers += [{
 workloads_to_use = ["../../workload_profiles/stupid.json"]
 
 options = [{
-    "platform":"../../platforms/energy_platform_homogeneous_no_net.xml",
+    "batsim_bin": "docker run batsim:dev",
+    "platform": "../../platforms/energy_platform_homogeneous_no_net.xml",
     "workload": w,
-    "output_dir":"SELF",#where all output files (stdins, stderrs, csvs...) will be outputed.
-                        #if set to "SELF" then output on the same dir as this option file.
+    "output_dir": "SELF",       # where all output files (stdins, stderrs, csvs...) will be outputed.
+                                # if set to "SELF" then output on the same dir as this option file.
     "batsim": {
-        "export":"out",# The export filename prefix used to generate simulation output
-        "energy-plugin": True,#        Enables energy-aware experiments
-        "disable-schedule-tracing": True,#remove paje output
-        "verbosity": "information"  #Sets the Batsim verbosity level. Available values
+        "export": "out",        # The export filename prefix used to generate simulation output
+        "energy-plugin": True,  # Enables energy-aware experiments
+        "disable-schedule-tracing": True,  # remove paje output
+        "verbosity": "information"  # Sets the Batsim verbosity level. Available values
                                     # are : quiet, network-only, information (default), debug.
         },
     "scheduler": copy.deepcopy(s)
     } for s in schedulers for w in workloads_to_use]
 
 
-
-
-
 for opt in options:
     opt["scheduler"]["name_expe"] += "_"+os.path.splitext(os.path.basename(opt["workload"]))[0]
-    
+
     new_dir = "tests/"+opt["scheduler"]["name_expe"]
-    print new_dir
+    print(new_dir)
     try:
         os.mkdir(new_dir)
     except OSError:
-        print "ALREADY HERE"
+        print("ALREADY HERE")
         pass
-    #print json.dumps(opt, indent=4)
-    open(new_dir+'/expe.json','w').write(json.dumps(opt, indent=4))
-
-
+    # print json.dumps(opt, indent=4)
+    open(new_dir+'/expe.json', 'w').write(json.dumps(opt, indent=4))

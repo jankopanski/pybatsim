@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import re
-import os.path as op
-
-
-from codecs import open
+import sys
+import os
 from setuptools import setup, find_packages
 
 requirements = [
@@ -13,12 +10,23 @@ requirements = [
     "redis"
 ]
 
-version = '1.0'
+if sys.argv[-1] == 'test':
+    test_requirements = [
+        'coverage'
+    ]
+    try:
+        modules = map(__import__, test_requirements)
+    except ImportError as e:
+        err_msg = e.message.replace("No module named ", "")
+        msg = "%s is not installed. Install your test requirments." % err_msg
+        raise ImportError(msg)
+    os.system('cd tests; make')
+    sys.exit()
 
 setup(
     name='pybatsim',
     author="David Glesser",
-    version=version,
+    version=1.0,
     url='git@gitlab.inria.fr:batsim/pybatsim.git',
     packages=find_packages(),
     install_requires=requirements,
