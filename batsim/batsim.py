@@ -239,6 +239,10 @@ class Batsim(object):
         if self.verbose > 0:
             print("[PYBATSIM]: BATSIM ---> DECISION\n {}".format(new_msg))
         self._connection.send_string(json.dumps(new_msg))
+
+        if finished_received:
+            self._connection.close()
+
         return not finished_received
 
 
