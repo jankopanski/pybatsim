@@ -25,9 +25,10 @@ if sys.argv[-1] == 'test':
 
 setup(
     name='pybatsim',
-    author="David Glesser",
+    author="Michael Mercier",
+    author_email="michael.mercier@inria.fr",
     version=1.0,
-    url='git@gitlab.inria.fr:batsim/pybatsim.git',
+    url='https://gitlab.inria.fr/batsim/pybatsim',
     packages=find_packages(),
     install_requires=requirements,
     include_package_data=True,
@@ -36,7 +37,6 @@ setup(
     keywords='Scheduler',
     classifiers=[
         'Development Status :: 4 - Beta',
-        'Programming Language :: Python',
         'Programming Language :: Python :: 3',
         'Topic :: System :: Clustering',
     ]
