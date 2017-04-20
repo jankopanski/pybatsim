@@ -43,7 +43,7 @@ class Batsim(object):
         self.nb_jobs_scheduled = 0
 
         self.scheduler.bs = self
-
+        #import pdb; pdb.set_trace()
         # Wait the "simulation starts" message to read the number of machines
         self._read_bat_msg()
 
@@ -271,6 +271,13 @@ class DataStorage(object):
                    json_dict["walltime"],
                    json_dict["res"],
                    json_dict["profile"])
+    
+    def set_job(self, job_id, subtime, walltime, res):
+        real_key = '{iprefix}:{ukey}'.format(iprefix = self.prefix,
+                                             ukey = job_id)
+        json_job =  json.dumps({"id": job_id, "subtime": subtime,
+                                "walltime": walltime, "res": res})
+        self.redis.set(real_key, json_job)
 
 
 class Job(object):
