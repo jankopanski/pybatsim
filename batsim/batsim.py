@@ -224,6 +224,9 @@ class Batsim(object):
             elif event_type == "QUERY_REPLY":
                 consumed_energy = event_data["consumed_energy"]
                 self.scheduler.onReportEnergyConsumed(consumed_energy)
+            elif event_type == 'REQUESTED_CALL':
+                self.scheduler.onNOP()
+                # TODO: separate NOP / REQUESTED_CALL (here and in the algos)
             else:
                 raise Exception("Unknow event type {}".format(event_type))
 
