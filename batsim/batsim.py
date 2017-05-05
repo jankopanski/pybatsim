@@ -37,8 +37,6 @@ class Batsim(object):
         self._connection.bind(self.socket_endpoint)
 
         # initialize some public attributes
-        self.last_msg_recv_time = -1
-
         self.nb_jobs_received = 0
         self.nb_jobs_scheduled = 0
 
@@ -186,7 +184,6 @@ class Batsim(object):
         if msg["events"] is []:
             # No events in the message
             self.scheduler.onNOP()
-            self.last_msg_recv_time = msg["events"][-1].timestamp
 
         self._events_to_send = []
 
