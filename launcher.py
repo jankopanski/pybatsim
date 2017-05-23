@@ -10,22 +10,17 @@ Options:
     -v --verbose                        Be verbose.
     -p --protect                        Protect the scheduler using a validating machine.
     -s --socket-endpoint=<endpoint>     Batsim socket endpoint to use [default: tcp://*:28000]
-    --redis-hostname=<hostname>         Redis server hostname [default: 127.0.0.1]
-    --redis-port=<port>                 Redis server port number [default: 6379]
-    --redis-prefix=<prefix>             Redis prefix [default: default]
     -o --options=<options_string>       A Json string to pass to the scheduler [default: {}]
 '''
 
-
-from batsim.docopt import docopt
-import sys
 import json
+import sys
 import time
-from batsim.batsim import Batsim
-from batsim.validatingmachine import ValidatingMachine
-
-
 from datetime import timedelta
+
+from batsim.batsim import Batsim
+from batsim.docopt import docopt
+from batsim.validatingmachine import ValidatingMachine
 
 
 def module_to_class(module):
@@ -76,11 +71,6 @@ if __name__ == "__main__":
     scheduler_filename = arguments['<scheduler>']
     socket_endpoint = arguments['--socket-endpoint']
 
-    # Redis
-    redis_hostname = str(arguments['--redis-hostname'])
-    redis_port = int(arguments['--redis-port'])
-    redis_prefix = str(arguments['--redis-prefix'])
-
     print("Starting simulation...")
     print("Scheduler:", scheduler_filename)
     print("Options:", options)
@@ -90,10 +80,7 @@ if __name__ == "__main__":
     bs = Batsim(scheduler,
                 validatingmachine=vm,
                 socket_endpoint=socket_endpoint,
-                verbose=verbose,
-                redis_hostname=redis_hostname,
-                redis_port=redis_port,
-                redis_prefix=redis_prefix)
+                verbose=verbose)
 
     bs.start()
     time_ran = str(timedelta(seconds=time.time() - time_start))

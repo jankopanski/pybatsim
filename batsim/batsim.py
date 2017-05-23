@@ -1,25 +1,20 @@
 from __future__ import print_function
 
 import json
-# import re
-import redis
 import sys
+
+import redis
+
 import zmq
 
 
 class Batsim(object):
 
-    def __init__(self, scheduler, redis_prefix='default',
-                 redis_hostname='localhost', redis_port=6379,
-                 redis_enabled=True,
+    def __init__(self, scheduler,
                  validatingmachine=None,
                  socket_endpoint='tcp://*:28000', verbose=0):
         self.socket_endpoint = socket_endpoint
         self.verbose = verbose
-        self.redis_enabled = redis_enabled
-
-        if redis_enabled:
-            self.redis = DataStorage(redis_prefix, redis_hostname, redis_port)
 
         self.jobs = dict()
 
@@ -41,7 +36,7 @@ class Batsim(object):
         self.nb_jobs_scheduled = 0
 
         self.scheduler.bs = self
-        #import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         # Wait the "simulation starts" message to read the number of machines
         self._read_bat_msg()
 
@@ -55,12 +50,10 @@ class Batsim(object):
         return self._current_time
 
     def wake_me_up_at(self, time):
-        self._events_to_send.append({
-                "timestamp": self.time(),
-                "type": "CALL_ME_LATER",
-                "data": {"timestamp": time}
-            }
-        )
+        self._events_to_send.append(
+            {"timestamp": self.time(),
+             "type": "CALL_ME_LATER",
+             "data": {"timestamp": time}})
 
     def start_jobs_continuous(self, allocs):
         """
@@ -73,13 +66,13 @@ class Batsim(object):
 
         for (job, (first_res, last_res)) in allocs:
             self._events_to_send.append({
-                    "timestamp": self.time(),
-                    "type": "EXECUTE_JOB",
-                    "data": {
+                "timestamp": self.time(),
+                "type": "EXECUTE_JOB",
+                "data": {
                         "job_id": job.id,
                         "alloc": "{}-{}".format(first_res, last_res)
-                    }
                 }
+            }
             )
             self.nb_jobs_scheduled += 1
 
@@ -87,14 +80,14 @@ class Batsim(object):
         """ args:res: is list of int (resources ids) """
         for job in jobs:
             self._events_to_send.append({
-                    "timestamp": self.time(),
-                    "type": "EXECUTE_JOB",
-                    "data": {
+                "timestamp": self.time(),
+                "type": "EXECUTE_JOB",
+                "data": {
                         "job_id": job.id,
                         # FixMe do not send "[9]"
                         "alloc": " ".join(map(str, res[job.id]))
-                    }
                 }
+            }
             )
             self.nb_jobs_scheduled += 1
 
@@ -102,7 +95,8 @@ class Batsim(object):
         if self.redis_enabled:
             job = self.redis.get_job(event["data"]["job_id"])
         else:
-            job = event["data"]["job"]
+            json_dict = event["data"]["job"]
+            job = Job.from_json_dict(json_dict)
         return job
 
     def request_consumed_energy(self):
@@ -194,6 +188,17 @@ class Batsim(object):
             event_data = event.get("data", {})
             if event_type == "SIMULATION_BEGINS":
                 self.nb_res = event_data["nb_resources"]
+                batconf = event_data["config"]
+
+                self.redis_enabled = batconf["redis"]["enabled"]
+                redis_hostname = batconf["redis"]["hostname"]
+                redis_port = batconf["redis"]["port"]
+                redis_prefix = batconf["redis"]["prefix"]
+
+                if self.redis_enabled:
+                    self.redis = DataStorage(redis_prefix, redis_hostname,
+                                             redis_port)
+
             elif event_type == "SIMULATION_ENDS":
                 print("All jobs have been submitted and completed!")
                 finished_received = True
@@ -263,20 +268,15 @@ class DataStorage(object):
 
     def get_job(self, job_id):
         key = 'job_{job_id}'.format(job_id=job_id)
-        job_str = self.get(key)
+        job_str = self.get(key).decode('utf-8')
 
-        json_dict = json.loads(job_str.decode('utf-8'))
-        return Job(json_dict["id"],
-                   json_dict["subtime"],
-                   json_dict["walltime"],
-                   json_dict["res"],
-                   json_dict["profile"])
-    
+        return Job.from_json_string(job_str)
+
     def set_job(self, job_id, subtime, walltime, res):
-        real_key = '{iprefix}:{ukey}'.format(iprefix = self.prefix,
-                                             ukey = job_id)
-        json_job =  json.dumps({"id": job_id, "subtime": subtime,
-                                "walltime": walltime, "res": res})
+        real_key = '{iprefix}:{ukey}'.format(iprefix=self.prefix,
+                                             ukey=job_id)
+        json_job = json.dumps({"id": job_id, "subtime": subtime,
+                               "walltime": walltime, "res": res})
         self.redis.set(real_key, json_job)
 
 
@@ -294,6 +294,19 @@ class Job(object):
         return("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4}>".format(
             self.id, self.submit_time, self.requested_resources,
             self.requested_time, self.profile))
+
+    @staticmethod
+    def from_json_string(json_str):
+        json_dict = json.loads(json_str)
+        return Job.from_json_dict(json_dict)
+
+    @staticmethod
+    def from_json_dict(json_dict):
+        return Job(json_dict["id"],
+                   json_dict["subtime"],
+                   json_dict["walltime"],
+                   json_dict["res"],
+                   json_dict["profile"])
     # def __eq__(self, other):
         # return self.id == other.id
     # def __ne__(self, other):
