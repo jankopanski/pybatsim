@@ -27,7 +27,7 @@ setup(
     name='pybatsim',
     author="Michael Mercier",
     author_email="michael.mercier@inria.fr",
-    version=1.0,
+    version=1.1,
     url='https://gitlab.inria.fr/batsim/pybatsim',
     packages=find_packages(),
     install_requires=requirements,
