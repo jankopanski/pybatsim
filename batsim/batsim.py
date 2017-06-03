@@ -282,13 +282,14 @@ class DataStorage(object):
 
 class Job(object):
 
-    def __init__(self, id, subtime, walltime, res, profile):
+    def __init__(self, id, subtime, walltime, res, profile, json_dict):
         self.id = id
         self.submit_time = subtime
         self.requested_time = walltime
         self.requested_resources = res
         self.profile = profile
         self.finish_time = None  # will be set on completion by batsim
+        self.json_dict = json_dict
 
     def __repr__(self):
         return("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4}>".format(
@@ -306,7 +307,8 @@ class Job(object):
                    json_dict["subtime"],
                    json_dict["walltime"],
                    json_dict["res"],
-                   json_dict["profile"])
+                   json_dict["profile"],
+                   json_dict)
     # def __eq__(self, other):
         # return self.id == other.id
     # def __ne__(self, other):
