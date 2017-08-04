@@ -91,6 +91,20 @@ class Batsim(object):
             )
             self.nb_jobs_scheduled += 1
 
+    def start_jobs_interval_set_strings(self, jobs, res):
+        """ args:res: is a jobID:interval_set_string dict """
+        for job in jobs:
+            self._events_to_send.append({
+                "timestamp": self.time(),
+                "type": "EXECUTE_JOB",
+                "data": {
+                        "job_id": job.id,
+                        "alloc": res[job.id]
+                }
+            }
+            )
+            self.nb_jobs_scheduled += 1
+
     def get_job(self, event):
         if self.redis_enabled:
             job = self.redis.get_job(event["data"]["job_id"])
