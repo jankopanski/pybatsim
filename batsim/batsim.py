@@ -163,6 +163,20 @@ class Batsim(object):
         self._events_to_send.append(msg)
         self.nb_jobs_submitted += 1
 
+    def set_resource_state(self, resources, state):
+        """ args:resources: is a list of resource numbers or intervals as strings (e.g. "1-5").
+            args:state: is a state identifier configured in the platform specification.
+        """
+
+        self._events_to_send.append({
+            "timestamp": self.time(),
+            "type": "SET_RESOURCE_STATE",
+            "data": {
+                    "resources": " ".join(resources),
+                    "state": state
+            }
+        })
+
     def start_jobs_interval_set_strings(self, jobs, res):
         """ args:res: is a jobID:interval_set_string dict """
         for job in jobs:
