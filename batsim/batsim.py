@@ -37,6 +37,7 @@ class Batsim(object):
         self.nb_jobs_received = 0
         self.nb_jobs_submitted = 0
         self.nb_jobs_killed = 0
+        self.nb_jobs_rejected = 0
         self.nb_jobs_scheduled = 0
         self.nb_jobs_completed = 0
         self.current_dyn_id = 0
@@ -114,6 +115,18 @@ class Batsim(object):
             }
             )
             self.nb_jobs_scheduled += 1
+
+    def reject_jobs(self, jobs):
+        """Reject the given jobs."""
+        for job in jobs:
+            self._events_to_send.append({
+                "timestamp": self.time(),
+                "type": "REJECT_JOB",
+                "data": {
+                        "job_id": job.id,
+                }
+            })
+            self.nb_jobs_rejected += 1
 
     def kill_jobs(self, jobs):
         """Kill the given jobs."""
