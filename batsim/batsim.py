@@ -391,20 +391,20 @@ class BatsimScheduler(object):
         pass
 
     def onNOP(self):
-        raise Exception("not implemented")
+        raise NotImplementedError()
 
     def onJobSubmission(self, job):
-        raise Exception("not implemented")
+        raise NotImplementedError()
 
     def onJobCompletion(self, job):
-        raise Exception("not implemented")
+        raise NotImplementedError()
 
     def onJobsKilled(self, jobs):
         for job in jobs:
             self.onJobCompletion(job)
 
     def onMachinePStateChanged(self, nodeid, pstate):
-        raise Exception("not implemented")
+        raise NotImplementedError()
 
     def onReportEnergyConsumed(self, consumed_energy):
-        raise Exception("not implemented")
+        raise NotImplementedError()
