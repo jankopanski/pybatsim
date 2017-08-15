@@ -35,8 +35,10 @@ class Batsim(object):
 
         # initialize some public attributes
         self.nb_jobs_received = 0
+        self.nb_jobs_submitted = 0
         self.nb_jobs_scheduled = 0
         self.nb_jobs_completed = 0
+        self.current_dyn_id = 0
 
         self.scheduler.bs = self
         # import pdb; pdb.set_trace()
@@ -111,6 +113,29 @@ class Batsim(object):
             }
             )
             self.nb_jobs_scheduled += 1
+
+    def submit_job(self, job_id, res, walltime, profile, job_id_prefix="dyn"):
+        job_id = self.current_dyn_id
+        self.current_dyn_id += 1
+        full_job_id = "{}!{}".format(job_id_prefix, job_id)
+
+        msg = {
+            "timestamp": self.time(),
+            "type": "SUBMIT_JOB",
+            "data": {
+                    "job_id": full_job_id,
+                    "job": {
+                        "profile": full_job_id,
+                        "id": job_id,
+                        "res": res,
+                        "walltime": walltime,
+                        "subtime": self.time(),
+                    },
+                    "profile": profile
+            }
+        }
+        self._events_to_send.append(msg)
+        self.nb_jobs_submitted += 1
 
     def start_jobs_interval_set_strings(self, jobs, res):
         """ args:res: is a jobID:interval_set_string dict """
