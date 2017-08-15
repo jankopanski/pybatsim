@@ -135,10 +135,9 @@ class Batsim(object):
             "timestamp": self.time(),
             "type": "KILL_JOB",
             "data": {
-                    "job_ids": [id for job in jobs],
+                    "job_ids": [job.id for job in jobs],
             }
         })
-        self.nb_jobs_killed += len(jobs)
 
     def submit_job(self, job_id, res, walltime, profile, job_id_prefix="dyn"):
         job_id = self.current_dyn_id
@@ -261,6 +260,9 @@ class Batsim(object):
                 self.jobs[job_id] = self.get_job(event)
                 self.scheduler.onJobSubmission(self.jobs[job_id])
                 self.nb_jobs_received += 1
+            elif event_type == "JOB_KILLED":
+                self.scheduler.onJobsKilled([self.jobs[jid] for jid in event_data["job_ids"]])
+                self.nb_jobs_killed += len(event_data["job_ids"])
             elif event_type == "JOB_COMPLETED":
                 job_id = event_data["job_id"]
                 j = self.jobs[job_id]
@@ -287,7 +289,7 @@ class Batsim(object):
                 raise Exception("Unknow event type {}".format(event_type))
 
         if self.handle_dynamic_notify and not finished_received:
-            if self.nb_jobs_completed == self.nb_jobs_scheduled:
+            if (self.nb_jobs_completed + self.nb_jobs_killed) == self.nb_jobs_scheduled:
                 self.notify_submission_finished()
             else:
                 self.notify_submission_continue()
@@ -392,6 +394,10 @@ class BatsimScheduler(object):
 
     def onJobCompletion(self, job):
         raise Exception("not implemented")
+
+    def onJobsKilled(self, jobs):
+        for job in jobs:
+            self.onJobCompletion(job)
 
     def onMachinePStateChanged(self, nodeid, pstate):
         raise Exception("not implemented")
