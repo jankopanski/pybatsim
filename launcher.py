@@ -85,8 +85,12 @@ if __name__ == "__main__":
     bs.start()
     time_ran = str(timedelta(seconds=time.time() - time_start))
     print("Simulation ran for: " + time_ran)
-    print("Job received:", bs.nb_jobs_received, ", scheduled:",
-          bs.nb_jobs_scheduled)
+    print("Job received:", bs.nb_jobs_received,
+            ", scheduled:", bs.nb_jobs_scheduled,
+            ", rejected:", bs.nb_jobs_rejected,
+            ", killed:", bs.nb_jobs_killed,
+            ", submitted:", bs.nb_jobs_submitted,
+            ", completed:", bs.nb_jobs_completed)
 
     if bs.nb_jobs_received != bs.nb_jobs_scheduled:
         sys.exit(1)
