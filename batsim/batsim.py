@@ -12,9 +12,11 @@ class Batsim(object):
 
     def __init__(self, scheduler,
                  validatingmachine=None,
-                 socket_endpoint='tcp://*:28000', verbose=0):
+                 socket_endpoint='tcp://*:28000', verbose=0,
+                 handle_dynamic_notify=True):
         self.socket_endpoint = socket_endpoint
         self.verbose = verbose
+        self.handle_dynamic_notify = handle_dynamic_notify
 
         self.jobs = dict()
 
@@ -34,6 +36,7 @@ class Batsim(object):
         # initialize some public attributes
         self.nb_jobs_received = 0
         self.nb_jobs_scheduled = 0
+        self.nb_jobs_completed = 0
 
         self.scheduler.bs = self
         # import pdb; pdb.set_trace()
@@ -54,6 +57,24 @@ class Batsim(object):
             {"timestamp": self.time(),
              "type": "CALL_ME_LATER",
              "data": {"timestamp": time}})
+
+    def notify_submission_finished(self):
+        self._events_to_send.append({
+            "timestamp": self.time(),
+            "type": "NOTIFY",
+            "data": {
+                    "type": "submission_finished",
+            }
+        })
+
+    def notify_submission_continue(self):
+        self._events_to_send.append({
+            "timestamp": self.time(),
+            "type": "NOTIFY",
+            "data": {
+                    "type": "continue_submission",
+            }
+        })
 
     def start_jobs_continuous(self, allocs):
         """
@@ -227,6 +248,7 @@ class Batsim(object):
                 j = self.jobs[job_id]
                 j.finish_time = event["timestamp"]
                 self.scheduler.onJobCompletion(j)
+                self.nb_jobs_completed += 1
             elif event_type == "RESOURCE_STATE_CHANGED":
                 nodes = event_data["resources"].split("-")
                 if len(nodes) == 1:
@@ -245,6 +267,12 @@ class Batsim(object):
                 # TODO: separate NOP / REQUESTED_CALL (here and in the algos)
             else:
                 raise Exception("Unknow event type {}".format(event_type))
+
+        if self.handle_dynamic_notify and not finished_received:
+            if self.nb_jobs_completed == self.nb_jobs_scheduled:
+                self.notify_submission_finished()
+            else:
+                self.notify_submission_continue()
 
         if len(self._events_to_send) > 0:
             # sort msgs by timestamp
