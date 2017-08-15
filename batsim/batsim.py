@@ -139,10 +139,13 @@ class Batsim(object):
             }
         })
 
-    def submit_job(self, job_id, res, walltime, profile, job_id_prefix="dyn"):
+    def submit_job(self, job_id, res, walltime, profile,
+                workload_name="dyn"):
+        workload_name += ":{}".format(job_id)
+        workload_name = workload_name.replace("!", "%")
         job_id = self.current_dyn_id
         self.current_dyn_id += 1
-        full_job_id = "{}!{}".format(job_id_prefix, job_id)
+        full_job_id = "{}!{}".format(workload_name, job_id)
 
         msg = {
             "timestamp": self.time(),
@@ -150,7 +153,7 @@ class Batsim(object):
             "data": {
                     "job_id": full_job_id,
                     "job": {
-                        "profile": full_job_id,
+                        "profile": "profile!{}".format(full_job_id),
                         "id": job_id,
                         "res": res,
                         "walltime": walltime,
@@ -159,6 +162,7 @@ class Batsim(object):
                     "profile": profile
             }
         }
+
         self._events_to_send.append(msg)
         self.nb_jobs_submitted += 1
 
