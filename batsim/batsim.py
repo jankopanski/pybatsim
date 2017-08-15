@@ -205,7 +205,7 @@ class Batsim(object):
 
         if self.verbose > 0:
             print('[PYBATSIM]: BATSIM ---> DECISION\n {}'.format(
-                json.dumps(msg, ident=2))
+                json.dumps(msg, indent=2))
             )
 
         self._current_time = msg["now"]
