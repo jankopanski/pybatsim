@@ -175,8 +175,8 @@ class Batsim(object):
             "timestamp": self.time(),
             "type": "SET_RESOURCE_STATE",
             "data": {
-                    "resources": " ".join(resources),
-                    "state": state
+                    "resources": " ".join([str(r) for r in resources]),
+                    "state": str(state)
             }
         })
 
@@ -274,15 +274,17 @@ class Batsim(object):
                 self.scheduler.onJobCompletion(j)
                 self.nb_jobs_completed += 1
             elif event_type == "RESOURCE_STATE_CHANGED":
-                nodes = event_data["resources"].split("-")
-                if len(nodes) == 1:
-                    nodeInterval = (int(nodes[0]), int(nodes[0]))
-                elif len(nodes) == 2:
-                    nodeInterval = (int(nodes[0]), int(nodes[1]))
-                else:
-                    raise Exception("Multiple intervals are not supported")
-                self.scheduler.onMachinePStateChanged(
-                    nodeInterval, event_data["state"])
+                intervals = event_data["resources"].split(" ")
+                for interval in intervals:
+                    nodes = interval.split("-")
+                    if len(nodes) == 1:
+                        nodeInterval = (int(nodes[0]), int(nodes[0]))
+                    elif len(nodes) == 2:
+                        nodeInterval = (int(nodes[0]), int(nodes[1]))
+                    else:
+                        raise Exception("Multiple intervals are not supported")
+                    self.scheduler.onMachinePStateChanged(
+                        nodeInterval, event_data["state"])
             elif event_type == "QUERY_REPLY":
                 consumed_energy = event_data["consumed_energy"]
                 self.scheduler.onReportEnergyConsumed(consumed_energy)
