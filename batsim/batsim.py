@@ -36,6 +36,7 @@ class Batsim(object):
         # initialize some public attributes
         self.nb_jobs_received = 0
         self.nb_jobs_submitted = 0
+        self.nb_jobs_killed = 0
         self.nb_jobs_scheduled = 0
         self.nb_jobs_completed = 0
         self.current_dyn_id = 0
@@ -113,6 +114,18 @@ class Batsim(object):
             }
             )
             self.nb_jobs_scheduled += 1
+
+    def kill_jobs(self, jobs):
+        """Kill the given jobs."""
+
+        self._events_to_send.append({
+            "timestamp": self.time(),
+            "type": "KILL_JOB",
+            "data": {
+                    "job_ids": [id for job in jobs],
+            }
+        })
+        self.nb_jobs_killed += len(jobs)
 
     def submit_job(self, job_id, res, walltime, profile, job_id_prefix="dyn"):
         job_id = self.current_dyn_id
