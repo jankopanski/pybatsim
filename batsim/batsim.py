@@ -210,53 +210,6 @@ class Batsim(object):
             }
         )
 
-    # def change_pstates(self, pstates_to_change):
-    #     """
-    #     should be [ (new_pstate, (first_node, last_node)),  ...]
-    #     """
-    #     if len(pstates_to_change) == 0:
-    #         return
-
-    #     parts = []
-    #     for (new_pstate, (first_res, last_res)) in pstates_to_change:
-    #         if first_res == last_res:
-    #             parts.append(str(first_res) + "=" + str(new_pstate))
-    #         else:
-    #             parts.append(str(first_res) + "-" + str(last_res) +
-    #                          "=" + str(new_pstate))
-    #     for part in parts:
-    #         self._events_to_send.append((self.time(), "P:" + part))
-
-    # def change_pstate_merge(self, new_pstate, first_node, last_node):
-    #     """
-    #     if the previous call of change_pstate_merge had the same new_pstate
-    #     and old.last_node+1 == new.first_node, then we merge the requests.
-    #     """
-    #     part = None
-    #     if len(self._events_to_send) > 0:
-    #         last_msg = self._events_to_send[-1]
-    #         if last_msg[0] == self.time():
-    #             resInter = re.split(
-    #                 "P:([0-9]+)-([0-9]+)=([0-9]+)", last_msg[1])
-    #             resUniq = re.split("P:([0-9]+)=([0-9]+)", last_msg[1])
-    #             if (len(resInter) == 5
-    #                     and int(resInter[3]) == new_pstate
-    #                     and int(resInter[2]) + 1 == first_node):
-    #                 self._events_to_send.pop(-1)
-    #                 part = str(resInter[1]) + "-" + \
-    #                     str(last_node) + "=" + str(new_pstate)
-    #             elif (len(resUniq) == 4
-    #                     and int(resUniq[2]) == new_pstate
-    #                     and int(resUniq[1]) + 1 == first_node):
-    #                 self._events_to_send.pop(-1)
-    #                 part = str(resUniq[1]) + "-" + \
-    #                     str(last_node) + "=" + str(new_pstate)
-    #     if part is None:
-    #         part = str(first_node) + "-" + \
-    #             str(last_node) + "=" + str(new_pstate)
-
-    #     self._events_to_send.append((self.time(), "P:" + part))
-
     def do_next_event(self):
         return self._read_bat_msg()
 
