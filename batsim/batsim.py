@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+from enum import Enum
+
 import json
 import sys
 
@@ -127,6 +129,18 @@ class Batsim(object):
                 }
             })
             self.nb_jobs_rejected += 1
+
+    def change_job_state(self, job, state, kill_reason=""):
+        """Change the state of a job."""
+        self._events_to_send.append({
+            "timestamp": self.time(),
+            "type": "CHANGE_JOB_STATE",
+            "data": {
+                    "job_id": job.id,
+                    "job_state": state.name,
+                    "kill_reason": kill_reason
+            }
+        })
 
     def kill_jobs(self, jobs):
         """Kill the given jobs."""
@@ -271,6 +285,7 @@ class Batsim(object):
                 job_id = event_data["job_id"]
                 j = self.jobs[job_id]
                 j.finish_time = event["timestamp"]
+                j.status = event["data"]["status"]
                 self.scheduler.onJobCompletion(j)
                 self.nb_jobs_completed += 1
             elif event_type == "RESOURCE_STATE_CHANGED":
@@ -350,6 +365,14 @@ class DataStorage(object):
 
 class Job(object):
 
+    class State(Enum):
+        NOT_SUBMITTED = 0
+        SUBMITTED = 1
+        RUNNING = 2
+        COMPLETED_SUCCESSFULLY = 3
+        COMPLETED_KILLED = 4
+        REJECTED = 5
+
     def __init__(self, id, subtime, walltime, res, profile, json_dict):
         self.id = id
         self.submit_time = subtime
@@ -357,12 +380,13 @@ class Job(object):
         self.requested_resources = res
         self.profile = profile
         self.finish_time = None  # will be set on completion by batsim
+        self.status = None
         self.json_dict = json_dict
 
     def __repr__(self):
-        return("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4}>".format(
+        return("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} stat:{5}>".format(
             self.id, self.submit_time, self.requested_resources,
-            self.requested_time, self.profile))
+            self.requested_time, self.profile, self.status))
 
     @staticmethod
     def from_json_string(json_str):
