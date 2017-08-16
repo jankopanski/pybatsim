@@ -153,13 +153,18 @@ class Batsim(object):
             }
         })
 
-    def submit_job(self, job_id, res, walltime, profile,
-                workload_name="dyn"):
-        workload_name += ":{}".format(job_id)
+    def submit_job(self, job_id, res, walltime, profile, profile_name=None,
+                workload_name=None):
+        if workload_name is None:
+            workload_name = "dyn:{}".format(job_id)
+
         workload_name = workload_name.replace("!", "%")
         job_id = self.current_dyn_id
         self.current_dyn_id += 1
         full_job_id = "{}!{}".format(workload_name, job_id)
+
+        if profile_name is None:
+            profile_name = "profile!{}".format(full_job_id)
 
         msg = {
             "timestamp": self.time(),
@@ -167,7 +172,7 @@ class Batsim(object):
             "data": {
                     "job_id": full_job_id,
                     "job": {
-                        "profile": "profile!{}".format(full_job_id),
+                        "profile": profile_name,
                         "id": job_id,
                         "res": res,
                         "walltime": walltime,
