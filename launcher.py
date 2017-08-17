@@ -18,7 +18,7 @@ import sys
 import time
 from datetime import timedelta
 
-from batsim.batsim import Batsim
+from batsim.batsim import Batsim, BatsimScheduler
 from batsim.docopt import docopt
 from batsim.validatingmachine import ValidatingMachine
 
@@ -49,6 +49,8 @@ def instanciate_scheduler(name, options):
     # load the class
     scheduler_non_instancied = package.__dict__[my_module].__dict__[my_class]
     scheduler = scheduler_non_instancied(options)
+    if not isinstance(scheduler, BatsimScheduler):
+        scheduler = scheduler()
     return scheduler
 
 
