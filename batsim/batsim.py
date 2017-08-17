@@ -32,8 +32,9 @@ class Batsim(object):
         # open connection
         self._context = zmq.Context()
         self._connection = self._context.socket(zmq.REP)
-        print("[PYBATSIM]: binding to {addr}".format(addr=self.socket_endpoint))
-        sys.stdout.flush()
+        if self.verbose > 0:
+            print("[PYBATSIM]: binding to {addr}"
+                    .format(addr=self.socket_endpoint), flush=True)
         self._connection.bind(self.socket_endpoint)
 
         # initialize some public attributes
@@ -246,9 +247,7 @@ class Batsim(object):
 
         if self.verbose > 0:
             print('[PYBATSIM]: BATSIM ---> DECISION\n {}'.format(
-                json.dumps(msg, indent=2))
-            )
-            sys.stdout.flush()
+                json.dumps(msg, indent=2)), flush=True)
 
         self._current_time = msg["now"]
 
@@ -279,8 +278,8 @@ class Batsim(object):
                 self.scheduler.onSimulationBegins()
 
             elif event_type == "SIMULATION_ENDS":
-                print("All jobs have been submitted and completed!")
-                sys.stdout.flush()
+                print("[PYBATSIM]: All jobs have been submitted and completed!",
+                        flush=True)
                 finished_received = True
                 self.scheduler.onSimulationEnds()
             elif event_type == "JOB_SUBMITTED":
@@ -343,8 +342,8 @@ class Batsim(object):
             "events": self._events_to_send
         }
         if self.verbose > 0:
-            print("[PYBATSIM]: BATSIM ---> DECISION\n {}".format(new_msg))
-            sys.stdout.flush()
+            print("[PYBATSIM]: BATSIM ---> DECISION\n {}".format(new_msg),
+                    flush=True)
         self._connection.send_string(json.dumps(new_msg))
 
         if finished_received:
