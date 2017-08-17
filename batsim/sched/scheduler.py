@@ -7,6 +7,7 @@ from .resource import Resources, Resource
 from .job import Job
 from .reply import ConsumedEnergyReply
 
+
 class BaseBatsimScheduler(BatsimScheduler):
 
     def __init__(self, scheduler, options):
@@ -14,7 +15,8 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._options = options
 
     def onAfterBatsimInit(self):
-        self._scheduler.debug("decision process is executing after batsim init")
+        self._scheduler.debug(
+            "decision process is executing after batsim init")
         self._scheduler._batsim = self.bs
         self._scheduler._pre_init()
         self._scheduler.init()
@@ -34,13 +36,15 @@ class BaseBatsimScheduler(BatsimScheduler):
         self.do_schedule()
 
     def onJobsKilled(self, jobs):
-        self._scheduler.debug("decision process received jobs kills({})".format(jobs))
+        self._scheduler.debug(
+            "decision process received jobs kills({})".format(jobs))
         for job in jobs:
             self.complete_job(job)
         self.do_schedule()
 
     def onJobSubmission(self, job):
-        self._scheduler.debug("decision process received job submission({})".format(job))
+        self._scheduler.debug(
+            "decision process received job submission({})".format(job))
         newjob = Job(batsim_job=job)
         self._scheduler._open_jobs.append(newjob)
         self._scheduler._new_open_jobs.append(newjob)
@@ -48,14 +52,15 @@ class BaseBatsimScheduler(BatsimScheduler):
         self.do_schedule()
 
     def onJobCompletion(self, job):
-        self._scheduler.debug("decision process received job completion({})".format(job))
+        self._scheduler.debug(
+            "decision process received job completion({})".format(job))
         self.complete_job(job)
         self.do_schedule()
 
     def complete_job(self, job):
         jobobj = self._scheduler._job_map[job.id]
         self._scheduler.info("Remove completed job and free resources: {}"
-                    .format(jobobj))
+                             .format(jobobj))
         jobobj.free_all()
         self._scheduler._scheduled_jobs.remove(jobobj)
         self._scheduler._completed_jobs.append(jobobj)
@@ -63,13 +68,17 @@ class BaseBatsimScheduler(BatsimScheduler):
         del self._scheduler._job_map[job.id]
 
     def onMachinePStateChanged(self, nodeid, pstate):
-        self._scheduler.debug("decision process received machine pstate changed({}, {})".format(nodeid, pstate))
+        self._scheduler.debug(
+            "decision process received machine pstate changed({}, {})".format(
+                nodeid, pstate))
         # TODO
         #self._scheduler._changed_machines.append((nodeid, pstate))
         self.do_schedule()
 
     def onReportEnergyConsumed(self, consumed_energy):
-        self._scheduler.debug("decision process received energy consumed reply({})".format(consumed_energy))
+        self._scheduler.debug(
+            "decision process received energy consumed reply({})".format(
+                consumed_energy))
         self.do_schedule(BatsimReply(consumed_energy=consumed_energy))
 
     def do_schedule(self, reply=None):
@@ -83,7 +92,6 @@ class BaseBatsimScheduler(BatsimScheduler):
 
         self._scheduler._new_open_jobs = []
         self._scheduler._new_completed_jobs = []
-
 
 
 class Scheduler(metaclass=ABCMeta):
@@ -106,7 +114,10 @@ class Scheduler(metaclass=ABCMeta):
         self._rejected_jobs = []
         self._scheduled_jobs = []
         self._reply = None
-        self._sched_delay = float(options.get("sched_delay", None) or 0.00000000000001)
+        self._sched_delay = float(
+            options.get(
+                "sched_delay",
+                None) or 0.00000000000001)
 
         self._resources = Resources()
 
@@ -160,10 +171,10 @@ class Scheduler(metaclass=ABCMeta):
             self._logger.setLevel(logging.INFO)
 
         formatter = logging.Formatter(
-                '[%(name)s::%(levelname)s] %(message)s')
+            '[%(name)s::%(levelname)s] %(message)s')
 
         handler = logging.FileHandler(
-                "out_scheduler_{}.log".format(self.__class__.__name__))
+            "out_scheduler_{}.log".format(self.__class__.__name__))
         handler.setLevel(logging.DEBUG)
         handler.setFormatter(formatter)
         self._logger.addHandler(handler)
@@ -177,7 +188,8 @@ class Scheduler(metaclass=ABCMeta):
         return self._scheduler
 
     def _pre_init(self):
-        self._resources = Resources([Resource(self, id) for id in range(self._batsim.nb_res)])
+        self._resources = Resources([Resource(self, id)
+                                     for id in range(self._batsim.nb_res)])
         self.info("{} resources registered".format(len(self.resources)))
 
     def init(self):
@@ -217,15 +229,20 @@ class Scheduler(metaclass=ABCMeta):
                 j._do_reject(self)
         if self._open_jobs:
             self.debug(
-                    "{} jobs open at end of scheduling iteration", len(self._open_jobs))
+                "{} jobs open at end of scheduling iteration", len(
+                    self._open_jobs))
         self.debug("Ending scheduling iteration")
 
     def _pre_end(self):
         if self._open_jobs:
-            self.warn("{} jobs still in state open at end of simulation", len(self._open_jobs))
+            self.warn(
+                "{} jobs still in state open at end of simulation", len(
+                    self._open_jobs))
 
         if self._scheduled_jobs:
-            self.warn("{} jobs still in state scheduled at end of simulation", len(self._scheduled_jobs))
+            self.warn(
+                "{} jobs still in state scheduled at end of simulation", len(
+                    self._scheduled_jobs))
 
     def end(self):
         pass

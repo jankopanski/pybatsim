@@ -76,7 +76,16 @@ class Resources:
     def __add__(self, other):
         return Resources(set(self._resources + other._resources))
 
-    def filter(self, cond=None, sort=None, free=False, allocated=False, limit=None, min=None, num=None, for_job=None):
+    def filter(
+            self,
+            cond=None,
+            sort=None,
+            free=False,
+            allocated=False,
+            limit=None,
+            min=None,
+            num=None,
+            for_job=None):
         nr = []
 
         # Pre-defined filter to find resources for a job submission
@@ -90,7 +99,8 @@ class Resources:
             free = True
             allocated = True
 
-        # If a concrete number of resources is requested do not yield less or more
+        # If a concrete number of resources is requested do not yield less or
+        # more
         if num:
             min = num
             limit = num

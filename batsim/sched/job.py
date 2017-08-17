@@ -1,5 +1,6 @@
 from batsim.batsim import Job as BatsimJob
 
+
 class Job:
 
     def __init__(self, batsim_job=None):
@@ -18,8 +19,10 @@ class Job:
 
     def free(self, resource, recursive_call=False):
         # To free resources the job does either have to be not submitted yet
-        # or the job has to be completed (i.e. the job status is set by batsim).
-        assert not self._submitted or self._batsim_job.status in ["SUCCESS", "TIMEOUT"]
+        # or the job has to be completed (i.e. the job status is set by
+        # batsim).
+        assert not self._submitted or self._batsim_job.status in [
+            "SUCCESS", "TIMEOUT"]
 
         if not recursive_call:
             resource.free(self, recursive_call=True)
@@ -63,7 +66,9 @@ class Job:
         self._rejected_reason = reason
 
     def _do_reject(self, scheduler):
-        scheduler.info("Rejecting job ({}), reason={}".format(self, self._rejected_reason))
+        scheduler.info(
+            "Rejecting job ({}), reason={}".format(
+                self, self._rejected_reason))
         scheduler._batsim.reject_jobs([self._batsim_job])
         scheduler._open_jobs.remove(self)
         scheduler._rejected_jobs.append(self)
@@ -77,8 +82,8 @@ class Job:
             self.schedule()
 
         if self._batsim_job.requested_resources < len(self._reservation):
-            scheduler.warn("Starting of job ({}) is postponed since not enough resources are allocated"
-                    .format(self))
+            scheduler.warn(
+                "Starting of job ({}) is postponed since not enough resources are allocated" .format(self))
             return
 
         self._submitted = True
@@ -89,7 +94,7 @@ class Job:
             res.computing = True
 
         scheduler._batsim.start_jobs(
-                [self._batsim_job], {self._batsim_job.id: alloc})
+            [self._batsim_job], {self._batsim_job.id: alloc})
 
         self._scheduled = False
 
