@@ -32,9 +32,6 @@ class ValidatingMachine(BatsimScheduler):
         self.scheduler.bs = self.bs
         self.scheduler.onAfterBatsimInit()
 
-    def onJobRejection(self):
-        self.scheduler.onJobRejection()
-
     def onSimulationBegins(self):
         self.scheduler.onSimulationBegins()
 
@@ -53,6 +50,9 @@ class ValidatingMachine(BatsimScheduler):
             self.availableResources.add(res)
         self.previousAllocations.pop(job.id)
         self.scheduler.onJobCompletion(job)
+
+    def onJobsKilled(self, jobs):
+        self.scheduler.onJobsKilled(jobs)
 
     def onMachinePStateChanged(self, nodeid, pstate):
         self.scheduler.onMachinePStateChanged(nodeid, pstate)
