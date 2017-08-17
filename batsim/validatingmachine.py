@@ -35,6 +35,12 @@ class ValidatingMachine(BatsimScheduler):
     def onJobRejection(self):
         self.scheduler.onJobRejection()
 
+    def onSimulationBegins(self):
+        self.scheduler.onSimulationBegins()
+
+    def onSimulationEnds(self):
+        self.scheduler.onSimulationEnds()
+
     def onNOP(self):
         self.scheduler.onNOP()
 

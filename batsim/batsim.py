@@ -276,10 +276,13 @@ class Batsim(object):
                     self.redis = DataStorage(redis_prefix, redis_hostname,
                                              redis_port)
 
+                self.scheduler.onSimulationBegins()
+
             elif event_type == "SIMULATION_ENDS":
                 print("All jobs have been submitted and completed!")
                 sys.stdout.flush()
                 finished_received = True
+                self.scheduler.onSimulationEnds()
             elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
                 job_id = event_data["job_id"]
@@ -434,6 +437,12 @@ class BatsimScheduler(object):
 
     def onAfterBatsimInit(self):
         # You now have access to self.bs and all other functions
+        pass
+
+    def onSimulationBegins(self):
+        pass
+
+    def onSimulationEnds(self):
         pass
 
     def onNOP(self):
