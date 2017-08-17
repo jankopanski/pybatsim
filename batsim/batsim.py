@@ -291,6 +291,13 @@ class Batsim(object):
                 j = self.jobs[job_id]
                 j.finish_time = event["timestamp"]
                 j.status = event["data"]["status"]
+
+                try:
+                    j.job_state = Job.State[event["data"]["job_state"]]
+                except KeyError:
+                    j.job_state = Job.State.UNKNOWN
+                j.kill_reason = event["data"]["kill_reason"]
+
                 self.scheduler.onJobCompletion(j)
                 self.nb_jobs_completed += 1
             elif event_type == "RESOURCE_STATE_CHANGED":
@@ -371,6 +378,7 @@ class DataStorage(object):
 class Job(object):
 
     class State(Enum):
+        UNKNOWN = -1
         NOT_SUBMITTED = 0
         SUBMITTED = 1
         RUNNING = 2
@@ -386,12 +394,15 @@ class Job(object):
         self.profile = profile
         self.finish_time = None  # will be set on completion by batsim
         self.status = None
+        self.job_state = Job.State.UNKNOWN
+        self.kill_reason = None
         self.json_dict = json_dict
 
     def __repr__(self):
-        return("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} stat:{5}>".format(
+        return("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} stat:{5} jstat:{6} kill:{7}>".format(
             self.id, self.submit_time, self.requested_resources,
-            self.requested_time, self.profile, self.status))
+            self.requested_time, self.profile, self.status,
+            self.job_state, self.kill_reason))
 
     @staticmethod
     def from_json_string(json_str):
