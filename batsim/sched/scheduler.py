@@ -25,6 +25,9 @@ class BaseBatsimScheduler(BatsimScheduler):
 
     def onSimulationEnds(self):
         self._scheduler.info("Simulation ends")
+        self._scheduler._pre_end()
+        self._scheduler.end()
+        self._scheduler._post_end()
 
     def onNOP(self):
         self._scheduler.debug("decision process received NOP")
@@ -214,5 +217,18 @@ class Scheduler(metaclass=ABCMeta):
                 j._do_reject(self)
         if self._open_jobs:
             self.debug(
-                    "{} jobs open at end of scheduling iteration".format(len(self._open_jobs)))
-        self._logger.debug("Ending scheduling iteration")
+                    "{} jobs open at end of scheduling iteration", len(self._open_jobs))
+        self.debug("Ending scheduling iteration")
+
+    def _pre_end(self):
+        if self._open_jobs:
+            self.warn("{} jobs still in state open at end of simulation", len(self._open_jobs))
+
+        if self._scheduled_jobs:
+            self.warn("{} jobs still in state scheduled at end of simulation", len(self._scheduled_jobs))
+
+    def end(self):
+        pass
+
+    def _post_end(self):
+        pass
