@@ -1,7 +1,20 @@
+"""
+    batsim.sched.job
+    ~~~~~~~~~~~~~~~~
+
+    This module provides general abstractions to manage jobs (either created by Batsim
+    or by the user to submit dynamic jobs).
+
+"""
 from batsim.batsim import Job as BatsimJob
 
 
 class Job:
+    """A job is a wrapper around a batsim job to extend the basic API of Pybatsim with more
+    object oriented approaches on the implementation of the scheduler.
+
+    :param batsim_job: the batsim job object from the underlying Pybatsim scheduler.
+    """
 
     def __init__(self, batsim_job=None):
         self._batsim_job = batsim_job
@@ -14,6 +27,7 @@ class Job:
         self._previous_reservations = []
 
     def free_all(self):
+        """Free all reserved resources."""
         assert self._batsim_job
 
         self._previous_reservations.append(self._reservation[:])
@@ -21,6 +35,9 @@ class Job:
             self.free(res)
 
     def free(self, resource, recursive_call=False):
+        """Free the given `resource` object or fails if the resource is currently
+        not reserved by this job.
+        """
         assert self._batsim_job
 
         # To free resources the job does either have to be not submitted yet
@@ -34,6 +51,9 @@ class Job:
         self._reservation.remove(resource)
 
     def reserve(self, resource, recursive_call=False):
+        """Reserves a given `resource` to ensure exclusive access (time-sharing is currently not
+        implemented).
+        """
         assert self._batsim_job
         if not recursive_call:
             resource.allocate(self, recursive_call=True)
@@ -41,29 +61,39 @@ class Job:
 
     @property
     def scheduled(self):
+        """Whether or not this job was marked for scheduling at the end of the iteration."""
+        assert not self.rejected
         return self._scheduled
 
     @property
     def rejected(self):
+        """Whether or not this job will be rejected at the end of the iteration."""
+        assert not self.scheduled
         return self._rejected
 
     @property
     def reservation(self):
+        """Returns the current reservation of this job."""
         return tuple(self._reservation)
 
     @property
     def submitted(self):
+        """Whether or not this job was already submitted to Batsim for exection."""
         return self._submitted
 
     @property
     def killed(self):
+        """Whether or not this job was marked for killing at the end of the iteration."""
         return self._killed
 
     @property
     def previous_reservations(self):
+        """Returns a collection of previous reservations of this job."""
         return tuple(self._previous_reservations)
 
     def schedule(self, resource=None):
+        """Mark this job for scheduling. This can also be done even when not enough resources are
+        reserved. The job will not be sent to Batsim until enough resources were reserved."""
         assert self._batsim_job
 
         if resource:
@@ -73,24 +103,34 @@ class Job:
         self._scheduled = True
 
     def reject(self, reason=""):
+        """Reject the job. A reason can be given which will show up in the scheduler logs.
+        However, it will currently not show up in Batsim directly as a rejecting reason is
+        not part of the protocol."""
         assert self._batsim_job
         assert not self.submitted and not self.scheduled
         self._rejected = True
         self._rejected_reason = reason
 
     def change_state(self, scheduler, state, kill_reason=""):
+        """Change the state of a job. This is only needed in rare cases where the real job
+        should not be executed but instead the state should be set manually.
+        """
         assert self._batsim_job
         scheduler._batsim.change_job_state(job, state, kill_reason)
 
     def kill(self):
+        """Kill the current job during its execution."""
         assert self._batsim_job
+        assert not self.rejected
         self._killed = True
 
     def _do_kill(self, scheduler):
+        """Internal method to execute the killing of the job."""
         scheduler.info("Killing job ({})", self)
         scheduler._batsim.kill_jobs([self._batsim_job])
 
     def _do_reject(self, scheduler):
+        """Internal method to execute the rejecting of the job."""
         scheduler.info(
             "Rejecting job ({}), reason={}",
             self, self._rejected_reason)
@@ -100,6 +140,7 @@ class Job:
         del scheduler._job_map[self._batsim_job.id]
 
     def _do_execute(self, scheduler):
+        """Internal method to execute the execution of the job."""
         assert self._batsim_job is not None
         assert not self.submitted and not self.rejected
 
@@ -189,6 +230,23 @@ class Job:
 
 
 class UserJob(Job):
+    """A UserJob may be used to construct dynamic jobs afterwards submitted to the scheduler.
+    It has no related batsim_job since it is not known by Batsim yet. Instead it should be submitted
+    and will be bounced back to the scheduler as a job known by Batsim and can be executed in this state.
+
+    :param job_id: the id of the job (a dynamic job id will be generated, so this id is always guaranteed to be unique).
+
+    :param requested_resources: the number of requested resources.
+
+    :param requested_time: the number of requested time (walltime)
+
+    :param profile: The profile object (either a `Profile` object or a dictionary containing the
+    actual Batsim profile configuration).
+
+    :param profile_name: The name of the profile to be stored in Batsim (will be dynamically generated if omitted).
+
+    :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
+    """
 
     def __init__(
             self,
@@ -253,17 +311,23 @@ class UserJob(Job):
         return None
 
     def submit(self, scheduler):
+        """Marks a dynamic job for submission in the `scheduler`."""
         self._dyn_submitted = True
         scheduler._dyn_jobs.append(self)
 
     @property
     def dynamically_submitted(self):
+        """Whether or not this job object was marked for dynamic submission."""
         return self._dyn_submitted
 
     def _do_dyn_submit(self, scheduler):
+        """Execute the dynamic job submission in the `scheduler`."""
+        # The profile object will be executed if it is no dictionary already to
+        # allow complex Profile objects.
         profile = self._user_profile
         if not isinstance(profile, dict):
             profile = profile()
+
         scheduler.info("Submit dynamic job ({})", self)
         scheduler._batsim.submit_job(
             self._user_job_id,

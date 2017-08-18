@@ -1,3 +1,10 @@
+"""
+    batsim.sched
+    ~~~~~~~~~~~~
+
+    An advanced scheduler API based on Pybatsim.
+
+"""
 
 from .scheduler import *
 from .job import *
