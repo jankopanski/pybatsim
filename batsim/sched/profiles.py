@@ -20,6 +20,6 @@ class Profiles(metaclass=ABCMeta):
 
         def to_dict(self):
             return {
-                    "type": "delay",
-                    "delay": self.time
-                   }
+                "type": "delay",
+                "delay": self.time
+            }

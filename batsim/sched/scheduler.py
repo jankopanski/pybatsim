@@ -92,6 +92,7 @@ class BaseBatsimScheduler(BatsimScheduler):
 
         self._scheduler._new_open_jobs = []
         self._scheduler._new_completed_jobs = []
+        self._scheduler._new_changed_resources = []
 
 
 class Scheduler(metaclass=ABCMeta):
@@ -108,8 +109,10 @@ class Scheduler(metaclass=ABCMeta):
         self._time = 0
         self._new_open_jobs = []
         self._new_completed_jobs = []
+        self._new_changed_resources = []
 
         self._open_jobs = []
+        self._dyn_jobs = []
         self._completed_jobs = []
         self._rejected_jobs = []
         self._scheduled_jobs = []
@@ -184,6 +187,12 @@ class Scheduler(metaclass=ABCMeta):
         handler.setFormatter(formatter)
         self._logger.addHandler(handler)
 
+    def run_scheduler_at(self, time):
+        self._batsim.wake_me_up_at(time)
+
+    def request_consumed_energy(self):
+        self._batsim.request_consumed_energy()
+
     def __call__(self):
         return self._scheduler
 
@@ -222,15 +231,29 @@ class Scheduler(metaclass=ABCMeta):
         pass
 
     def _post_schedule(self):
+        for j in self._dyn_jobs[:]:
+            if j.dynamically_submitted:
+                j._do_dyn_submit(self)
+
         for j in self._open_jobs[:]:
             if j.scheduled:
-                j.submit(self)
+                j._do_execute(self)
             elif j.rejected:
                 j._do_reject(self)
+
+        for j in self._scheduled_jobs[:]:
+            if j.killed:
+                j._do_kill(self)
+
+        for r in self._resources:
+            if r._state != r._new_state:
+                r._do_change_state(self)
+
         if self._open_jobs:
             self.debug(
                 "{} jobs open at end of scheduling iteration", len(
                     self._open_jobs))
+
         self.debug("Ending scheduling iteration")
 
     def _pre_end(self):
