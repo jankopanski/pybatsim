@@ -62,13 +62,11 @@ class Job:
     @property
     def scheduled(self):
         """Whether or not this job was marked for scheduling at the end of the iteration."""
-        assert not self.rejected
         return self._scheduled
 
     @property
     def rejected(self):
         """Whether or not this job will be rejected at the end of the iteration."""
-        assert not self.scheduled
         return self._rejected
 
     @property
@@ -94,6 +92,7 @@ class Job:
     def schedule(self, resource=None):
         """Mark this job for scheduling. This can also be done even when not enough resources are
         reserved. The job will not be sent to Batsim until enough resources were reserved."""
+        assert not self.rejected
         assert self._batsim_job
 
         if resource:
@@ -169,6 +168,15 @@ class Job:
         scheduler._scheduled_jobs.append(self)
 
         scheduler.info("Starting job ({})", self)
+
+    def _complete_job(self, scheduler):
+        scheduler.info("Remove completed job and free resources: {}"
+                       .format(self))
+        self.free_all()
+        scheduler._scheduled_jobs.remove(self)
+        scheduler._completed_jobs.append(self)
+        scheduler._new_completed_jobs.append(self)
+        del scheduler._job_map[self._batsim_job.id]
 
     def __str__(self):
         return (

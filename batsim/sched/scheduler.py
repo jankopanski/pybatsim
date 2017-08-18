@@ -48,14 +48,15 @@ class BaseBatsimScheduler(BatsimScheduler):
 
     def onNOP(self):
         self._scheduler.debug("decision process received NOP")
-        self.do_schedule()
+        self._scheduler._do_schedule()
 
     def onJobsKilled(self, jobs):
         self._scheduler.debug(
             "decision process received jobs kills({})".format(jobs))
         for job in jobs:
-            self.complete_job(job)
-        self.do_schedule()
+            jobobj = self._scheduler._job_map[job.id]
+            jobobj._complete_job(self._scheduler)
+        self._scheduler._do_schedule()
 
     def onJobSubmission(self, job):
         self._scheduler.debug(
@@ -64,23 +65,14 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler._open_jobs.append(newjob)
         self._scheduler._new_open_jobs.append(newjob)
         self._scheduler._job_map[job.id] = newjob
-        self.do_schedule()
+        self._scheduler._do_schedule()
 
     def onJobCompletion(self, job):
         self._scheduler.debug(
             "decision process received job completion({})".format(job))
-        self.complete_job(job)
-        self.do_schedule()
-
-    def complete_job(self, job):
         jobobj = self._scheduler._job_map[job.id]
-        self._scheduler.info("Remove completed job and free resources: {}"
-                             .format(jobobj))
-        jobobj.free_all()
-        self._scheduler._scheduled_jobs.remove(jobobj)
-        self._scheduler._completed_jobs.append(jobobj)
-        self._scheduler._new_completed_jobs.append(jobobj)
-        del self._scheduler._job_map[job.id]
+        jobobj._complete_job(self._scheduler)
+        self._scheduler._do_schedule()
 
     def onMachinePStateChanged(self, nodeid, pstate):
         self._scheduler.debug(
@@ -89,26 +81,14 @@ class BaseBatsimScheduler(BatsimScheduler):
         # TODO
         # set resource._state with given nodeid to pstate
         # also add the resource to _new_changed_resources
-        self.do_schedule()
+        self._scheduler._do_schedule()
 
     def onReportEnergyConsumed(self, consumed_energy):
         self._scheduler.debug(
             "decision process received energy consumed reply({})".format(
                 consumed_energy))
-        self.do_schedule(BatsimReply(consumed_energy=consumed_energy))
-
-    def do_schedule(self, reply=None):
-        self._scheduler._time = self.bs.time()
-        self._scheduler._reply = reply
-        self._scheduler._pre_schedule()
-        self._scheduler.schedule()
-        self._scheduler._post_schedule()
-
-        self.bs.consume_time(self._scheduler._sched_delay)
-
-        self._scheduler._new_open_jobs = []
-        self._scheduler._new_completed_jobs = []
-        self._scheduler._new_changed_resources = []
+        self._scheduler._do_schedule(
+            BatsimReply(consumed_energy=consumed_energy))
 
 
 class Scheduler(metaclass=ABCMeta):
@@ -320,6 +300,19 @@ class Scheduler(metaclass=ABCMeta):
                     self._open_jobs))
 
         self.debug("Ending scheduling iteration")
+
+    def _do_schedule(self, reply=None):
+        self._time = self._batsim.time()
+        self._reply = reply
+        self._pre_schedule()
+        self.schedule()
+        self._post_schedule()
+
+        self._batsim.consume_time(self._sched_delay)
+
+        self._new_open_jobs = []
+        self._new_completed_jobs = []
+        self._new_changed_resources = []
 
     def _pre_end(self):
         """The _pre_end method called during the shut-down phase of the scheduler.
