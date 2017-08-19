@@ -157,7 +157,6 @@ class Job:
         alloc = []
         for res in self._reservation[:self._batsim_job.requested_resources]:
             alloc.append(res.id)
-            res.computing = True
 
         scheduler._batsim.start_jobs(
             [self._batsim_job], {self._batsim_job.id: alloc})

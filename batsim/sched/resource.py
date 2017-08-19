@@ -37,7 +37,6 @@ class Resource:
 
         self._allocated_by = []
         self._previously_allocated_by = []
-        self._computing = False
 
     @property
     def id(self):
@@ -73,25 +72,12 @@ class Resource:
         self._previously_allocated_by.append((self._scheduler.time, job))
         self._allocated_by.remove(job)
 
-        if not self.is_allocated:
-            self.computing = False
-
     @property
     def state(self):
         return self._state
 
     def _do_change_state(self, scheduler):
         scheduler._batsim.set_resource_state([self.id], self._new_state)
-
-    @property
-    def computing(self):
-        """Whether or not this node is currently computing. As long as one job is still running on this
-        node the state will not change."""
-        return self._computing
-
-    @computing.setter
-    def computing(self, value):
-        self._computing = value
 
     @property
     def resources(self):
@@ -125,10 +111,25 @@ class Resources:
         """Concatenate two resources lists."""
         return Resources(set(self._resources + other._resources))
 
+    @property
+    def free(self):
+        return filter(free=True)
+
+    @property
+    def allocated(self):
+        return filter(allocated=True)
+
+    def apply(self, apply):
+        """Apply a function to modify the resources list (e.g. sorting the list).
+
+        :param apply: a function evaluating the result list.
+
+        """
+        return Resources(apply(self_resources))
+
     def filter(
             self,
             cond=None,
-            sort=None,
             free=False,
             allocated=False,
             limit=None,
@@ -138,8 +139,6 @@ class Resources:
         """Filter the resources lists to search for resources.
 
         :param cond: a function evaluating the current resource and returns True or False whether or not the resource should be returned.
-
-        :param sort: a function evaluating the result list prior to limiting the values to sort the results of the filtering.
 
         :param free: whether or not free resources should be returned.
 
@@ -153,8 +152,6 @@ class Resources:
 
         :param for_job: for the common case that sufficient resources for a job should be found the exact number of required resources for this particular job are returned. The result can still be filtered with a condition or sorted with a sorting function.
         """
-        nr = []
-
         # Pre-defined filter to find resources for a job submission
         if for_job is not None:
             free = True
@@ -173,37 +170,42 @@ class Resources:
             limit = num
 
         # Filter free or allocated resources
-        for r in self._resources:
-            if r.is_allocated:
-                if allocated:
-                    nr.append(r)
+        def filter_free_or_allocated_resources(res):
+            for r in res:
+                if r.is_allocated:
+                    if allocated:
+                        yield r
+                else:
+                    if free:
+                        yield r
+
+        def filter_condition(res):
+            if cond:
+                for r in res:
+                    if cond(r):
+                        yield r
             else:
-                if free:
-                    nr.append(r)
+                for r in res:
+                    yield r
 
-        # Filter applying a given condition
-        if cond:
-            nr2 = nr
-            nr = []
-            for r in nr2:
-                if cond(r):
-                    nr.append(r)
+        def filter(res):
+            yield from filter_condition(filter_free_or_allocated_resources(res))
 
-        # Sort the resources if a function was given. Resources which should be
-        # preferred to be chosen can be sorted to the front of the list.
-        if sort:
-            nr = sort(nr)
-
-        # Do not yield more resources than requested
-        if limit:
-            nr = nr[:limit]
+        result = []
+        num_elems = 0
+        for i in filter(self._resources):
+            # Do not yield more resources than requested
+            if limit and num_elems >= limit:
+                break
+            num_elems += 1
+            result.append(i)
 
         # Do not yield less resources than requested (better nothing than less)
-        if min and len(nr) < min:
-            nr = []
+        if min and len(result) < min:
+            result = []
 
         # Construct a new resources list which can be filtered again
-        return Resources(nr)
+        return Resources(result)
 
     def __len__(self):
         return len(self._resources)
