@@ -358,9 +358,13 @@ class UserJob(Job):
             scheduler._jobs.append(self)
 
     @property
-    def marked_for_dyanmic_submission(self):
+    def marked_for_dynamic_submission(self):
         """Whether or not this job object was marked for dynamic submission."""
         return self._dyn_marked_submission
+
+    @property
+    def completed(self):
+        return False
 
     @property
     def dynamically_submitted(self):
