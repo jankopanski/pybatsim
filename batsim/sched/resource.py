@@ -7,6 +7,8 @@
 """
 from enum import Enum
 
+from .utils import FilterList
+
 
 class Resource:
     """A resource is an introduced abstraction to easier keep track of resource states and
@@ -32,7 +34,7 @@ class Resource:
             self._state = Resource.State[(state or "").upper()]
         except KeyError:
             raise ValueError("Invalid machine state: {}, {}={}"
-                    .format(id, name, state))
+                             .format(id, name, state))
         self._properties = properties
 
         self._allocated_by = []
@@ -84,48 +86,33 @@ class Resource:
         return [self]
 
 
-class Resources:
+class Resources(FilterList):
     """Helper class implementing parts of the python list API to manage the resources.
 
        :param from_list: a list of `Resource` objects to be managed by this wrapper.
     """
 
-    def __init__(self, from_list=[]):
-        self._resources = list(from_list)
-
     def allocate(self, job, recursive_call=False):
         """Allocate the job on the whole set of resources."""
-        for r in self._resources:
+        for r in self.all:
             r.allocate(job, recursive_call=recursive_call)
 
     def free(self, job, recursive_call=False):
         """Free the job from the whole set of resources."""
-        for r in self._resources:
+        for r in self.all:
             r.free(job, recursive_call=recursive_call)
 
     @property
     def resources(self):
-        return tuple(self._resources)
-
-    def __add__(self, other):
-        """Concatenate two resources lists."""
-        return Resources(set(self._resources + other._resources))
+        return self.all
 
     @property
     def free(self):
-        return filter(free=True)
+        return self.filter(free=True)
 
     @property
     def allocated(self):
-        return filter(allocated=True)
-
-    def apply(self, apply):
-        """Apply a function to modify the resources list (e.g. sorting the list).
-
-        :param apply: a function evaluating the result list.
-
-        """
-        return Resources(apply(self_resources))
+        return self.filter(allocated=True)
 
     def filter(
             self,
@@ -163,12 +150,6 @@ class Resources:
             free = True
             allocated = True
 
-        # If a concrete number of resources is requested do not yield less or
-        # more
-        if num:
-            min = num
-            limit = num
-
         # Filter free or allocated resources
         def filter_free_or_allocated_resources(res):
             for r in res:
@@ -179,57 +160,6 @@ class Resources:
                     if free:
                         yield r
 
-        def filter_condition(res):
-            if cond:
-                for r in res:
-                    if cond(r):
-                        yield r
-            else:
-                for r in res:
-                    yield r
-
-        def filter(res):
-            yield from filter_condition(filter_free_or_allocated_resources(res))
-
-        result = []
-        num_elems = 0
-        for i in filter(self._resources):
-            # Do not yield more resources than requested
-            if limit and num_elems >= limit:
-                break
-            num_elems += 1
-            result.append(i)
-
-        # Do not yield less resources than requested (better nothing than less)
-        if min and len(result) < min:
-            result = []
-
-        # Construct a new resources list which can be filtered again
-        return Resources(result)
-
-    def __len__(self):
-        return len(self._resources)
-
-    def __getitem__(self, items):
-        return self._resources[items]
-
-    def __delitem__(self, index):
-        del self._resources[index]
-
-    def __setitem__(self, index, element):
-        self._resources[index] = element
-
-    def __str__(self):
-        return str(self._resources)
-
-    def append(self, element):
-        self._resources.append(element)
-
-    def remove(self, element):
-        self._resources.remove(element)
-
-    def insert(self, index, element):
-        self._resources.insert(index, element)
-
-    def __iter__(self):
-        return iter(self._resources)
+        return self.base_filter(
+            [filter_free_or_allocated_resources],
+            cond, limit, min, num)

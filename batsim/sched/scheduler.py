@@ -13,7 +13,7 @@ from abc import ABCMeta, abstractmethod
 from batsim.batsim import BatsimScheduler
 
 from .resource import Resources, Resource
-from .job import Job
+from .job import Job, Jobs
 from .reply import ConsumedEnergyReply
 
 
@@ -29,49 +29,61 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler = scheduler
         self._options = options
 
+        self._jobmap = {}
+
     def onAfterBatsimInit(self):
         self._scheduler.debug(
             "decision process is executing after batsim init")
         self._scheduler._batsim = self.bs
-        self._scheduler._pre_init()
-        self._scheduler.init()
-        self._scheduler._post_init()
+        self._scheduler._on_pre_init()
+        self._scheduler.on_init()
+        self._scheduler._on_post_init()
 
     def onSimulationBegins(self):
         self._scheduler.info("Simulation begins")
 
     def onSimulationEnds(self):
         self._scheduler.info("Simulation ends")
-        self._scheduler._pre_end()
-        self._scheduler.end()
-        self._scheduler._post_end()
+        self._scheduler._on_pre_end()
+        self._scheduler.on_end()
+        self._scheduler._on_post_end()
 
     def onNOP(self):
         self._scheduler.debug("decision process received NOP")
+        self._scheduler.on_nop()
         self._scheduler._do_schedule()
 
     def onJobsKilled(self, jobs):
         self._scheduler.debug(
             "decision process received jobs kills({})".format(jobs))
+        jobobjs = []
         for job in jobs:
-            jobobj = self._scheduler._job_map[job.id]
-            jobobj._complete_job(self._scheduler)
+            jobobj = self._jobmap[job.id]
+            jobobj._do_complete_job(self._scheduler)
+            del self._jobmap[job.id]
+            jobobjs.append(job)
+        self._scheduler.on_jobs_killed(jobobjs)
         self._scheduler._do_schedule()
 
     def onJobSubmission(self, job):
         self._scheduler.debug(
             "decision process received job submission({})".format(job))
         newjob = Job(batsim_job=job)
-        self._scheduler._open_jobs.append(newjob)
-        self._scheduler._new_open_jobs.append(newjob)
-        self._scheduler._job_map[job.id] = newjob
+        self._jobmap[job.id] = newjob
+
+        self._scheduler.jobs.append(newjob)
+
+        self._scheduler.on_job_submission(newjob)
         self._scheduler._do_schedule()
 
     def onJobCompletion(self, job):
         self._scheduler.debug(
             "decision process received job completion({})".format(job))
-        jobobj = self._scheduler._job_map[job.id]
-        jobobj._complete_job(self._scheduler)
+        jobobj = self._jobmap[job.id]
+        del self._jobmap[job.id]
+        jobobj._do_complete_job(self._scheduler)
+
+        self._scheduler.on_job_completion(jobobj)
         self._scheduler._do_schedule()
 
     def onMachinePStateChanged(self, nodeid, pstate):
@@ -81,12 +93,16 @@ class BaseBatsimScheduler(BatsimScheduler):
         # TODO
         # set resource._state with given nodeid to pstate
         # also add the resource to _new_changed_resources
+
+        self._scheduler.on_machine_pstate_changed(nodeid, pstate)
         self._scheduler._do_schedule()
 
     def onReportEnergyConsumed(self, consumed_energy):
         self._scheduler.debug(
             "decision process received energy consumed reply({})".format(
                 consumed_energy))
+
+        self._scheduler.on_report_energy_consumed(consumed_energy)
         self._scheduler._do_schedule(
             BatsimReply(consumed_energy=consumed_energy))
 
@@ -108,19 +124,8 @@ class Scheduler(metaclass=ABCMeta):
         # Use the basic Pybatsim scheduler to wrap the Batsim API
         self._scheduler = BaseBatsimScheduler(self, options)
 
-        self._job_map = {}
-
         self._time = 0
 
-        self._new_open_jobs = []
-        self._new_completed_jobs = []
-        self._new_changed_resources = []
-
-        self._open_jobs = []
-        self._dyn_jobs = []
-        self._completed_jobs = []
-        self._rejected_jobs = []
-        self._scheduled_jobs = []
         self._reply = None
 
         self._sched_delay = float(
@@ -128,59 +133,10 @@ class Scheduler(metaclass=ABCMeta):
                 "sched_delay",
                 None) or 0.00000000000001)
 
+        self._jobs = Jobs()
         self._resources = Resources()
 
         self.debug("Scheduler initialised")
-
-    @property
-    def options(self):
-        """The options given to the launcher."""
-        return self._options
-
-    @property
-    def resources(self):
-        """The searchable collection of resources."""
-        return self._resources
-
-    @property
-    def open_jobs(self):
-        """The open jobs (yet to be scheduled)."""
-        return tuple(self._open_jobs)
-
-    @property
-    def completed_jobs(self):
-        """The completed jobs (already scheduled)."""
-        return tuple(self._completed_jobs)
-
-    @property
-    def rejected_jobs(self):
-        """The rejected jobs."""
-        return tuple(self._rejected_jobs)
-
-    @property
-    def scheduled_jobs(self):
-        """The currently scheduled jobs."""
-        return tuple(self._scheduled_jobs)
-
-    @property
-    def reply(self):
-        """The last reply from Batsim (or None)."""
-        return self._reply
-
-    @property
-    def new_open_jobs(self):
-        """The jobs which are new in this iteration."""
-        return (self._new_open_jobs)
-
-    @property
-    def new_completed_jobs(self):
-        """The jobs which were completed in this iteration."""
-        return tuple(self._new_completed_jobs)
-
-    @property
-    def time(self):
-        """The current simulation time."""
-        return self._time
 
     def _init_logger(self):
         debug = self.options.get("debug", False)
@@ -207,6 +163,31 @@ class Scheduler(metaclass=ABCMeta):
         handler.setFormatter(formatter)
         self._logger.addHandler(handler)
 
+    @property
+    def options(self):
+        """The options given to the launcher."""
+        return self._options
+
+    @property
+    def resources(self):
+        """The searchable collection of resources."""
+        return self._resources
+
+    @property
+    def jobs(self):
+        """The searchable collection of jobs."""
+        return self._jobs
+
+    @property
+    def reply(self):
+        """The last reply from Batsim (or None)."""
+        return self._reply
+
+    @property
+    def time(self):
+        """The current simulation time."""
+        return self._time
+
     def run_scheduler_at(self, time):
         """Wake the scheduler at the given point in time (of the simulation)."""
         self._batsim.wake_me_up_at(time)
@@ -223,7 +204,7 @@ class Scheduler(metaclass=ABCMeta):
     def has_time_sharing(self):
         return self._batsim.time_sharing
 
-    def _pre_init(self):
+    def _on_pre_init(self):
         """The _pre_init method called during the start-up phase of the scheduler.
         If the _pre_init method is overridden the super method should be called with:
         `super()._pre_init()`
@@ -231,18 +212,18 @@ class Scheduler(metaclass=ABCMeta):
         resources = []
         for r in self._batsim.resources:
             resources.append(Resource(self,
-                r["id"],
-                r["name"],
-                r["state"],
-                r["properties"]))
+                                      r["id"],
+                                      r["name"],
+                                      r["state"],
+                                      r["properties"]))
         self._resources = Resources(resources)
         self.info("{} resources registered".format(len(self.resources)))
 
-    def init(self):
+    def on_init(self):
         """The init method called during the start-up phase of the scheduler."""
         pass
 
-    def _post_init(self):
+    def _on_post_init(self):
         """The _post_init method called during the start-up phase of the scheduler.
         If the _post_init method is overridden the super method should be called with:
         `super()._post_init()`
@@ -286,28 +267,26 @@ class Scheduler(metaclass=ABCMeta):
         If the _post_schedule method is overridden the super method should be called with:
         `super()._post_schedule()`
         """
-        for j in self._dyn_jobs[:]:
-            if j.dynamically_submitted:
-                j._do_dyn_submit(self)
+        for j in self.jobs.filter(marked_for_dynamic_submission=True):
+            j._do_dyn_submit(self)
 
-        for j in self._open_jobs[:]:
-            if j.scheduled:
-                j._do_execute(self)
-            elif j.rejected:
-                j._do_reject(self)
+        for j in self.jobs.marked_for_scheduling:
+            j._do_execute(self)
 
-        for j in self._scheduled_jobs[:]:
-            if j.killed:
-                j._do_kill(self)
+        for j in self.jobs.marked_for_rejection:
+            j._do_reject(self)
 
-        #for r in self._resources:
+        for j in self.jobs.marked_for_killing:
+            j._do_kill(self)
+
+        # for r in self._resources:
         #    if r._state != r._new_state:
         #        r._do_change_state(self)
 
-        if self._open_jobs:
+        if self.jobs.open:
             self.debug(
                 "{} jobs open at end of scheduling iteration", len(
-                    self._open_jobs))
+                    self.jobs.open))
 
         self.debug("Ending scheduling iteration")
 
@@ -320,32 +299,41 @@ class Scheduler(metaclass=ABCMeta):
 
         self._batsim.consume_time(self._sched_delay)
 
-        self._new_open_jobs = []
-        self._new_completed_jobs = []
-        self._new_changed_resources = []
-
-    def _pre_end(self):
+    def _on_pre_end(self):
         """The _pre_end method called during the shut-down phase of the scheduler.
         If the _pre_end method is overridden the super method should be called with:
         `super()._pre_end()`
         """
-        if self._open_jobs:
+        if self.jobs.open:
             self.warn(
                 "{} jobs still in state open at end of simulation", len(
-                    self._open_jobs))
+                    self.jobs.open))
 
-        if self._scheduled_jobs:
-            self.warn(
-                "{} jobs still in state scheduled at end of simulation", len(
-                    self._scheduled_jobs))
-
-    def end(self):
+    def on_end(self):
         """The end method called during the shut-down phase of the scheduler."""
         pass
 
-    def _post_end(self):
+    def _on_post_end(self):
         """The _post_end method called during the shut-down phase of the scheduler.
         If the _post_end method is overridden the super method should be called with:
         `super()._post_end()`
         """
+        pass
+
+    def on_nop(self):
+        pass
+
+    def on_jobs_killed(self, jobs):
+        pass
+
+    def on_job_submission(self, job):
+        pass
+
+    def on_job_completion(self, job):
+        pass
+
+    def on_machine_pstate_changed(self, nodeid, pstate):
+        pass
+
+    def on_report_energy_consumed(self, consumed_energy):
         pass

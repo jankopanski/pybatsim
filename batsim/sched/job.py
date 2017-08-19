@@ -8,6 +8,8 @@
 """
 from batsim.batsim import Job as BatsimJob
 
+from .utils import FilterList
+
 
 class Job:
     """A job is a wrapper around a batsim job to extend the basic API of Pybatsim with more
@@ -18,11 +20,17 @@ class Job:
 
     def __init__(self, batsim_job=None):
         self._batsim_job = batsim_job
+
+        self._marked_for_scheduling = False
         self._scheduled = False
-        self._submitted = False
+
         self._killed = False
+        self._marked_for_killing = False
+
         self._rejected = False
+        self._marked_for_rejection = False
         self._rejected_reason = None
+
         self._reservation = []
         self._previous_reservations = []
 
@@ -43,8 +51,8 @@ class Job:
         # To free resources the job does either have to be not submitted yet
         # or the job has to be completed (i.e. the job status is set by
         # batsim).
-        assert not self._submitted or self._batsim_job.status in [
-            "SUCCESS", "TIMEOUT"]
+        assert (
+            not self.marked_for_scheduling and not self.scheduled) or self.completed
 
         if not recursive_call:
             resource.free(self, recursive_call=True)
@@ -60,29 +68,123 @@ class Job:
         self._reservation += resource.resources
 
     @property
-    def scheduled(self):
+    def open(self):
+        """Whether or not this job is still open."""
+        return True not in [
+            self.completed,
+            self.marked_for_scheduling, self.scheduled,
+            self.marked_for_killing, self.killed,
+            self.marked_for_rejection, self.rejected]
+
+    @property
+    def completed(self):
+        """Whether or not this job has been completed."""
+        return self._batsim_job.status in ["SUCCESS", "TIMEOUT"]
+
+    @property
+    def marked_for_scheduling(self):
         """Whether or not this job was marked for scheduling at the end of the iteration."""
+        return self._marked_for_scheduling
+
+    @property
+    def scheduled(self):
+        """Whether or not this job was already submitted to Batsim for exection."""
         return self._scheduled
+
+    def _do_execute(self, scheduler):
+        """Internal method to execute the execution of the job."""
+        assert self._batsim_job is not None
+        assert not self.scheduled and not self.rejected
+
+        if self.marked_for_scheduling and not self.scheduled:
+            if self._batsim_job.requested_resources < len(self._reservation):
+                scheduler.warn(
+                    "Scheduling of job ({}) is postponed since not enough resources are allocated",
+                    self)
+                return
+
+            alloc = []
+            for res in self._reservation[:self._batsim_job.requested_resources]:
+                alloc.append(res.id)
+
+            scheduler._batsim.start_jobs(
+                [self._batsim_job], {self._batsim_job.id: alloc})
+
+            scheduler.info("Scheduled job ({})", self)
+            self._marked_for_scheduling = False
+            self._scheduled = True
+
+    def _do_complete_job(self, scheduler):
+        scheduler.info("Remove completed job and free resources: {}"
+                       .format(self))
+        self.free_all()
+
+    @property
+    def marked_for_rejection(self):
+        """Whether or not this job will be rejected at the end of the iteration."""
+        return self._marked_for_rejection
 
     @property
     def rejected(self):
-        """Whether or not this job will be rejected at the end of the iteration."""
+        """Whether or not this job was submitted for rejection to batsim."""
         return self._rejected
+
+    @property
+    def rejected_reason(self):
+        """The reason for the rejection"""
+        return self._rejected_reason
+
+    def reject(self, reason=""):
+        """Reject the job. A reason can be given which will show up in the scheduler logs.
+        However, it will currently not show up in Batsim directly as a rejecting reason is
+        not part of the protocol."""
+        assert self._batsim_job
+        assert not self.rejected and not self.scheduled and not self.killed
+
+        self._marked_for_rejection = True
+        self._rejected_reason = reason
+
+    def _do_reject(self, scheduler):
+        """Internal method to execute the rejecting of the job."""
+        if self.marked_for_rejection and not self.rejected:
+            scheduler.info(
+                "Rejecting job ({}), reason={}",
+                self, self.rejected_reason)
+            scheduler._batsim.reject_jobs([self._batsim_job])
+            del scheduler._scheduler._jobmap[self._batsim_job.id]
+
+            self._rejected = True
+            self._marked_for_rejection = False
+
+    @property
+    def marked_for_killing(self):
+        """Whether or not this job was marked for killing at the end of the iteration."""
+        return self._marked_for_killing
+
+    @property
+    def killed(self):
+        """Whether or not this job has been sent to Batsim for killing."""
+        return self._killed
+
+    def kill(self):
+        """Kill the current job during its execution."""
+        assert self._batsim_job
+        assert not self.rejected
+        self._killed = True
+
+    def _do_kill(self, scheduler):
+        """Internal method to execute the killing of the job."""
+        if self.marked_for_killing and not self.killed:
+            scheduler.info("Killing job ({})", self)
+            scheduler._batsim.kill_jobs([self._batsim_job])
+
+            self._killed = True
+            self._marked_for_killing = True
 
     @property
     def reservation(self):
         """Returns the current reservation of this job."""
         return tuple(self._reservation)
-
-    @property
-    def submitted(self):
-        """Whether or not this job was already submitted to Batsim for exection."""
-        return self._submitted
-
-    @property
-    def killed(self):
-        """Whether or not this job was marked for killing at the end of the iteration."""
-        return self._killed
 
     @property
     def previous_reservations(self):
@@ -93,22 +195,13 @@ class Job:
         """Mark this job for scheduling. This can also be done even when not enough resources are
         reserved. The job will not be sent to Batsim until enough resources were reserved."""
         assert not self.rejected
+        assert not self.scheduled
         assert self._batsim_job
 
         if resource:
             self.reserve(resource)
 
-        assert not self.submitted
-        self._scheduled = True
-
-    def reject(self, reason=""):
-        """Reject the job. A reason can be given which will show up in the scheduler logs.
-        However, it will currently not show up in Batsim directly as a rejecting reason is
-        not part of the protocol."""
-        assert self._batsim_job
-        assert not self.submitted and not self.scheduled
-        self._rejected = True
-        self._rejected_reason = reason
+        self._marked_for_scheduling = True
 
     def change_state(self, scheduler, state, kill_reason=""):
         """Change the state of a job. This is only needed in rare cases where the real job
@@ -116,66 +209,6 @@ class Job:
         """
         assert self._batsim_job
         scheduler._batsim.change_job_state(job, state, kill_reason)
-
-    def kill(self):
-        """Kill the current job during its execution."""
-        assert self._batsim_job
-        assert not self.rejected
-        self._killed = True
-
-    def _do_kill(self, scheduler):
-        """Internal method to execute the killing of the job."""
-        scheduler.info("Killing job ({})", self)
-        scheduler._batsim.kill_jobs([self._batsim_job])
-
-    def _do_reject(self, scheduler):
-        """Internal method to execute the rejecting of the job."""
-        scheduler.info(
-            "Rejecting job ({}), reason={}",
-            self, self._rejected_reason)
-        scheduler._batsim.reject_jobs([self._batsim_job])
-        scheduler._open_jobs.remove(self)
-        scheduler._rejected_jobs.append(self)
-        del scheduler._job_map[self._batsim_job.id]
-
-    def _do_execute(self, scheduler):
-        """Internal method to execute the execution of the job."""
-        assert self._batsim_job is not None
-        assert not self.submitted and not self.rejected
-
-        if not self.scheduled:
-            self.schedule()
-
-        if self._batsim_job.requested_resources < len(self._reservation):
-            scheduler.warn(
-                "Starting of job ({}) is postponed since not enough resources are allocated",
-                self)
-            return
-
-        self._submitted = True
-
-        alloc = []
-        for res in self._reservation[:self._batsim_job.requested_resources]:
-            alloc.append(res.id)
-
-        scheduler._batsim.start_jobs(
-            [self._batsim_job], {self._batsim_job.id: alloc})
-
-        self._scheduled = False
-
-        scheduler._open_jobs.remove(self)
-        scheduler._scheduled_jobs.append(self)
-
-        scheduler.info("Starting job ({})", self)
-
-    def _complete_job(self, scheduler):
-        scheduler.info("Remove completed job and free resources: {}"
-                       .format(self))
-        self.free_all()
-        scheduler._scheduled_jobs.remove(self)
-        scheduler._completed_jobs.append(self)
-        scheduler._new_completed_jobs.append(self)
-        del scheduler._job_map[self._batsim_job.id]
 
     def __str__(self):
         return (
@@ -232,7 +265,7 @@ class Job:
         return self._batsim_job.kill_reason
 
     @classmethod
-    def create(cls, *args, **kwargs):
+    def create_dynamic(cls, *args, **kwargs):
         return UserJob(*args, **kwargs)
 
 
@@ -271,6 +304,7 @@ class UserJob(Job):
         self._user_profile_name = profile_name
         self._user_workload_name = workload_name
 
+        self._dyn_marked_submission = False
         self._dyn_submitted = False
 
     @property
@@ -319,28 +353,190 @@ class UserJob(Job):
 
     def submit(self, scheduler):
         """Marks a dynamic job for submission in the `scheduler`."""
-        self._dyn_submitted = True
-        scheduler._dyn_jobs.append(self)
+        if not self._dyn_marked_submission and not self._dyn_submitted:
+            self._dyn_marked_submission = True
+            scheduler._jobs.append(self)
+
+    @property
+    def marked_for_dyanmic_submission(self):
+        """Whether or not this job object was marked for dynamic submission."""
+        return self._dyn_marked_submission
 
     @property
     def dynamically_submitted(self):
-        """Whether or not this job object was marked for dynamic submission."""
+        """Whether or not this job object was dynamically submitted."""
         return self._dyn_submitted
 
     def _do_dyn_submit(self, scheduler):
         """Execute the dynamic job submission in the `scheduler`."""
-        # The profile object will be executed if it is no dictionary already to
-        # allow complex Profile objects.
-        profile = self._user_profile
-        if not isinstance(profile, dict):
-            profile = profile()
+        if self._dyn_marked_submission and not self._dyn_submitted:
+            # The profile object will be executed if it is no dictionary already to
+            # allow complex Profile objects.
+            profile = self._user_profile
+            if not isinstance(profile, dict):
+                profile = profile()
 
-        scheduler.info("Submit dynamic job ({})", self)
-        scheduler._batsim.submit_job(
-            self._user_job_id,
-            self._user_requested_resources,
-            self._user_requested_time,
-            profile,
-            self._user_profile_name,
-            self._user_workload_name)
-        scheduler._dyn_jobs.remove(self)
+            scheduler.info("Submit dynamic job ({})", self)
+            scheduler._batsim.submit_job(
+                self._user_job_id,
+                self._user_requested_resources,
+                self._user_requested_time,
+                profile,
+                self._user_profile_name,
+                self._user_workload_name)
+
+            self._dyn_submitted = True
+            self._dyn_marked_submission = False
+
+
+class Jobs(FilterList):
+    """Helper class implementing parts of the python list API to manage the jobs.
+
+       :param from_list: a list of `Job` objects to be managed by this wrapper.
+    """
+
+    @property
+    def open(self):
+        return self.filter(open=True)
+
+    @property
+    def completed(self):
+        return self.filter(completed=True)
+
+    @property
+    def rejected(self):
+        return self.filter(rejected=True)
+
+    @property
+    def marked_for_rejection(self):
+        return self.filter(marked_for_rejection=True)
+
+    @property
+    def scheduled(self):
+        return self.filter(scheduled=True)
+
+    @property
+    def marked_for_scheduling(self):
+        return self.filter(marked_for_scheduling=True)
+
+    @property
+    def killed(self):
+        return self.filter(killed=True)
+
+    @property
+    def marked_for_killing(self):
+        return self.filter(marked_for_killing=True)
+
+    @property
+    def dynamically_submitted(self):
+        return self.filter(dynamically_submitted=True)
+
+    @property
+    def marked_for_dynamic_submission(self):
+        return self.filter(marked_for_dyanmic_submission=True)
+
+    def filter(
+            self,
+            cond=None,
+            open=False,
+            completed=False,
+            rejected=False,
+            marked_for_rejection=False,
+            scheduled=False,
+            marked_for_scheduling=False,
+            killed=False,
+            marked_for_killing=False,
+            dynamically_submitted=False,
+            marked_for_dynamic_submission=False,
+            limit=None,
+            min=None,
+            num=None):
+        """Filter the jobs lists to search for jobs.
+
+        :param cond: a function evaluating the current resource and returns True or False whether or not the resource should be returned.
+
+        :param open: whether the job is still open.
+
+        :param completed: whether the job has already been completed.
+
+        :param rejected: whether the job has already been rejected.
+
+        :param marked_for_rejection: whether the job has been marked for rejection.
+
+        :param scheduled: whether the job has already been scheduled.
+
+        :param marked_for_scheduling: whether the job has been marked for scheduling.
+
+        :param killed: whether the job has been sent for killing.
+
+        :param marked_for_killing: whether the job has been marked for killing.
+
+        :param dynamically_submitted: whether the job has been submited as dynamic job.
+
+        :param marked_for_dynamic_submission: whether the job has been marked for dynamic job submission.
+
+        :param limit: the maximum number of returned jobs.
+
+        :param min: the minimum number of returned jobs (if less jobs are available no jobs will be returned at all).
+
+        :param num: the exact number of returned jobs.
+        """
+
+        # Yield all jobs if not filtered
+        if True not in [
+                open, completed,
+                rejected, marked_for_rejection,
+                scheduled, marked_for_scheduling,
+                killed, marked_for_killing,
+                dynamically_submitted, marked_for_dynamic_submission]:
+            open = True
+            completed = True
+
+            rejected = True
+            marked_for_rejection = True
+
+            scheduled = True
+            marked_for_scheduling = True
+
+            killed = True
+            marked_for_killing = True
+
+            dynamically_submitted = True
+            marked_for_dynamic_submission = True
+
+        # Filter jobs
+        def filter_jobs(jobs):
+            for j in jobs:
+                if j.completed:
+                    if completed:
+                        yield j
+                elif j.rejected:
+                    if rejected:
+                        yield j
+                elif j.marked_for_rejection:
+                    if marked_for_rejection:
+                        yield j
+                elif j.scheduled:
+                    if scheduled:
+                        yield j
+                elif j.marked_for_scheduling:
+                    if marked_for_scheduling:
+                        yield j
+                elif j.killed:
+                    if killed:
+                        yield j
+                elif j.marked_for_killing:
+                    if marked_for_killing:
+                        yield j
+                elif isinstance(j, UserJob):
+                    if j.dynamically_submitted:
+                        if dynamically_submitted:
+                            yield j
+                    elif j.marked_for_dynamic_submission:
+                        if marked_for_dynamic_submission:
+                            yield j
+                else:  # open job
+                    if open:
+                        yield j
+
+        return self.base_filter([filter_jobs], cond, limit, min, num)
