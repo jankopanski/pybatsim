@@ -268,6 +268,11 @@ class Job:
     def create_dynamic(cls, *args, **kwargs):
         return UserJob(*args, **kwargs)
 
+    @property
+    def is_user_job(self):
+        return self.id.startswith(UserJob.DYNAMIC_JOB_PREFIX +
+                                  UserJob.DYNAMIC_JOB_DELIMITER)
+
 
 class UserJob(Job):
     """A UserJob may be used to construct dynamic jobs afterwards submitted to the scheduler.
@@ -288,21 +293,25 @@ class UserJob(Job):
     :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
     """
 
+    DYNAMIC_JOB_PREFIX = "USERJOB"
+    DYNAMIC_JOB_DELIMITER = "::"
+
     def __init__(
             self,
             job_id,
             requested_resources,
             requested_time,
             profile,
-            profile_name=None,
-            workload_name=None):
+            profile_name=None):
         super().__init__(None)
-        self._user_job_id = job_id
+        self._user_job_id = (
+            UserJob.DYNAMIC_JOB_PREFIX +
+            UserJob.DYNAMIC_JOB_DELIMITER +
+            (job_id or ""))
         self._user_requested_resources = requested_resources
         self._user_requested_time = requested_time
         self._user_profile = profile
         self._user_profile_name = profile_name
-        self._user_workload_name = workload_name
 
         self._dyn_marked_submission = False
         self._dyn_submitted = False
@@ -332,10 +341,6 @@ class UserJob(Job):
         return self._user_profile
 
     @property
-    def workload_name(self):
-        return self._user_workload_name
-
-    @property
     def finish_time(self):
         return None
 
@@ -355,7 +360,7 @@ class UserJob(Job):
         """Marks a dynamic job for submission in the `scheduler`."""
         if not self._dyn_marked_submission and not self._dyn_submitted:
             self._dyn_marked_submission = True
-            scheduler._jobs.append(self)
+            scheduler.jobs.append(self)
 
     @property
     def marked_for_dynamic_submission(self):
@@ -387,7 +392,7 @@ class UserJob(Job):
                 self._user_requested_time,
                 profile,
                 self._user_profile_name,
-                self._user_workload_name)
+                self._user_job_id)
 
             self._dyn_submitted = True
             self._dyn_marked_submission = False

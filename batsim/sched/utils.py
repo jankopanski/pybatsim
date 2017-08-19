@@ -44,6 +44,9 @@ class FilterList:
         """Concatenate two lists."""
         return self.create(set(self._data + other._data))
 
+    def __str__(self):
+        return str([str(entry) for entry in self._data])
+
     @property
     def all(self):
         return tuple(self._data)

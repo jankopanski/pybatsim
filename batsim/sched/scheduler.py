@@ -73,6 +73,14 @@ class BaseBatsimScheduler(BatsimScheduler):
 
         self._scheduler.jobs.append(newjob)
 
+        if newjob.is_user_job:
+            for job2 in self._scheduler.jobs.dynamically_submitted:
+                self._scheduler.error("XX: {}", job)
+                self._scheduler.error("YY: {}", job2)
+                if job.id.startswith(job2.id.replace("!", "%")):
+                    self._scheduler.jobs.remove(job2)
+                    break
+
         self._scheduler.on_job_submission(newjob)
         self._scheduler._do_schedule()
 
