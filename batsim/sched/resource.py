@@ -5,6 +5,7 @@
     This module provides an abstraction around resources to keep track of allocations.
 
 """
+from enum import Enum
 
 
 class Resource:
@@ -16,16 +17,27 @@ class Resource:
     :param batsim_id: the id of this resource.
     """
 
-    def __init__(self, scheduler, batsim_id=-1):
+    class State(Enum):
+        SLEEPING = 0
+        IDLE = 1
+        COMPUTING = 2
+        TRANSITING_FROM_SLEEPING_TO_COMPUTING = 3
+        TRANSITING_FROM_COMPUTING_TO_SLEEPING = 4
+
+    def __init__(self, scheduler, id, name, state, properties):
         self._scheduler = scheduler
-        self._id = batsim_id
+        self._id = id
+        self._name = name
+        try:
+            self._state = Resource.State[(state or "").upper()]
+        except KeyError:
+            raise ValueError("Invalid machine state: {}, {}={}"
+                    .format(id, name, state))
+        self._properties = properties
+
         self._allocated_by = []
         self._previously_allocated_by = []
         self._computing = False
-
-        # TODO: get resource information from Batsim
-        self._state = 0
-        self._new_state = 0
 
     @property
     def id(self):
@@ -67,10 +79,6 @@ class Resource:
     @property
     def state(self):
         return self._state
-
-    @state.setter
-    def state(self, value):
-        self._new_state = value
 
     def _do_change_state(self, scheduler):
         scheduler._batsim.set_resource_state([self.id], self._new_state)

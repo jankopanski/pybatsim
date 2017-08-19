@@ -276,6 +276,10 @@ class Batsim(object):
                     self.redis = DataStorage(redis_prefix, redis_hostname,
                                              redis_port)
 
+                self.resources = event_data["resources_data"]
+
+                self.hpst = event_data.get("hpst_host", None)
+                self.lcst = event_data.get("lcst_host", None)
                 self.scheduler.onSimulationBegins()
 
             elif event_type == "SIMULATION_ENDS":

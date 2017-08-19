@@ -228,8 +228,14 @@ class Scheduler(metaclass=ABCMeta):
         If the _pre_init method is overridden the super method should be called with:
         `super()._pre_init()`
         """
-        self._resources = Resources([Resource(self, id)
-                                     for id in range(self._batsim.nb_res)])
+        resources = []
+        for r in self._batsim.resources:
+            resources.append(Resource(self,
+                r["id"],
+                r["name"],
+                r["state"],
+                r["properties"]))
+        self._resources = Resources(resources)
         self.info("{} resources registered".format(len(self.resources)))
 
     def init(self):
@@ -294,9 +300,9 @@ class Scheduler(metaclass=ABCMeta):
             if j.killed:
                 j._do_kill(self)
 
-        for r in self._resources:
-            if r._state != r._new_state:
-                r._do_change_state(self)
+        #for r in self._resources:
+        #    if r._state != r._new_state:
+        #        r._do_change_state(self)
 
         if self._open_jobs:
             self.debug(
