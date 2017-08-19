@@ -219,6 +219,10 @@ class Scheduler(metaclass=ABCMeta):
         """Return the underlying Pybatsim scheduler."""
         return self._scheduler
 
+    @property
+    def has_time_sharing(self):
+        return self._batsim.time_sharing
+
     def _pre_init(self):
         """The _pre_init method called during the start-up phase of the scheduler.
         If the _pre_init method is overridden the super method should be called with:

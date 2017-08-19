@@ -265,6 +265,7 @@ class Batsim(object):
             if event_type == "SIMULATION_BEGINS":
                 self.nb_res = event_data["nb_resources"]
                 batconf = event_data["config"]
+                self.time_sharing = event_data["allow_time_sharing"]
 
                 self.redis_enabled = batconf["redis"]["enabled"]
                 redis_hostname = batconf["redis"]["hostname"]
