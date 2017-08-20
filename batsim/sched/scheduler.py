@@ -106,11 +106,11 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler._do_schedule()
 
     def onMachinePStateChanged(self, nodeid, pstate):
-        # TODO
-        # set resource._state with given nodeid to pstate
-        # also add the resource to _new_changed_resources
-        #
-        # TODO: log message about changed machine state
+        resource = self._scheduler.resources[nodeid]
+        self._scheduler.info("Resource state was updated ({}) to {}"
+                             .format(resource, pstate))
+
+        resource.update_pstate_change(pstate)
 
         self._scheduler.on_machine_pstate_changed(nodeid, pstate)
         self._scheduler._do_schedule()
@@ -296,9 +296,9 @@ class Scheduler(metaclass=ABCMeta):
         for j in self.jobs.marked_for_killing:
             j._do_kill(self)
 
-        # for r in self._resources:
-        #    if r._state != r._new_state:
-        #        r._do_change_state(self)
+        for r in self._resources:
+            if r._pstate_update_request_necessary:
+                r._do_change_state(self)
 
         if self.jobs.open:
             self.debug(

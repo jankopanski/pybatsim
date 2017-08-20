@@ -39,6 +39,11 @@ class Resource:
 
         self._allocations = {}
 
+        self._pstate = None
+        self._old_pstate = None
+        self._pstate_update_in_progress = False
+        self._pstate_update_request_necessary = False
+
     @property
     def id(self):
         return self._id
@@ -50,6 +55,38 @@ class Resource:
     @property
     def allocations(self):
         return dict(self._allocations)
+
+    def _update_pstate_change(self, pstate):
+        self._old_pstate = self._pstate
+        self._pstate = pstate
+        self._pstate_update_in_progress = False
+        self._pstate_update_request_necessary = False
+
+    @property
+    def pstate_update_in_progress(self):
+        return self._pstate_update_in_progress
+
+    @property
+    def old_pstate(self):
+        return self._old_pstate
+
+    @property
+    def pstate(self):
+        return self._pstate
+
+    @pstate.setter
+    def pstate(self, newval):
+        if not self.pstate_update_in_progress:
+            self._old_pstate = self._pstate
+
+        self._pstate_update_request_necessary = True
+        self._pstate_update_in_progress = True
+
+        self._pstate = newval
+
+    def _do_change_state(self, scheduler):
+        self._pstate_update_request_necessary = False
+        scheduler._batsim.set_resource_state([self.id], self._new_state)
 
     def allocate(self, job, recursive_call=False):
         """Allocate the resource for the given job."""
@@ -72,13 +109,6 @@ class Resource:
         del self._allocations[job.id]
 
     @property
-    def state(self):
-        return self._state
-
-    def _do_change_state(self, scheduler):
-        scheduler._batsim.set_resource_state([self.id], self._new_state)
-
-    @property
     def resources(self):
         return [self]
 
@@ -89,6 +119,10 @@ class Resources(FilterList):
        :param from_list: a list of `Resource` objects to be managed by this wrapper.
     """
 
+    def __init__(self, *args, **kwargs):
+        self._resource_map = {}
+        super().__init__(*args, **kwargs)
+
     def allocate(self, job, recursive_call=False):
         """Allocate the job on the whole set of resources."""
         for r in self.all:
@@ -98,6 +132,24 @@ class Resources(FilterList):
         """Free the job from the whole set of resources."""
         for r in self.all:
             r.free(job, recursive_call=recursive_call)
+
+    def __getitem__(self, items):
+        return self._resource_map[items]
+
+    def __delitem__(self, index):
+        resource = self._resource_map[items]
+        self.remove(resource)
+
+    def __setitem__(self, index, element):
+        raise ValueError("Cannot override a resource id")
+
+    def _element_new(self, resource):
+        if resource.id:
+            self._resource_map[resource.id] = resource
+
+    def _element_del(self, resource):
+        if resource.id:
+            del self._resource_map[resource.id]
 
     @property
     def resources(self):
