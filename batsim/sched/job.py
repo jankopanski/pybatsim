@@ -70,6 +70,64 @@ class Job:
             resource.allocate(self, recursive_call=True)
         self._reservation += resource.resources
 
+    def dependencies_fulfilled(self, jobs):
+        for dep in self.get_resolved_dependencies(jobs):
+            if not isinstance(dep, Job) or not dep.completed:
+                return False
+        return True
+
+    def get_resolved_dependencies(self, jobs):
+        result = []
+        for dep in self.dependencies:
+            jobparts = self.id.split("!")
+            workload_name = "!".join(jobparts[:len(jobparts) - 1])
+            job_id = jobparts[-1]
+
+            dep_job_id = str(workload_name) + "!" + str(dep)
+            try:
+                dep_job = jobs[dep_job_id]
+                result.append(dep_job)
+            except KeyError:
+                result.append(dep_job_id)
+        return tuple(result)
+
+    @property
+    def dependencies(self):
+        return self.get_job_data("deps") or ()
+
+    @property
+    def qos(self):
+        return self.get_job_data("qos") or ""
+
+    @property
+    def user(self):
+        return self.get_job_data("user") or ""
+
+    @property
+    def partition(self):
+        return self.get_job_data("partition") or ""
+
+    @property
+    def job_group(self):
+        return self.get_job_data("group") or ""
+
+    @property
+    def comment(self):
+        return self.get_job_data("comment") or ""
+
+    @property
+    def application(self):
+        return self.get_job_data("application") or ""
+
+    def get_job_data(self, key):
+        if not self._batsim_job:
+            return None
+        return self._batsim_job.json_dict.get(key, None)
+
+    def is_runnable(self, jobs):
+        """Whether the job is open and has only fulfilled dependencies."""
+        return self.dependencies_fulfilled(jobs) and self.open
+
     @property
     def open(self):
         """Whether or not this job is still open."""
@@ -419,6 +477,32 @@ class Jobs(FilterList):
        :param from_list: a list of `Job` objects to be managed by this wrapper.
     """
 
+    def __init__(self, *args, **kwargs):
+        self._job_map = {}
+        super().__init__(*args, **kwargs)
+
+    def __getitem__(self, items):
+        return self._job_map[items]
+
+    def __delitem__(self, index):
+        job = self._job_map[items]
+        self.remove(job)
+
+    def __setitem__(self, index, element):
+        raise ValueError("Cannot override a job id")
+
+    def _element_new(self, job):
+        if job.id:
+            self._job_map[job.id] = job
+
+    def _element_del(self, job):
+        if job.id:
+            del self._job_map[job.id]
+
+    @property
+    def runnable(self):
+        return self.filter(runnable=True)
+
     @property
     def open(self):
         return self.filter(open=True)
@@ -462,6 +546,7 @@ class Jobs(FilterList):
     def filter(
             self,
             cond=None,
+            runnable=False,
             open=False,
             completed=False,
             rejected=False,
@@ -478,6 +563,8 @@ class Jobs(FilterList):
         """Filter the jobs lists to search for jobs.
 
         :param cond: a function evaluating the current resource and returns True or False whether or not the resource should be returned.
+
+        :param runnable: whether the job is runnable (open and dependencies fulfilled).
 
         :param open: whether the job is still open.
 
@@ -508,11 +595,14 @@ class Jobs(FilterList):
 
         # Yield all jobs if not filtered
         if True not in [
+                runnable,
                 open, completed,
                 rejected, marked_for_rejection,
                 scheduled, marked_for_scheduling,
                 killed, marked_for_killing,
                 dynamically_submitted, marked_for_dynamic_submission]:
+            runnable = True
+
             open = True
             completed = True
 
@@ -562,5 +652,8 @@ class Jobs(FilterList):
                 else:  # open job
                     if open:
                         yield j
+                    elif j.is_runnable(self):
+                        if runnable:
+                            yield j
 
         return self.base_filter([filter_jobs], cond, limit, min, num)

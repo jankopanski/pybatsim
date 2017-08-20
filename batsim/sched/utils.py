@@ -12,6 +12,17 @@ class FilterList:
 
     def __init__(self, from_list=[]):
         self._data = list(from_list)
+        for i in from_list:
+            self._element_new(i)
+
+    def _element_new(self, element):
+        pass
+
+    def _element_del(self, element):
+        pass
+
+    def update_element(self, element):
+        pass
 
     def __len__(self):
         return len(self._data)
@@ -20,22 +31,42 @@ class FilterList:
         return self._data[items]
 
     def __delitem__(self, index):
+        has_elem = False
+        try:
+            oldelem = self._data[index]
+            has_elem = True
+        except KeyError:
+            pass
         del self._data[index]
+        if has_elem:
+            self._element_del(oldelem)
 
     def __setitem__(self, index, element):
+        has_elem = False
+        try:
+            oldelem = self._data[index]
+            has_elem = True
+        except KeyError:
+            pass
         self._data[index] = element
+        if has_elem:
+            self._element_del(oldelem)
+        self._element_new(element)
 
     def __str__(self):
         return str(self._data)
 
     def append(self, element):
         self._data.append(element)
+        self._element_new(element)
 
     def remove(self, element):
         self._data.remove(element)
+        self._element_del(element)
 
     def insert(self, index, element):
         self._data.insert(index, element)
+        self._element_new(element)
 
     def __iter__(self):
         return iter(self._data)
