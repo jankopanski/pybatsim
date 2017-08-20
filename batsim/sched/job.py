@@ -18,8 +18,9 @@ class Job:
     :param batsim_job: the batsim job object from the underlying Pybatsim scheduler.
     """
 
-    def __init__(self, batsim_job=None):
+    def __init__(self, batsim_job=None, parent_job=None):
         self._batsim_job = batsim_job
+        self._parent_job = parent_job
 
         self._marked_for_scheduling = False
         self._scheduled = False
@@ -33,6 +34,8 @@ class Job:
 
         self._reservation = []
         self._previous_reservations = []
+
+        self._sub_jobs = []
 
     def free_all(self):
         """Free all reserved resources."""
@@ -75,6 +78,14 @@ class Job:
             self.marked_for_scheduling, self.scheduled,
             self.marked_for_killing, self.killed,
             self.marked_for_rejection, self.rejected]
+
+    @property
+    def parent_job(self):
+        return self._parent_job
+
+    @property
+    def sub_jobs(self):
+        return tuple(self._sub_jobs)
 
     @property
     def completed(self):
@@ -268,6 +279,9 @@ class Job:
     def create_dynamic_job(cls, *args, **kwargs):
         return DynamicJob(*args, **kwargs)
 
+    def create_sub_job(self, *args, **kwargs):
+        return DynamicJob(*args, parent_job=self, **kwargs)
+
     @property
     def is_user_job(self):
         return self.id.startswith(Batsim.DYNAMIC_JOB_PREFIX + "!")
@@ -298,8 +312,9 @@ class DynamicJob(Job):
             requested_time,
             profile,
             profile_name=None,
-            workload_name=None):
-        super().__init__(None)
+            workload_name=None,
+            parent_job=None):
+        super().__init__(parent_job=parent_job)
         self._user_job_id = None
         self._user_requested_resources = requested_resources
         self._user_requested_time = requested_time
@@ -390,6 +405,9 @@ class DynamicJob(Job):
                 profile,
                 self._user_profile_name,
                 self._user_workload_name)
+
+            if self.parent_job:
+                self.parent_job._sub_jobs.append(self)
 
             self._dyn_submitted = True
             self._dyn_marked_submission = False
