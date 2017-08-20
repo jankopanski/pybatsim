@@ -8,7 +8,7 @@
 """
 from batsim.batsim import Job as BatsimJob, Batsim
 
-from .utils import FilterList
+from .utils import ObserveList, filter_list
 from .alloc import Allocation
 
 
@@ -518,7 +518,7 @@ class DynamicJob(Job):
             self._dyn_marked_submission = False
 
 
-class Jobs(FilterList):
+class Jobs(ObserveList):
     """Helper class implementing parts of the python list API to manage the jobs.
 
        :param from_list: a list of `Job` objects to be managed by this wrapper.
@@ -703,4 +703,4 @@ class Jobs(FilterList):
                         if runnable:
                             yield j
 
-        return self.base_filter([filter_jobs], cond, limit, min, num)
+        return self.create(filter_list(self._data, [filter_jobs], cond, limit, min, num))

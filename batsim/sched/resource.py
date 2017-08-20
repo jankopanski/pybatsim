@@ -7,7 +7,7 @@
 """
 from enum import Enum
 
-from .utils import FilterList
+from .utils import ObserveList, filter_list
 
 
 class Resource:
@@ -113,7 +113,7 @@ class Resource:
         return [self]
 
 
-class Resources(FilterList):
+class Resources(ObserveList):
     """Helper class implementing parts of the python list API to manage the resources.
 
        :param from_list: a list of `Resource` objects to be managed by this wrapper.
@@ -209,6 +209,6 @@ class Resources(FilterList):
                     if free:
                         yield r
 
-        return self.base_filter(
+        return self.create(filter_list(self._data,
             [filter_free_or_allocated_resources],
-            cond, limit, min, num)
+            cond, limit, min, num))
