@@ -33,37 +33,45 @@ class BaseBatsimScheduler(BatsimScheduler):
 
     def onAfterBatsimInit(self):
         self._scheduler.debug(
-            "decision process is executing after batsim init")
+            "decision process is executing after batsim init", type="on_init")
         self._scheduler._batsim = self.bs
         self._scheduler._on_pre_init()
         self._scheduler.on_init()
         self._scheduler._on_post_init()
 
     def onSimulationBegins(self):
-        self._scheduler.info("Simulation begins")
+        self._scheduler.info(
+            "Simulation begins",
+            type="simulation_begins_received")
 
     def onSimulationEnds(self):
-        self._scheduler.info("Simulation ends")
+        self._scheduler.info(
+            "Simulation ends",
+            type="simulation_ends_received")
         self._scheduler._on_pre_end()
         self._scheduler.on_end()
         self._scheduler._on_post_end()
 
     def onNOP(self):
-        self._scheduler.debug("decision process received NOP")
+        self._scheduler.debug(
+            "decision process received NOP",
+            type="nop_received")
         self._scheduler.on_nop()
         self._scheduler._do_schedule()
 
     def onJobsKilled(self, jobs):
         self._scheduler.debug(
-            "decision process received jobs kills({})".format(jobs))
+            "decision process received jobs kills({jobs})",
+            jobs=jobs,
+            type="jobs_killed_received2")
         jobobjs = []
         for job in jobs:
             jobobj = self._jobmap[job.id]
             del self._jobmap[job.id]
             jobobjs.append(job)
 
-        self._scheduler.info("The following jobs were killed: ({})"
-                             .format(jobobjs))
+        self._scheduler.info("The following jobs were killed: ({jobs})",
+                             jobs=jobobjs, type="jobs_killed_received")
 
         for job in jobobjs:
             job._do_complete_job(self._scheduler)
@@ -73,14 +81,16 @@ class BaseBatsimScheduler(BatsimScheduler):
 
     def onJobSubmission(self, job):
         self._scheduler.debug(
-            "decision process received job submission({})".format(job))
+            "decision process received job submission({job})",
+            job=job,
+            type="job_submission_received2")
         newjob = Job(batsim_job=job)
         self._jobmap[job.id] = newjob
 
         self._scheduler.jobs.append(newjob)
 
-        self._scheduler.info("Received job submission from Batsim ({})"
-                             .format(newjob))
+        self._scheduler.info("Received job submission from Batsim ({job})",
+                             job=newjob, type="job_submission_received")
 
         if newjob.is_user_job:
             for job2 in self._scheduler.jobs.dynamically_submitted:
@@ -93,12 +103,14 @@ class BaseBatsimScheduler(BatsimScheduler):
 
     def onJobCompletion(self, job):
         self._scheduler.debug(
-            "decision process received job completion({})".format(job))
+            "decision process received job completion({job})",
+            job=job,
+            type="job_completion_received2")
         jobobj = self._jobmap[job.id]
         del self._jobmap[job.id]
 
-        self._scheduler.info("Job has completed its execution ({})"
-                             .format(jobobj))
+        self._scheduler.info("Job has completed its execution ({job})",
+                             job=jobobj, type="job_completion_received")
 
         jobobj._do_complete_job(self._scheduler)
 
@@ -107,8 +119,11 @@ class BaseBatsimScheduler(BatsimScheduler):
 
     def onMachinePStateChanged(self, nodeid, pstate):
         resource = self._scheduler.resources[nodeid]
-        self._scheduler.info("Resource state was updated ({}) to {}"
-                             .format(resource, pstate))
+        self._scheduler.info(
+            "Resource state was updated ({resource}) to {pstate}",
+            resource=resource,
+            pstate=pstate,
+            type="pstate_change_received")
 
         resource.update_pstate_change(pstate)
 
@@ -116,8 +131,10 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler._do_schedule()
 
     def onReportEnergyConsumed(self, consumed_energy):
-        self._scheduler.info("Received reply from Batsim (energy_consumed={})"
-                             .format(consumed_energy))
+        self._scheduler.info(
+            "Received reply from Batsim (energy_consumed={energy_consumed})",
+            energy_consumed=consumed_energy,
+            type="reply_energy_received")
 
         self._scheduler.on_report_energy_consumed(consumed_energy)
         self._scheduler._do_schedule(
@@ -153,7 +170,7 @@ class Scheduler(metaclass=ABCMeta):
         self._jobs = Jobs()
         self._resources = Resources()
 
-        self.debug("Scheduler initialised")
+        self.debug("Scheduler initialised", type="scheduler_initialised")
 
     def _init_logger(self):
         debug = self.options.get("debug", False)
@@ -169,16 +186,21 @@ class Scheduler(metaclass=ABCMeta):
         formatter = logging.Formatter(
             '[%(name)s::%(levelname)s] %(message)s')
 
-        handler = logging.FileHandler(
-            "out_scheduler_{}.log".format(self.__class__.__name__))
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        self._logger.addHandler(handler)
-
         handler = logging.StreamHandler()
         handler.setLevel(logging.INFO)
         handler.setFormatter(formatter)
         self._logger.addHandler(handler)
+
+        self._event_logger = logging.getLogger(
+            self.__class__.__name__ + "Events")
+        self._event_logger.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(message)s')
+
+        handler = logging.FileHandler(
+            "out_scheduler_events_{}.csv".format(self.__class__.__name__))
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(formatter)
+        self._event_logger.addHandler(handler)
 
     @property
     def options(self):
@@ -234,7 +256,11 @@ class Scheduler(metaclass=ABCMeta):
                                       r["state"],
                                       r["properties"]))
         self._resources = Resources(resources)
-        self.info("{} resources registered".format(len(self.resources)))
+        self.info(
+            "{num_resources} resources registered",
+            num_resources=len(
+                self.resources),
+            type="resources_registered")
 
     def on_init(self):
         """The init method called during the start-up phase of the scheduler."""
@@ -252,27 +278,41 @@ class Scheduler(metaclass=ABCMeta):
         If the _pre_schedule method is overridden the super method should be called with:
         `super()._pre_schedule()`
         """
-        self.debug("Starting scheduling iteration")
+        self.debug(
+            "Starting scheduling iteration",
+            type="scheduling_iteration_started")
 
-    def _format_msg(self, msg, *args, **kwargs):
-        msg = msg.format(*args, **kwargs)
+    def _format_log_msg(self, msg, **kwargs):
+        msg = msg.format(**kwargs)
         return "{:.6f} | {}".format(self.time, msg)
 
-    def debug(self, msg, *args, **kwargs):
+    def _format_event_msg(self, level, msg, type="msg", **kwargs):
+        msg = msg.format(**kwargs)
+        data = ";".join(
+            ["{}={}".format(
+                str(k).replace(";", ","),
+                str(v).replace(";", ",")) for k, v in kwargs.items()])
+        return "{:.6f};{};{};{};{}".format(self.time, level, type, msg, data)
+
+    def debug(self, msg, **kwargs):
         """Writes a debug message to the logging facility."""
-        self._logger.debug(self._format_msg(msg, *args, **kwargs))
+        self._logger.debug(self._format_log_msg(msg, **kwargs))
+        self._event_logger.info(self._format_event_msg(1, msg, **kwargs))
 
-    def info(self, msg, *args, **kwargs):
+    def info(self, msg, **kwargs):
         """Writes a info message to the logging facility."""
-        self._logger.info(self._format_msg(msg, *args, **kwargs))
+        self._logger.info(self._format_log_msg(msg, **kwargs))
+        self._event_logger.info(self._format_event_msg(2, msg, **kwargs))
 
-    def warn(self, msg, *args, **kwargs):
+    def warn(self, msg, **kwargs):
         """Writes a warn message to the logging facility."""
-        self._logger.warn(self._format_msg(msg, *args, **kwargs))
+        self._logger.warn(self._format_log_msg(msg, **kwargs))
+        self._event_logger.info(self._format_event_msg(3, msg, **kwargs))
 
-    def error(self, msg, *args, **kwargs):
+    def error(self, msg, **kwargs):
         """Writes a error message to the logging facility."""
-        self._logger.error(self._format_msg(msg, *args, **kwargs))
+        self._logger.error(self._format_log_msg(msg, **kwargs))
+        self._event_logger.info(self._format_event_msg(4, msg, **kwargs))
 
     @abstractmethod
     def schedule(self):
@@ -302,10 +342,14 @@ class Scheduler(metaclass=ABCMeta):
 
         if self.jobs.open:
             self.debug(
-                "{} jobs open at end of scheduling iteration", len(
-                    self.jobs.open))
+                "{num_jobs} jobs open at end of scheduling iteration",
+                num_jobs=len(
+                    self.jobs.open),
+                type="jobs_open_at_end")
 
-        self.debug("Ending scheduling iteration")
+        self.debug(
+            "Ending scheduling iteration",
+            type="scheduling_iteration_ended")
 
     def _do_schedule(self, reply=None):
         self._time = self._batsim.time()
@@ -323,8 +367,10 @@ class Scheduler(metaclass=ABCMeta):
         """
         if self.jobs.open:
             self.warn(
-                "{} jobs still in state open at end of simulation", len(
-                    self.jobs.open))
+                "{num_jobs} jobs still in state open at end of simulation",
+                num_jobs=len(
+                    self.jobs.open),
+                type="open_jobs_warning")
 
     def on_end(self):
         """The end method called during the shut-down phase of the scheduler."""

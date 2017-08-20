@@ -184,8 +184,9 @@ class Job:
         if self.marked_for_scheduling and not self.scheduled:
             if self._batsim_job.requested_resources < len(self.allocation):
                 scheduler.warn(
-                    "Scheduling of job ({}) is postponed since not enough resources are allocated",
-                    self)
+                    "Scheduling of job ({job}) is postponed since not enough resources are allocated",
+                    job=self,
+                    type="job_starting_postponed_too_few_resources")
                 return
 
             if not scheduler.has_time_sharing:
@@ -203,13 +204,16 @@ class Job:
             scheduler._batsim.start_jobs(
                 [self._batsim_job], {self._batsim_job.id: alloc})
 
-            scheduler.info("Scheduled job ({})", self)
+            scheduler.info(
+                "Scheduled job ({job})",
+                job=self,
+                type="job_scheduled")
             self._marked_for_scheduling = False
             self._scheduled = True
 
     def _do_complete_job(self, scheduler):
-        scheduler.info("Remove completed job and free resources: {}"
-                       .format(self))
+        scheduler.info("Remove completed job and free resources: {job}",
+                       job=self, type="job_completed")
         self.allocation.free()
 
     def move_properties_from(self, otherjob):
@@ -249,8 +253,8 @@ class Job:
         """Internal method to execute the rejecting of the job."""
         if self.marked_for_rejection and not self.rejected:
             scheduler.info(
-                "Rejecting job ({}), reason={}",
-                self, self.rejected_reason)
+                "Rejecting job ({job}), reason={reason}",
+                job=self, reason=self.rejected_reason, type="job_rejection")
             scheduler._batsim.reject_jobs([self._batsim_job])
             del scheduler._scheduler._jobmap[self._batsim_job.id]
 
@@ -280,7 +284,7 @@ class Job:
     def _do_kill(self, scheduler):
         """Internal method to execute the killing of the job."""
         if self.marked_for_killing and not self.killed:
-            scheduler.info("Killing job ({})", self)
+            scheduler.info("Killing job ({job})", job=self, type="job_killing")
             scheduler._batsim.kill_jobs([self._batsim_job])
 
             self._killed = True
@@ -487,7 +491,10 @@ class DynamicJob(Job):
             if not isinstance(profile, dict):
                 profile = profile()
 
-            scheduler.info("Submit dynamic job ({})", self)
+            scheduler.info(
+                "Submit dynamic job ({job})",
+                job=self,
+                type="job_submit")
             self._user_job_id = scheduler._batsim.submit_job(
                 self._user_requested_resources,
                 self._user_requested_time,
