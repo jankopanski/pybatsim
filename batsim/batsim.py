@@ -12,6 +12,9 @@ import zmq
 
 class Batsim(object):
 
+    DYNAMIC_JOB_PREFIX = "dynamic_job"
+    DYNAMIC_PROFILE_PREFIX = "dynamic_profile"
+
     def __init__(self, scheduler,
                  validatingmachine=None,
                  socket_endpoint='tcp://*:28000', verbose=0,
@@ -44,7 +47,8 @@ class Batsim(object):
         self.nb_jobs_rejected = 0
         self.nb_jobs_scheduled = 0
         self.nb_jobs_completed = 0
-        self.current_dyn_id = 0
+
+        self.dynamic_id_counter = {}
 
         self.scheduler.bs = self
         # import pdb; pdb.set_trace()
@@ -155,18 +159,21 @@ class Batsim(object):
             }
         })
 
-    def submit_job(self, job_id, res, walltime, profile, profile_name=None,
-                workload_name=None):
+    def submit_job(self, res, walltime, profile, profile_name=None,
+            workload_name=None):
         if workload_name is None:
-            workload_name = "dyn:{}".format(job_id)
+            workload_name=Batsim.DYNAMIC_JOB_PREFIX
 
         workload_name = workload_name.replace("!", "%")
-        job_id = self.current_dyn_id
-        self.current_dyn_id += 1
+
+        job_id = self.dynamic_id_counter.setdefault(workload_name, 0)
+        self.dynamic_id_counter[workload_name] += 1
+
         full_job_id = "{}!{}".format(workload_name, job_id)
 
         if profile_name is None:
-            profile_name = "profile!{}".format(full_job_id)
+            profile_name = "{}!{}".format(
+                    Batsim.DYNAMIC_PROFILE_PREFIX, full_job_id)
 
         msg = {
             "timestamp": self.time(),
@@ -183,9 +190,10 @@ class Batsim(object):
                     "profile": profile
             }
         }
-
         self._events_to_send.append(msg)
         self.nb_jobs_submitted += 1
+
+        return full_job_id
 
     def set_resource_state(self, resources, state):
         """ args:resources: is a list of resource numbers or intervals as strings (e.g. "1-5").

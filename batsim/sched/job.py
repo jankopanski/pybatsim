@@ -6,7 +6,7 @@
     or by the user to submit dynamic jobs).
 
 """
-from batsim.batsim import Job as BatsimJob
+from batsim.batsim import Job as BatsimJob, Batsim
 
 from .utils import FilterList
 
@@ -265,17 +265,16 @@ class Job:
         return self._batsim_job.kill_reason
 
     @classmethod
-    def create_dynamic(cls, *args, **kwargs):
-        return UserJob(*args, **kwargs)
+    def create_dynamic_job(cls, *args, **kwargs):
+        return DynamicJob(*args, **kwargs)
 
     @property
     def is_user_job(self):
-        return self.id.startswith(UserJob.DYNAMIC_JOB_PREFIX +
-                                  UserJob.DYNAMIC_JOB_DELIMITER)
+        return self.id.startswith(Batsim.DYNAMIC_JOB_PREFIX + "!")
 
 
-class UserJob(Job):
-    """A UserJob may be used to construct dynamic jobs afterwards submitted to the scheduler.
+class DynamicJob(Job):
+    """A DynamicJob may be used to construct dynamic jobs afterwards submitted to the scheduler.
     It has no related batsim_job since it is not known by Batsim yet. Instead it should be submitted
     and will be bounced back to the scheduler as a job known by Batsim and can be executed in this state.
 
@@ -293,25 +292,20 @@ class UserJob(Job):
     :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
     """
 
-    DYNAMIC_JOB_PREFIX = "USERJOB"
-    DYNAMIC_JOB_DELIMITER = "::"
-
     def __init__(
             self,
-            job_id,
             requested_resources,
             requested_time,
             profile,
-            profile_name=None):
+            profile_name=None,
+            workload_name=None):
         super().__init__(None)
-        self._user_job_id = (
-            UserJob.DYNAMIC_JOB_PREFIX +
-            UserJob.DYNAMIC_JOB_DELIMITER +
-            (job_id or ""))
+        self._user_job_id = None
         self._user_requested_resources = requested_resources
         self._user_requested_time = requested_time
         self._user_profile = profile
         self._user_profile_name = profile_name
+        self._user_workload_name = workload_name
 
         self._dyn_marked_submission = False
         self._dyn_submitted = False
@@ -339,6 +333,10 @@ class UserJob(Job):
     @property
     def profile_object(self):
         return self._user_profile
+
+    @property
+    def workload_name(self):
+        return self._user_workload_name
 
     @property
     def finish_time(self):
@@ -386,13 +384,12 @@ class UserJob(Job):
                 profile = profile()
 
             scheduler.info("Submit dynamic job ({})", self)
-            scheduler._batsim.submit_job(
-                self._user_job_id,
+            self._user_job_id = scheduler._batsim.submit_job(
                 self._user_requested_resources,
                 self._user_requested_time,
                 profile,
                 self._user_profile_name,
-                self._user_job_id)
+                self._user_workload_name)
 
             self._dyn_submitted = True
             self._dyn_marked_submission = False
@@ -537,7 +534,7 @@ class Jobs(FilterList):
                 elif j.marked_for_killing:
                     if marked_for_killing:
                         yield j
-                elif isinstance(j, UserJob):
+                elif isinstance(j, DynamicJob):
                     if j.dynamically_submitted:
                         if dynamically_submitted:
                             yield j
