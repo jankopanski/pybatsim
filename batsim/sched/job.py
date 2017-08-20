@@ -37,6 +37,8 @@ class Job:
 
         self._sub_jobs = []
 
+        self._own_dependencies = []
+
     def free_all(self):
         """Free all reserved resources."""
         assert self._batsim_job
@@ -93,7 +95,13 @@ class Job:
 
     @property
     def dependencies(self):
-        return self.get_job_data("deps") or ()
+        return tuple((self.get_job_data("deps") or []) + self._own_dependencies)
+
+    def add_dependency(self, job):
+        return self._own_dependencies.append(job)
+
+    def remove_dependency(self, job):
+        return self._own_dependencies.remove(job)
 
     @property
     def qos(self):
@@ -187,6 +195,14 @@ class Job:
         scheduler.info("Remove completed job and free resources: {}"
                        .format(self))
         self.free_all()
+
+    def move_properties_from(self, otherjob):
+        parent_job = otherjob.parent_job
+        if parent_job:
+            parent_job._sub_jobs.append(self)
+            self._parent_job = parent_job
+            parent_job._sub_jobs.remove(otherjob)
+        self._own_dependencies = list(otherjob._own_dependencies)
 
     @property
     def marked_for_rejection(self):

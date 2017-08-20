@@ -76,14 +76,9 @@ class BaseBatsimScheduler(BatsimScheduler):
         if newjob.is_user_job:
             for job2 in self._scheduler.jobs.dynamically_submitted:
                 if job.id == job2.id:
-                    parent_job = job2.parent_job
-                    if parent_job:
-                        parent_job._sub_jobs.append(newjob)
-                        newjob._parent_job = parent_job
-                        parent_job._sub_jobs.remove(job2)
+                    newjob.move_properties_from(job2)
                     self._scheduler.jobs.remove(job2)
                     break
-
         self._scheduler.on_job_submission(newjob)
         self._scheduler._do_schedule()
 
