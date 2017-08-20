@@ -41,7 +41,7 @@ class Job:
 
     def free_all(self):
         """Free all reserved resources."""
-        assert self._batsim_job
+        assert self._allocation is not None
 
         for res in self.allocation.resources:
             self.free(res)
@@ -66,11 +66,10 @@ class Job:
             self._allocation = None
 
     def reserve(self, resource, recursive_call=False):
-        """Reserves a given `resource` to ensure exclusive access (time-sharing is currently not
-        implemented).
-        """
+        """Reserves a given `resource` to ensure exclusive access."""
         assert self._batsim_job
         assert self._allocation is None
+        assert self.open
 
         self._allocation = Allocation(self)
 
@@ -105,9 +104,11 @@ class Job:
             self._own_dependencies)
 
     def add_dependency(self, job):
+        assert self.open
         return self._own_dependencies.append(job)
 
     def remove_dependency(self, job):
+        assert self.open
         return self._own_dependencies.remove(job)
 
     @property
@@ -187,6 +188,12 @@ class Job:
                     self)
                 return
 
+            if not scheduler.has_time_sharing:
+                for r in self.allocation.resources:
+                    if len(r.allocations) != 1:
+                        raise ValueError(
+                            "Time sharing is not enabled in Batsim")
+
             self.allocation.allocate()
 
             alloc = []
@@ -233,7 +240,7 @@ class Job:
         However, it will currently not show up in Batsim directly as a rejecting reason is
         not part of the protocol."""
         assert self._batsim_job
-        assert not self.rejected and not self.scheduled and not self.killed
+        assert self.open
 
         self._marked_for_rejection = True
         self._rejected_reason = reason
@@ -263,8 +270,12 @@ class Job:
     def kill(self):
         """Kill the current job during its execution."""
         assert self._batsim_job
-        assert not self.rejected
+        assert self.running
         self._killed = True
+
+    @property
+    def running(self):
+        return not self.open and self.scheduled and not self.completed
 
     def _do_kill(self, scheduler):
         """Internal method to execute the killing of the job."""
@@ -283,9 +294,8 @@ class Job:
     def schedule(self, resource=None):
         """Mark this job for scheduling. This can also be done even when not enough resources are
         reserved. The job will not be sent to Batsim until enough resources were reserved."""
-        assert not self.rejected
-        assert not self.scheduled
         assert self._batsim_job
+        assert self.open
 
         if resource:
             self.reserve(resource)
@@ -297,6 +307,7 @@ class Job:
         should not be executed but instead the state should be set manually.
         """
         assert self._batsim_job
+        assert self.open
         scheduler._batsim.change_job_state(job, state, kill_reason)
 
     def __str__(self):

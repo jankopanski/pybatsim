@@ -63,7 +63,7 @@ class BaseBatsimScheduler(BatsimScheduler):
             jobobjs.append(job)
 
         self._scheduler.info("The following jobs were killed: ({})"
-                .format(jobobjs))
+                             .format(jobobjs))
 
         for job in jobobjs:
             job._do_complete_job(self._scheduler)
@@ -80,7 +80,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler.jobs.append(newjob)
 
         self._scheduler.info("Received job submission from Batsim ({})"
-                .format(newjob))
+                             .format(newjob))
 
         if newjob.is_user_job:
             for job2 in self._scheduler.jobs.dynamically_submitted:
@@ -98,7 +98,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         del self._jobmap[job.id]
 
         self._scheduler.info("Job has completed its execution ({})"
-                .format(jobobj))
+                             .format(jobobj))
 
         jobobj._do_complete_job(self._scheduler)
 
@@ -117,7 +117,7 @@ class BaseBatsimScheduler(BatsimScheduler):
 
     def onReportEnergyConsumed(self, consumed_energy):
         self._scheduler.info("Received reply from Batsim (energy_consumed={})"
-                .format(consumed_energy))
+                             .format(consumed_energy))
 
         self._scheduler.on_report_energy_consumed(consumed_energy)
         self._scheduler._do_schedule(
