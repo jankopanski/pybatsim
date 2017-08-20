@@ -491,10 +491,19 @@ class DynamicJob(Job):
             if not isinstance(profile, dict):
                 profile = profile()
 
+            parent_job_id = None
+            try:
+                parent_job_id = self.parent_job.id
+            except AttributeError:
+                pass
+
             scheduler.info(
                 "Submit dynamic job ({job})",
                 job=self,
-                type="job_submit")
+                subjob_of=parent_job_id,
+                subjob_of_obj=self.parent_job,
+                is_subjob=(parent_job_id is not None),
+                type="dynamic_job_submit")
             self._user_job_id = scheduler._batsim.submit_job(
                 self._user_requested_resources,
                 self._user_requested_time,
