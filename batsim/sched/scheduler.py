@@ -59,9 +59,15 @@ class BaseBatsimScheduler(BatsimScheduler):
         jobobjs = []
         for job in jobs:
             jobobj = self._jobmap[job.id]
-            jobobj._do_complete_job(self._scheduler)
             del self._jobmap[job.id]
             jobobjs.append(job)
+
+        self._scheduler.info("The following jobs were killed: ({})"
+                .format(jobobjs))
+
+        for job in jobobjs:
+            job._do_complete_job(self._scheduler)
+
         self._scheduler.on_jobs_killed(jobobjs)
         self._scheduler._do_schedule()
 
@@ -72,6 +78,9 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._jobmap[job.id] = newjob
 
         self._scheduler.jobs.append(newjob)
+
+        self._scheduler.info("Received job submission from Batsim ({})"
+                .format(newjob))
 
         if newjob.is_user_job:
             for job2 in self._scheduler.jobs.dynamically_submitted:
@@ -87,26 +96,28 @@ class BaseBatsimScheduler(BatsimScheduler):
             "decision process received job completion({})".format(job))
         jobobj = self._jobmap[job.id]
         del self._jobmap[job.id]
+
+        self._scheduler.info("Job has completed its execution ({})"
+                .format(jobobj))
+
         jobobj._do_complete_job(self._scheduler)
 
         self._scheduler.on_job_completion(jobobj)
         self._scheduler._do_schedule()
 
     def onMachinePStateChanged(self, nodeid, pstate):
-        self._scheduler.debug(
-            "decision process received machine pstate changed({}, {})".format(
-                nodeid, pstate))
         # TODO
         # set resource._state with given nodeid to pstate
         # also add the resource to _new_changed_resources
+        #
+        # TODO: log message about changed machine state
 
         self._scheduler.on_machine_pstate_changed(nodeid, pstate)
         self._scheduler._do_schedule()
 
     def onReportEnergyConsumed(self, consumed_energy):
-        self._scheduler.debug(
-            "decision process received energy consumed reply({})".format(
-                consumed_energy))
+        self._scheduler.info("Received reply from Batsim (energy_consumed={})"
+                .format(consumed_energy))
 
         self._scheduler.on_report_energy_consumed(consumed_energy)
         self._scheduler._do_schedule(
