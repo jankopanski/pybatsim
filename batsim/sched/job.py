@@ -9,6 +9,7 @@
 from batsim.batsim import Job as BatsimJob, Batsim
 
 from .utils import FilterList
+from .alloc import Allocation
 
 
 class Job:
@@ -32,19 +33,17 @@ class Job:
         self._marked_for_rejection = False
         self._rejected_reason = None
 
-        self._reservation = []
-        self._previous_reservations = []
-
         self._sub_jobs = []
 
         self._own_dependencies = []
+
+        self._allocation = None
 
     def free_all(self):
         """Free all reserved resources."""
         assert self._batsim_job
 
-        self._previous_reservations.append(self._reservation[:])
-        for res in self._reservation[:]:
+        for res in self.allocation.resources:
             self.free(res)
 
     def free(self, resource, recursive_call=False):
@@ -52,6 +51,7 @@ class Job:
         not reserved by this job.
         """
         assert self._batsim_job
+        assert self._allocation is not None
 
         # To free resources the job does either have to be not submitted yet
         # or the job has to be completed (i.e. the job status is set by
@@ -61,16 +61,21 @@ class Job:
 
         if not recursive_call:
             resource.free(self, recursive_call=True)
-        self._reservation.remove(resource)
+
+        if len(self.allocation) == 0:
+            self._allocation = None
 
     def reserve(self, resource, recursive_call=False):
         """Reserves a given `resource` to ensure exclusive access (time-sharing is currently not
         implemented).
         """
         assert self._batsim_job
+        assert self._allocation is None
+
+        self._allocation = Allocation(self)
+
         if not recursive_call:
             resource.allocate(self, recursive_call=True)
-        self._reservation += resource.resources
 
     def dependencies_fulfilled(self, jobs):
         for dep in self.get_resolved_dependencies(jobs):
@@ -95,7 +100,9 @@ class Job:
 
     @property
     def dependencies(self):
-        return tuple((self.get_job_data("deps") or []) + self._own_dependencies)
+        return tuple(
+            (self.get_job_data("deps") or []) +
+            self._own_dependencies)
 
     def add_dependency(self, job):
         return self._own_dependencies.append(job)
@@ -174,14 +181,16 @@ class Job:
         assert not self.scheduled and not self.rejected
 
         if self.marked_for_scheduling and not self.scheduled:
-            if self._batsim_job.requested_resources < len(self._reservation):
+            if self._batsim_job.requested_resources < len(self.allocation):
                 scheduler.warn(
                     "Scheduling of job ({}) is postponed since not enough resources are allocated",
                     self)
                 return
 
+            self.allocation.allocate()
+
             alloc = []
-            for res in self._reservation[:self._batsim_job.requested_resources]:
+            for res in self.allocation[:self._batsim_job.requested_resources]:
                 alloc.append(res.id)
 
             scheduler._batsim.start_jobs(
@@ -194,7 +203,7 @@ class Job:
     def _do_complete_job(self, scheduler):
         scheduler.info("Remove completed job and free resources: {}"
                        .format(self))
-        self.free_all()
+        self.allocation.free()
 
     def move_properties_from(self, otherjob):
         parent_job = otherjob.parent_job
@@ -267,14 +276,9 @@ class Job:
             self._marked_for_killing = True
 
     @property
-    def reservation(self):
-        """Returns the current reservation of this job."""
-        return tuple(self._reservation)
-
-    @property
-    def previous_reservations(self):
-        """Returns a collection of previous reservations of this job."""
-        return tuple(self._previous_reservations)
+    def allocation(self):
+        """Returns the current allocation of this job."""
+        return self._allocation
 
     def schedule(self, resource=None):
         """Mark this job for scheduling. This can also be done even when not enough resources are

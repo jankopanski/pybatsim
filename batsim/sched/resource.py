@@ -37,8 +37,7 @@ class Resource:
                              .format(id, name, state))
         self._properties = properties
 
-        self._allocated_by = []
-        self._previously_allocated_by = []
+        self._allocations = {}
 
     @property
     def id(self):
@@ -46,15 +45,11 @@ class Resource:
 
     @property
     def is_allocated(self):
-        return bool(self._allocated_by)
+        return bool(self._allocations)
 
     @property
-    def allocated_by(self):
-        return tuple(self._allocated_by)
-
-    @property
-    def previously_allocated_by(self):
-        return tuple(self._previously_allocated_by)
+    def allocations(self):
+        return dict(self._allocations)
 
     def allocate(self, job, recursive_call=False):
         """Allocate the resource for the given job."""
@@ -62,17 +57,19 @@ class Resource:
 
         if not recursive_call:
             job.reserve(self, recursive_call=True)
-        self._allocated_by.append(job)
+
+        job.allocation.add_resource(self)
+        self._allocations[job.id] = job.allocation
 
     def free(self, job, recursive_call=False):
         """Free the resource from the given job."""
-        assert job in self._allocated_by, "Job is not allocated on this resource"
+        assert job.id in self._allocations, "Job is not allocated on this resource"
 
         if not recursive_call:
             job.free(self, recursive_call=True)
 
-        self._previously_allocated_by.append((self._scheduler.time, job))
-        self._allocated_by.remove(job)
+        job.allocation.remove_resource(self)
+        del self._allocations[job.id]
 
     @property
     def state(self):
