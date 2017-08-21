@@ -400,3 +400,14 @@ class Scheduler(metaclass=ABCMeta):
 
     def on_report_energy_consumed(self, consumed_energy):
         pass
+
+
+def as_scheduler(*args, base_class=Scheduler, **kwargs):
+    def convert_to_scheduler(schedule_function):
+        class InheritedScheduler(base_class):
+            def schedule(self):
+                schedule_function(self, *args, **kwargs)
+        InheritedScheduler.__name__ = schedule_function.__name__
+
+        return InheritedScheduler
+    return convert_to_scheduler
