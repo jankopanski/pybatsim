@@ -200,6 +200,11 @@ class Job:
         return tuple(self._sub_jobs)
 
     @property
+    def running(self):
+        """Whether or not this job is currently running."""
+        return self.scheduled and not self.completed and not self.killed
+
+    @property
     def completed(self):
         """Whether or not this job has been completed."""
         return self._batsim_job.status in ["SUCCESS", "TIMEOUT"]
@@ -590,6 +595,10 @@ class Jobs(ObserveList):
         return self.filter(runnable=True)
 
     @property
+    def running(self):
+        return self.filter(running=True)
+
+    @property
     def open(self):
         return self.filter(open=True)
 
@@ -632,6 +641,7 @@ class Jobs(ObserveList):
     def filter(
             self,
             runnable=False,
+            running=False,
             open=False,
             completed=False,
             rejected=False,
@@ -646,6 +656,8 @@ class Jobs(ObserveList):
         """Filter the jobs lists to search for jobs.
 
         :param runnable: whether the job is runnable (open and dependencies fulfilled).
+
+        :param running: whether the job is currently running.
 
         :param open: whether the job is still open.
 
@@ -671,13 +683,14 @@ class Jobs(ObserveList):
 
         # Yield all jobs if not filtered
         if True not in [
-                runnable,
+                runnable, running,
                 open, completed,
                 rejected, marked_for_rejection,
                 scheduled, marked_for_scheduling,
                 killed, marked_for_killing,
                 dynamically_submitted, marked_for_dynamic_submission]:
             runnable = True
+            running = True
 
             open = True
             completed = True
@@ -697,7 +710,10 @@ class Jobs(ObserveList):
         # Filter jobs
         def filter_jobs(jobs):
             for j in jobs:
-                if j.completed:
+                if j.running:
+                    if running:
+                        yield j
+                elif j.completed:
                     if completed:
                         yield j
                 elif j.rejected:
