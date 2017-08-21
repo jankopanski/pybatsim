@@ -100,7 +100,7 @@ class Job:
     @property
     def dependencies(self):
         return tuple(
-            (self.get_job_data("deps") or []) +
+            (self.get_batsim_job_data("deps") or []) +
             self._own_dependencies)
 
     def add_dependency(self, job):
@@ -113,29 +113,67 @@ class Job:
 
     @property
     def qos(self):
-        return self.get_job_data("qos") or ""
+        return self._get_overwritable_value("qos")
+
+    @qos.setter
+    def qos(self, value):
+        self._qos = value
+
+    @property
+    def priority(self):
+        return self._get_overwritable_value("priority", 1)
+
+    @priority.setter
+    def priority(self, value):
+        self._priority = value
 
     @property
     def user(self):
-        return self.get_job_data("user") or ""
+        return self._get_overwritable_value("user")
+
+    @user.setter
+    def user(self, value):
+        self._user = value
 
     @property
     def partition(self):
-        return self.get_job_data("partition") or ""
+        return self._get_overwritable_value("partition")
+
+    @partition.setter
+    def partition(self, value):
+        self._partition = value
 
     @property
     def job_group(self):
-        return self.get_job_data("group") or ""
+        return self._get_overwritable_value("group")
+
+    @job_group.setter
+    def job_group(self, value):
+        self._group = value
 
     @property
     def comment(self):
-        return self.get_job_data("comment") or ""
+        return self._get_overwritable_value("comment")
+
+    @comment.setter
+    def comment(self, value):
+        self._comment = value
 
     @property
     def application(self):
-        return self.get_job_data("application") or ""
+        return self._get_overwritable_value("application")
 
-    def get_job_data(self, key):
+    @application.setter
+    def application(self, value):
+        self._application = value
+
+    def _get_overwritable_value(self, field_name, default=None):
+        try:
+            return getattr(self, "_" + field_name)
+        except AttributeError:
+            return self.get_batsim_job_data(field_name) or default
+
+    def get_batsim_job_data(self, key):
         if not self._batsim_job:
             return None
         return self._batsim_job.json_dict.get(key, None)
