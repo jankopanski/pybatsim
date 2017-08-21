@@ -47,6 +47,7 @@ class Batsim(object):
         self.nb_jobs_rejected = 0
         self.nb_jobs_scheduled = 0
         self.nb_jobs_completed = 0
+        self.nb_jobs_timeout = 0
 
         self.has_dynamic_job_submissions = False
 
@@ -320,7 +321,10 @@ class Batsim(object):
                 j.kill_reason = event["data"]["kill_reason"]
 
                 self.scheduler.onJobCompletion(j)
-                self.nb_jobs_completed += 1
+                if j.status == "TIMEOUT":
+                    self.nb_jobs_timeout += 1
+                else:
+                    self.nb_jobs_completed += 1
             elif event_type == "RESOURCE_STATE_CHANGED":
                 intervals = event_data["resources"].split(" ")
                 for interval in intervals:
@@ -343,7 +347,7 @@ class Batsim(object):
                 raise Exception("Unknow event type {}".format(event_type))
 
         if self.handle_dynamic_notify and not finished_received:
-            if ((self.nb_jobs_completed + self.nb_jobs_killed) == self.nb_jobs_scheduled
+            if ((self.nb_jobs_completed + self.nb_jobs_timeout + self.nb_jobs_killed) == self.nb_jobs_scheduled
                     and not self.has_dynamic_job_submissions):
                 self.notify_submission_finished()
             else:

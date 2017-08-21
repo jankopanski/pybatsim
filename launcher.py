@@ -98,7 +98,8 @@ if __name__ == "__main__":
             ", rejected:", bs.nb_jobs_rejected,
             ", killed:", bs.nb_jobs_killed,
             ", submitted:", bs.nb_jobs_submitted,
-            ", completed:", bs.nb_jobs_completed, flush=True)
+            ", timeout:", bs.nb_jobs_timeout,
+            ", success:", bs.nb_jobs_completed, flush=True)
 
     if bs.nb_jobs_received != bs.nb_jobs_scheduled:
         sys.exit(1)
