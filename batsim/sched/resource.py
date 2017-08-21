@@ -159,6 +159,9 @@ class Resources(ObserveList):
     def free(self):
         return self.filter(free=True)
 
+    def for_job_requirements(self, job, *args, **kwargs):
+        return self.filter(*args, for_job_requirements=job, **kwargs)
+
     @property
     def allocated(self):
         return self.filter(allocated=True)
@@ -168,7 +171,7 @@ class Resources(ObserveList):
             free=False,
             allocated=False,
             num=None,
-            for_job=None,
+            for_job_requirements=None,
             **kwargs):
         """Filter the resources lists to search for resources.
 
@@ -176,13 +179,13 @@ class Resources(ObserveList):
 
         :param allocated: whether or not already allocated resources should be returned.
 
-        :param for_job: for the common case that sufficient resources for a job should be found the exact number of required resources for this particular job are returned. The result can still be filtered with a condition or sorted with a sorting function.
+        :param for_job_requirements: for the common case that sufficient resources for a job should be found the exact number of required resources for this particular job are returned. The result can still be filtered with a condition or sorted with a sorting function.
         """
         # Pre-defined filter to find resources for a job submission
-        if for_job is not None:
+        if for_job_requirements is not None:
             free = True
             allocated = False
-            num = for_job.requested_resources
+            num = for_job_requirements.requested_resources
 
         # Yield all resources if not filtered
         if not free and not allocated:
