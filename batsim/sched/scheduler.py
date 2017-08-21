@@ -87,7 +87,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         newjob = Job(batsim_job=job)
         self._jobmap[job.id] = newjob
 
-        self._scheduler.jobs.append(newjob)
+        self._scheduler.jobs.add(newjob)
 
         self._scheduler.info("Received job submission from Batsim ({job})",
                              job=newjob, type="job_submission_received")

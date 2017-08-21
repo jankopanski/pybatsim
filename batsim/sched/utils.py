@@ -11,9 +11,13 @@ class ObserveList:
     """Helper class implementing a filtered list."""
 
     def __init__(self, from_list=[]):
-        self._data = list(from_list)
+        self._data = list()
+        self._data_set = set()
         for i in from_list:
-            self._element_new(i)
+            self.add(i)
+
+    def _check_new_elem(self, element):
+        return True
 
     def _element_new(self, element):
         pass
@@ -27,46 +31,36 @@ class ObserveList:
     def __len__(self):
         return len(self._data)
 
-    def __getitem__(self, items):
-        return self._data[items]
-
-    def __delitem__(self, index):
-        has_elem = False
-        try:
-            oldelem = self._data[index]
-            has_elem = True
-        except KeyError:
-            pass
-        del self._data[index]
-        if has_elem:
-            self._element_del(oldelem)
-
-    def __setitem__(self, index, element):
-        has_elem = False
-        try:
-            oldelem = self._data[index]
-            has_elem = True
-        except KeyError:
-            pass
-        self._data[index] = element
-        if has_elem:
-            self._element_del(oldelem)
-        self._element_new(element)
+    def __contains__(self, element):
+        return element in self._data_set
 
     def __str__(self):
         return str(self._data)
 
-    def append(self, element):
-        self._data.append(element)
-        self._element_new(element)
+    def add(self, element):
+        if self._check_new_elem(element):
+            self._data.append(element)
+            self._data_set.add(element)
+            self._element_new(element)
 
     def remove(self, element):
         self._data.remove(element)
+        self._data_set.remove(element)
         self._element_del(element)
 
-    def insert(self, index, element):
-        self._data.insert(index, element)
-        self._element_new(element)
+    def discard(self, element):
+        try:
+            self._data_set.remove(element)
+            self._data.remove(element)
+            self._element_del(element)
+        except KeyError:
+            pass
+
+    def clear(self):
+        for e in self._data:
+            self._element_del(e)
+        self._data.clear()
+        self._data_set.clear()
 
     def __iter__(self):
         return iter(self._data)
@@ -88,7 +82,7 @@ class ObserveList:
         :param apply: a function evaluating the result list.
 
         """
-        return self.create(apply(self._resources))
+        return self.create(apply(self._data))
 
     def create(self, *args, **kwargs):
         return self.__class__(*args, **kwargs)
@@ -107,7 +101,7 @@ def filter_list(
 
     :param filter: a list of generators through which the entries will be piped.
 
-    :param cond: a function evaluating the entries and returns True or False whether or not the resource should be returned.
+    :param cond: a function evaluating the entries and returns True or False whether or not the entry should be returned.
 
     :param max: the maximum number of returned entries.
 
