@@ -16,9 +16,11 @@ Options:
 import json
 import sys
 import time
+import types
 from datetime import timedelta
 
 from batsim.batsim import Batsim, BatsimScheduler
+from batsim.sched import as_scheduler
 from batsim.docopt import docopt
 from batsim.validatingmachine import ValidatingMachine
 
@@ -48,7 +50,11 @@ def instanciate_scheduler(name, options):
         sys.exit(1)
     # load the class
     scheduler_non_instancied = package.__dict__[my_module].__dict__[my_class]
-    scheduler = scheduler_non_instancied(options)
+    if isinstance(scheduler_non_instancied, types.FunctionType):
+        scheduler = as_scheduler()(scheduler_non_instancied)
+        scheduler = scheduler(options)
+    else:
+        scheduler = scheduler_non_instancied(options)
     if not isinstance(scheduler, BatsimScheduler):
         scheduler = scheduler()
     return scheduler
