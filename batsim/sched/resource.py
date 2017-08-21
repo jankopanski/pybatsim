@@ -165,26 +165,16 @@ class Resources(ObserveList):
 
     def filter(
             self,
-            cond=None,
             free=False,
             allocated=False,
-            limit=None,
-            min=None,
             num=None,
-            for_job=None):
+            for_job=None,
+            **kwargs):
         """Filter the resources lists to search for resources.
-
-        :param cond: a function evaluating the current resource and returns True or False whether or not the resource should be returned.
 
         :param free: whether or not free resources should be returned.
 
         :param allocated: whether or not already allocated resources should be returned.
-
-        :param limit: the maximum number of returned resources.
-
-        :param min: the minimum number of returned resources (if less resources are available no resources will be returned at all).
-
-        :param num: the exact number of returned resources.
 
         :param for_job: for the common case that sufficient resources for a job should be found the exact number of required resources for this particular job are returned. The result can still be filtered with a condition or sorted with a sorting function.
         """
@@ -211,4 +201,5 @@ class Resources(ObserveList):
 
         return self.create(filter_list(self._data,
                                        [filter_free_or_allocated_resources],
-                                       cond, limit, min, num))
+                                       num=num,
+                                       **kwargs))

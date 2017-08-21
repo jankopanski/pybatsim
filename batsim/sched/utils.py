@@ -98,20 +98,26 @@ def filter_list(
         data,
         filter=[],
         cond=None,
-        limit=None,
+        max=None,
         min=None,
-        num=None):
+        num=None,
+        prefer_min=False,
+        min_or_max=False):
     """Filter the list.
 
     :param filter: a list of generators through which the entries will be piped.
 
     :param cond: a function evaluating the entries and returns True or False whether or not the resource should be returned.
 
-    :param limit: the maximum number of returned entries.
+    :param max: the maximum number of returned entries.
 
     :param min: the minimum number of returned entries (if less entries are available no entries will be returned at all).
 
     :param num: the exact number of returned entries.
+
+    :param prefer_min: return the minimum specified number of entries as soon as found.
+
+    :param min_or_max: either return the minimum or maximum number but nothing between.
 
     """
 
@@ -119,7 +125,7 @@ def filter_list(
     # more
     if num:
         min = num
-        limit = num
+        max = num
 
     def filter_condition(res):
         if cond:
@@ -137,16 +143,30 @@ def filter_list(
 
     result = []
     num_elems = 0
-    for i in do_filter(data):
+    iterator = do_filter(data)
+    while True:
         # Do not yield more entries than requested
-        if limit and num_elems >= limit:
+        if max and num_elems >= max:
+            break
+        if min and prefer_min and num_elems == min:
+            break
+
+        try:
+            elem = next(iterator)
+        except StopIteration:
             break
         num_elems += 1
-        result.append(i)
+        result.append(elem)
 
     # Do not yield less entries than requested (better nothing than less)
     if min and len(result) < min:
         result = []
+        num_elems = 0
+
+    # Return only min elements if flag is set and num_elems is between min and
+    # max
+    if min_or_max and min and max and num_elems < max and num_elems > min:
+        result = result[:min]
 
     # Construct a new list which can be filtered again
     return result

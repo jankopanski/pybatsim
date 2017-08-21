@@ -592,7 +592,6 @@ class Jobs(ObserveList):
 
     def filter(
             self,
-            cond=None,
             runnable=False,
             open=False,
             completed=False,
@@ -604,12 +603,8 @@ class Jobs(ObserveList):
             marked_for_killing=False,
             dynamically_submitted=False,
             marked_for_dynamic_submission=False,
-            limit=None,
-            min=None,
-            num=None):
+            **kwargs):
         """Filter the jobs lists to search for jobs.
-
-        :param cond: a function evaluating the current resource and returns True or False whether or not the resource should be returned.
 
         :param runnable: whether the job is runnable (open and dependencies fulfilled).
 
@@ -633,11 +628,6 @@ class Jobs(ObserveList):
 
         :param marked_for_dynamic_submission: whether the job has been marked for dynamic job submission.
 
-        :param limit: the maximum number of returned jobs.
-
-        :param min: the minimum number of returned jobs (if less jobs are available no jobs will be returned at all).
-
-        :param num: the exact number of returned jobs.
         """
 
         # Yield all jobs if not filtered
@@ -707,7 +697,4 @@ class Jobs(ObserveList):
             filter_list(
                 self._data,
                 [filter_jobs],
-                cond,
-                limit,
-                min,
-                num))
+                **kwargs))
