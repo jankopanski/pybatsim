@@ -48,6 +48,8 @@ class Batsim(object):
         self.nb_jobs_scheduled = 0
         self.nb_jobs_completed = 0
 
+        self.has_dynamic_job_submissions = False
+
         self.dynamic_id_counter = {}
 
         self.scheduler.bs = self
@@ -192,6 +194,7 @@ class Batsim(object):
         }
         self._events_to_send.append(msg)
         self.nb_jobs_submitted += 1
+        self.has_dynamic_job_submissions = True
 
         return full_job_id
 
@@ -340,10 +343,12 @@ class Batsim(object):
                 raise Exception("Unknow event type {}".format(event_type))
 
         if self.handle_dynamic_notify and not finished_received:
-            if (self.nb_jobs_completed + self.nb_jobs_killed) == self.nb_jobs_scheduled:
+            if ((self.nb_jobs_completed + self.nb_jobs_killed) == self.nb_jobs_scheduled
+                    and not self.has_dynamic_job_submissions):
                 self.notify_submission_finished()
             else:
                 self.notify_submission_continue()
+                self.has_dynamic_job_submissions = False
 
         if len(self._events_to_send) > 0:
             # sort msgs by timestamp
