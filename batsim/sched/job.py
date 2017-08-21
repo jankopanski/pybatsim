@@ -233,10 +233,11 @@ class Job:
                         raise ValueError(
                             "Time sharing is not enabled in Batsim")
 
-            self.allocation.allocate()
+            r = range(0, self._batsim_job.requested_resources)
+            self.allocation.allocate(r)
 
             alloc = []
-            for res in self.allocation[:self._batsim_job.requested_resources]:
+            for res in self.allocation.allocated_resources:
                 alloc.append(res.id)
 
             scheduler._batsim.start_jobs(

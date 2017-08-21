@@ -15,6 +15,8 @@ class Allocation:
         self._allocated = False
         self._previously_allocated = False
 
+        self._allocated_resources = set()
+
     @property
     def job(self):
         return self._job
@@ -26,6 +28,10 @@ class Allocation:
     @property
     def allocated(self):
         return self._allocated
+
+    @property
+    def allocated_resources(self):
+        return tuple(self._allocated_resources)
 
     @property
     def previously_allocated(self):
@@ -50,9 +56,16 @@ class Allocation:
     def __getitem__(self, items):
         return self._resources[items]
 
-    def allocate(self):
+    def allocate(self, range1, *more_ranges):
         assert not self._previously_allocated and not self._allocated
         self._allocated = True
+
+        for r in ([range1] + list(more_ranges)):
+            for i in r:
+                res = self._resources[i]
+                if res in self._allocated_resources:
+                    raise ValueError("Resource ranges in allocation are invalid")
+                self._allocated_resources.add(res)
 
     def free(self):
         assert not self._previously_allocated and self._allocated
