@@ -70,7 +70,6 @@ class Allocation:
     def free(self):
         assert not self._previously_allocated and self._allocated
 
-        self.job._allocation = None
         for r in self.resources:
             del r._allocations[self.job.id]
 
