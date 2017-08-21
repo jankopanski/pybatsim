@@ -93,6 +93,7 @@ class ObserveList:
     def create(self, *args, **kwargs):
         return self.__class__(*args, **kwargs)
 
+
 def filter_list(
         data,
         filter=[],

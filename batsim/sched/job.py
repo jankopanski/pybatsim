@@ -703,4 +703,11 @@ class Jobs(ObserveList):
                         if runnable:
                             yield j
 
-        return self.create(filter_list(self._data, [filter_jobs], cond, limit, min, num))
+        return self.create(
+            filter_list(
+                self._data,
+                [filter_jobs],
+                cond,
+                limit,
+                min,
+                num))

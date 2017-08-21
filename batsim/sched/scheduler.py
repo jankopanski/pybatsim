@@ -150,10 +150,28 @@ class Scheduler(metaclass=ABCMeta):
 
     """
 
+    class Event:
+
+        def __init__(self, time, level, msg, type, data):
+            self.time = time
+            self.level = level
+            self.msg = msg
+            self.type = type
+            self.data = data
+
+        def __str__(self):
+            data = ";".join(
+                ["{}={}".format(
+                    str(k).replace(";", ","),
+                    str(v).replace(";", ",")) for k, v in self.data.items()])
+            return "{:.6f};{};{};{};{}".format(
+                self.time, self.level, self.type, self.msg, data)
+
     def __init__(self, options):
         self._options = options
 
         self._init_logger()
+        self._events = []
 
         # Use the basic Pybatsim scheduler to wrap the Batsim API
         self._scheduler = BaseBatsimScheduler(self, options)
@@ -201,6 +219,10 @@ class Scheduler(metaclass=ABCMeta):
         handler.setLevel(logging.DEBUG)
         handler.setFormatter(formatter)
         self._event_logger.addHandler(handler)
+
+    @property
+    def events(self):
+        return tuple(self._events)
 
     @property
     def options(self):
@@ -288,11 +310,12 @@ class Scheduler(metaclass=ABCMeta):
 
     def _format_event_msg(self, level, msg, type="msg", **kwargs):
         msg = msg.format(**kwargs)
-        data = ";".join(
-            ["{}={}".format(
-                str(k).replace(";", ","),
-                str(v).replace(";", ",")) for k, v in kwargs.items()])
-        return "{:.6f};{};{};{};{}".format(self.time, level, type, msg, data)
+
+        event = Scheduler.Event(self.time, level, msg, type, kwargs)
+
+        self._events.append(event)
+
+        return str(event)
 
     def debug(self, msg, **kwargs):
         """Writes a debug message to the logging facility."""

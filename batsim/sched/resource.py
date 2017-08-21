@@ -210,5 +210,5 @@ class Resources(ObserveList):
                         yield r
 
         return self.create(filter_list(self._data,
-            [filter_free_or_allocated_resources],
-            cond, limit, min, num))
+                                       [filter_free_or_allocated_resources],
+                                       cond, limit, min, num))
