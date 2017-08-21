@@ -56,6 +56,13 @@ class Resource:
     def allocations(self):
         return dict(self._allocations)
 
+    @property
+    def computing(self):
+        for jobid, alloc in self._allocations.items():
+            if self in alloc.allocated_resources:
+                return True
+        return False
+
     def _update_pstate_change(self, pstate):
         self._old_pstate = self._pstate
         self._pstate = pstate
@@ -166,10 +173,15 @@ class Resources(ObserveList):
     def allocated(self):
         return self.filter(allocated=True)
 
+    @property
+    def computing(self):
+        return self.filter(computing=True)
+
     def filter(
             self,
             free=False,
             allocated=False,
+            computing=False,
             num=None,
             for_job_requirements=None,
             **kwargs):
@@ -185,18 +197,23 @@ class Resources(ObserveList):
         if for_job_requirements is not None:
             free = True
             allocated = False
+            computing = False
             num = for_job_requirements.requested_resources
 
         # Yield all resources if not filtered
-        if not free and not allocated:
+        if not free and not allocated and not computing:
             free = True
             allocated = True
+            computing = True
 
         # Filter free or allocated resources
         def filter_free_or_allocated_resources(res):
             for r in res:
                 if r.is_allocated:
                     if allocated:
+                        yield r
+                elif r.computing:
+                    if computing:
                         yield r
                 else:
                     if free:

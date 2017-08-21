@@ -64,7 +64,8 @@ class Allocation:
             for i in r:
                 res = self._resources[i]
                 if res in self._allocated_resources:
-                    raise ValueError("Resource ranges in allocation are invalid")
+                    raise ValueError(
+                        "Resource ranges in allocation are invalid")
                 self._allocated_resources.add(res)
 
     def free(self):
