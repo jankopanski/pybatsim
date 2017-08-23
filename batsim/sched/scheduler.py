@@ -84,7 +84,7 @@ class BaseBatsimScheduler(BatsimScheduler):
             "decision process received job submission({job})",
             job=job,
             type="job_submission_received2")
-        newjob = Job(batsim_job=job)
+        newjob = Job(batsim_job=job, scheduler=self._scheduler)
         self._jobmap[job.id] = newjob
 
         self._scheduler.jobs.add(newjob)

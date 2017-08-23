@@ -37,7 +37,7 @@ class Resource:
                              .format(id, name, state))
         self._properties = properties
 
-        self._allocations = {}
+        self._allocations = set()
 
         self._pstate = None
         self._old_pstate = None
@@ -54,11 +54,11 @@ class Resource:
 
     @property
     def allocations(self):
-        return dict(self._allocations)
+        return tuple(self._allocations)
 
     @property
     def computing(self):
-        for jobid, alloc in self._allocations.items():
+        for alloc in self._allocations:
             if self in alloc.allocated_resources:
                 return True
         return False
@@ -95,25 +95,23 @@ class Resource:
         self._pstate_update_request_necessary = False
         scheduler._batsim.set_resource_state([self.id], self._new_state)
 
-    def allocate(self, job, recursive_call=False):
-        """Allocate the resource for the given job."""
-        assert not self.is_allocated, "Node sharing is currently not allowed"
+    def _do_add_allocation(self, allocation):
+        # If time sharing is not enabled: check that allocations do not overlap
+        if not self._scheduler.has_time_sharing:
+            for alloc in self._allocations:
+                if alloc.overlaps_with(allocation):
+                    raise ValueError(
+                        "Overlapping resource allocation while time-sharing is not enabled")
+        self._allocations.add(allocation)
 
-        if not recursive_call:
-            job.reserve(self, recursive_call=True)
+    def _do_remove_allocation(self, allocation):
+        self._allocations.remove(allocation)
 
-        job.allocation.add_resource(self)
-        self._allocations[job.id] = job.allocation
+    def _do_allocate_allocation(self, allocation):
+        pass
 
-    def free(self, job, recursive_call=False):
-        """Free the resource from the given job."""
-        assert job.id in self._allocations, "Job is not allocated on this resource"
-
-        if not recursive_call:
-            job.free(self, recursive_call=True)
-
-        job.allocation.remove_resource(self)
-        del self._allocations[job.id]
+    def _do_free_allocation(self, allocation):
+        self._allocations.remove(allocation)
 
     @property
     def resources(self):
@@ -129,16 +127,6 @@ class Resources(ObserveList):
     def __init__(self, *args, **kwargs):
         self._resource_map = {}
         super().__init__(*args, **kwargs)
-
-    def allocate(self, job, recursive_call=False):
-        """Allocate the job on the whole set of resources."""
-        for r in self.all:
-            r.allocate(job, recursive_call=recursive_call)
-
-    def free(self, job, recursive_call=False):
-        """Free the job from the whole set of resources."""
-        for r in self.all:
-            r.free(job, recursive_call=recursive_call)
 
     def __getitem__(self, items):
         return self._resource_map[items]

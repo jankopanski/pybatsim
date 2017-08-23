@@ -19,7 +19,8 @@ class Job:
     :param batsim_job: the batsim job object from the underlying Pybatsim scheduler.
     """
 
-    def __init__(self, batsim_job=None, parent_job=None):
+    def __init__(self, batsim_job=None, scheduler=None, parent_job=None):
+        self._scheduler = scheduler
         self._batsim_job = batsim_job
         self._parent_job = parent_job
 
@@ -38,17 +39,14 @@ class Job:
         self._own_dependencies = []
 
         self._allocation = None
+        self._start_time = None
 
-    def free_all(self):
-        """Free all reserved resources."""
-        assert self._allocation is not None
+    @property
+    def start_time(self):
+        return self._start_time
 
-        for res in self.allocation.resources:
-            self.free(res)
-
-    def free(self, resource, recursive_call=False):
-        """Free the given `resource` object or fails if the resource is currently
-        not reserved by this job.
+    def free(self):
+        """Free the current allocation for this job.
         """
         assert self._batsim_job
         assert self._allocation is not None
@@ -59,22 +57,26 @@ class Job:
         assert (
             not self.marked_for_scheduling and not self.scheduled) or self.completed
 
-        if not recursive_call:
-            resource.free(self, recursive_call=True)
+        if self.completed:
+            self._allocation._free_job_from_allocation()
+        else:
+            self._allocation.free()
 
-        if len(self.allocation) == 0:
-            self._allocation = None
-
-    def reserve(self, resource, recursive_call=False):
+    def reserve(self, resource):
         """Reserves a given `resource` to ensure exclusive access."""
         assert self._batsim_job
         assert self._allocation is None
         assert self.open
 
-        self._allocation = Allocation(self)
-
-        if not recursive_call:
-            resource.allocate(self, recursive_call=True)
+        if isinstance(resource, Allocation):
+            resource._reserve_job_on_allocation(self)
+            self._allocation = resource
+        else:
+            self._allocation = Allocation(
+                start_time=self._scheduler.time,
+                job=self,
+                resources=resource,
+                walltime=self.requested_time)
 
     def dependencies_fulfilled(self, jobs):
         for dep in self.get_resolved_dependencies(jobs):
@@ -223,6 +225,7 @@ class Job:
         """Internal method to execute the execution of the job."""
         assert self._batsim_job is not None
         assert not self.scheduled and not self.rejected
+        assert self.allocation is not None
 
         if self.marked_for_scheduling and not self.scheduled:
             if self._batsim_job.requested_resources < len(self.allocation):
@@ -238,8 +241,12 @@ class Job:
                         raise ValueError(
                             "Time sharing is not enabled in Batsim")
 
+            if not self.allocation.fits_job_for_remaining_time(self):
+                raise ValueError(
+                    "Job does not fit in the remaining time frame of the allocation")
+
             r = range(0, self._batsim_job.requested_resources)
-            self.allocation.allocate(r)
+            self.allocation.allocate(scheduler, r)
 
             alloc = []
             for res in self.allocation.allocated_resources:
@@ -254,11 +261,12 @@ class Job:
                 type="job_scheduled")
             self._marked_for_scheduling = False
             self._scheduled = True
+            self._start_time = scheduler.time
 
     def _do_complete_job(self, scheduler):
         scheduler.info("Remove completed job and free resources: {job}",
                        job=self, type="job_completed")
-        self.allocation.free()
+        self.allocation.free(scheduler)
 
     def move_properties_from(self, otherjob):
         parent_job = otherjob.parent_job
