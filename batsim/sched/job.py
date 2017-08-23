@@ -245,7 +245,12 @@ class Job:
                 raise ValueError(
                     "Job does not fit in the remaining time frame of the allocation")
 
-            r = range(0, self._batsim_job.requested_resources)
+            # Abort job start if allocation is in the future
+            if self.allocation.start_time > scheduler.time:
+                scheduler.run_scheduler_at(self.allocation.start_time)
+                return
+
+            r = range(0, self.requested_resources)
             self.allocation.allocate(scheduler, r)
 
             alloc = []
@@ -253,7 +258,7 @@ class Job:
                 alloc.append(res.id)
 
             scheduler._batsim.start_jobs(
-                [self._batsim_job], {self._batsim_job.id: alloc})
+                [self._batsim_job], {self.id: alloc})
 
             scheduler.info(
                 "Scheduled job ({job})",
