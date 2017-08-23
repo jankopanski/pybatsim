@@ -63,7 +63,18 @@ class Job:
             self._allocation.free()
 
     def reserve(self, resource):
-        """Reserves a given `resource` to ensure exclusive access."""
+        """Reserves a given `resource` to ensure exclusive access.
+
+        If a resources object is given and not an allocation object, then the
+        allocation will be valid for exactly the time of the job walltime. As a
+        consequence, if reservations with Resource or Resources objects are made
+        the jobs should be immediately scheduled afterwards because otherwise the
+        allocation will have too few walltime available to fit the job.
+
+        As an alternative an Allocation can be created manually (with a longer
+        walltime) and then be given as parameter to the `reserve(resource)` method.
+        In this case the times of the allocation are not touched as long as the job
+        fits in the walltime."""
         assert self._batsim_job
         assert self._allocation is None
         assert self.open
