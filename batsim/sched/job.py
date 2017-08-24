@@ -599,7 +599,10 @@ class Jobs(ObserveList):
         super().__init__(*args, **kwargs)
 
     def __getitem__(self, items):
-        return self._job_map[items]
+        if isinstance(items, slice):
+            return self.create(self._data[items])
+        else:
+            return self._job_map[items]
 
     def __delitem__(self, index):
         job = self._job_map[items]
