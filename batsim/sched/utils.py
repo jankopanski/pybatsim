@@ -87,8 +87,12 @@ class ObserveList:
     def create(self, *args, **kwargs):
         return self.__class__(*args, **kwargs)
 
-    def sorted(self, field_getter=None):
-        return self.create(sorted(self._data, key=field_getter))
+    def sorted(self, field_getter=None, reverse=False):
+        return self.create(
+            sorted(
+                self._data,
+                key=field_getter,
+                reverse=reverse))
 
 
 def filter_list(
