@@ -8,6 +8,7 @@
 
 """
 import logging
+import os
 from abc import ABCMeta, abstractmethod
 
 from batsim.batsim import BatsimScheduler
@@ -216,6 +217,17 @@ class Scheduler(metaclass=ABCMeta):
 
         handler = logging.FileHandler(
             "out_scheduler_events_{}.csv".format(self.__class__.__name__))
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(formatter)
+        self._event_logger.addHandler(handler)
+
+        filename_lastschedule = "out_scheduler_events_{}_lastschedule.csv".format(
+            self.__class__.__name__)
+        try:
+            os.remove(filename_lastschedule)
+        except OSError:
+            pass
+        handler = logging.FileHandler(filename_lastschedule)
         handler.setLevel(logging.DEBUG)
         handler.setFormatter(formatter)
         self._event_logger.addHandler(handler)
