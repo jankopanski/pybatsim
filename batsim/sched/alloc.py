@@ -32,11 +32,22 @@ class Allocation:
             self.add_resource(resources)
 
         if job is not None:
+            if walltime is None:
+                self._walltime = job.requested_time
             self._reserve_job_on_allocation(job)
 
     @property
     def job(self):
         return self._job
+
+    def starts_in_future(self, scheduler):
+        return self.start_time > scheduler.time
+
+    def started_in_past(self, scheduler):
+        return self.start_time < scheduler.time
+
+    def starts_now(self, scheduler):
+        return self.start_time == scheduler.time
 
     def _reserve_job_on_allocation(self, newjob):
         assert not self.allocated and not self.previously_allocated
@@ -161,8 +172,13 @@ class Allocation:
                 res._do_allocate_allocation(self)
         self._allocated = True
 
-    def free(self, scheduler):
-        assert not self._previously_allocated and self._allocated
+    def free(self, scheduler=None):
+        if not self._allocated and not self._previously_allocated:
+            self.remove_all_resources()
+            if self._job is not None:
+                self._free_job_from_allocation()
+            return
+        assert scheduler is not None
 
         for r in self.resources:
             r._do_free_allocation(self)
