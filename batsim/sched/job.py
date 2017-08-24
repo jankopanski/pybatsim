@@ -96,18 +96,20 @@ class Job:
         return True
 
     def get_resolved_dependencies(self, jobs):
+        jobparts = self.id.split("!")
+        job_id = jobparts[-1]
+        workload_name = "!".join(jobparts[:len(jobparts) - 1])
         result = []
         for dep in self.dependencies:
-            jobparts = self.id.split("!")
-            workload_name = "!".join(jobparts[:len(jobparts) - 1])
-            job_id = jobparts[-1]
-
-            dep_job_id = str(workload_name) + "!" + str(dep)
+            # If the workload is missing: assume that the dependency refers
+            # to the same workload.
+            if "!" not in dep:
+                dep = str(workload_name) + "!" + str(dep)
             try:
-                dep_job = jobs[dep_job_id]
+                dep_job = jobs[dep]
                 result.append(dep_job)
             except KeyError:
-                result.append(dep_job_id)
+                result.append(dep)
         return tuple(result)
 
     @property
