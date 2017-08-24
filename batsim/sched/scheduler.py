@@ -314,6 +314,7 @@ class Scheduler(metaclass=ABCMeta):
         event = Scheduler.Event(self.time, level, msg, type, kwargs)
 
         self._events.append(event)
+        self.on_event(event)
 
         return str(event)
 
@@ -422,6 +423,9 @@ class Scheduler(metaclass=ABCMeta):
         pass
 
     def on_report_energy_consumed(self, consumed_energy):
+        pass
+
+    def on_event(self, event):
         pass
 
 

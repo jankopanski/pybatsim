@@ -77,7 +77,8 @@ class Resource:
                     time_updated = True
             estimated_end_time = time + requested_walltime
             for alloc in self._allocations:
-                if alloc.start_time > time and alloc.start_time < (estimated_end_time + 1):
+                if alloc.start_time > time and alloc.start_time < (
+                        estimated_end_time + 1):
                     time = alloc.end_time + 1
                     estimated_end_time = time + requested_walltime
                     time_updated = True
@@ -177,8 +178,12 @@ class Resources(ObserveList):
     def free(self):
         return self.filter(free=True)
 
-    def first_frame_for_walltime_combined(self,
-            requested_walltime, time, min_matches, max_matches):
+    def first_frame_for_walltime_combined(
+            self,
+            requested_walltime,
+            time,
+            min_matches,
+            max_matches):
         time_updated = True
         while time_updated:
             time_updated = False
@@ -186,7 +191,8 @@ class Resources(ObserveList):
             for i, r in enumerate(self._data):
                 new_time = r.first_frame_for_walltime(requested_walltime, time)
                 if new_time != time:
-                    if max_matches is None or len(found_resources) < max_matches:
+                    if max_matches is None or len(
+                            found_resources) < max_matches:
                         time = new_time
                         time_updated = True
                         break
@@ -200,12 +206,15 @@ class Resources(ObserveList):
             found_resources = []
         return time, self.create(found_resources)
 
-    def find_sufficient_resources_for_job_with_earliest_start_time(self, job, *args, allow_future_allocations=False, **kwargs):
+    def find_sufficient_resources_for_job_with_earliest_start_time(
+            self, job, *args, allow_future_allocations=False, **kwargs):
         has_time_sharing = job._scheduler.has_time_sharing
-        resources = self.filter(*args, free=True, allocated=has_time_sharing, computing=has_time_sharing, **kwargs)
+        resources = self.filter(
+            *args, free=True, allocated=has_time_sharing,
+            computing=has_time_sharing, **kwargs)
 
-        start_time, found_resources = resources.first_frame_for_walltime_combined(job.requested_time, job._scheduler.time,
-                job.requested_resources, job.requested_resources)
+        start_time, found_resources = resources.first_frame_for_walltime_combined(
+            job.requested_time, job._scheduler.time, job.requested_resources, job.requested_resources)
 
         if not allow_future_allocations and start_time != job._scheduler.time:
             found_resources = self.create()
@@ -213,7 +222,8 @@ class Resources(ObserveList):
         return found_resources, start_time
 
     def find_sufficient_resources_for_job(self, *args, **kwargs):
-        return self.find_sufficient_resources_for_job_with_earliest_start_time(*args, **kwargs)[0]
+        return self.find_sufficient_resources_for_job_with_earliest_start_time(
+            *args, **kwargs)[0]
 
     @property
     def allocated(self):
