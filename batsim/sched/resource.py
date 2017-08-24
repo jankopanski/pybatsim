@@ -63,7 +63,33 @@ class Resource:
                 return True
         return False
 
-    def first_frame_for_walltime(self, requested_walltime, time=None):
+    @property
+    def pstate_update_in_progress(self):
+        return self._pstate_update_in_progress
+
+    @property
+    def old_pstate(self):
+        return self._old_pstate
+
+    @property
+    def pstate(self):
+        return self._pstate
+
+    @pstate.setter
+    def pstate(self, newval):
+        if not self.pstate_update_in_progress:
+            self._old_pstate = self._pstate
+
+        self._pstate_update_request_necessary = True
+        self._pstate_update_in_progress = True
+
+        self._pstate = newval
+
+    @property
+    def resources(self):
+        return [self]
+
+    def find_first_time_to_fit_walltime(self, requested_walltime, time=None):
         if time is None:
             time = self._scheduler.time
         time_updated = True
@@ -90,28 +116,6 @@ class Resource:
         self._pstate_update_in_progress = False
         self._pstate_update_request_necessary = False
 
-    @property
-    def pstate_update_in_progress(self):
-        return self._pstate_update_in_progress
-
-    @property
-    def old_pstate(self):
-        return self._old_pstate
-
-    @property
-    def pstate(self):
-        return self._pstate
-
-    @pstate.setter
-    def pstate(self, newval):
-        if not self.pstate_update_in_progress:
-            self._old_pstate = self._pstate
-
-        self._pstate_update_request_necessary = True
-        self._pstate_update_in_progress = True
-
-        self._pstate = newval
-
     def _do_change_state(self, scheduler):
         self._pstate_update_request_necessary = False
         scheduler._batsim.set_resource_state([self.id], self._new_state)
@@ -134,10 +138,6 @@ class Resource:
     def _do_free_allocation(self, allocation):
         self._allocations.remove(allocation)
 
-    @property
-    def resources(self):
-        return [self]
-
 
 class Resources(ObserveList):
     """Helper class implementing parts of the python list API to manage the resources.
@@ -148,6 +148,22 @@ class Resources(ObserveList):
     def __init__(self, *args, **kwargs):
         self._resource_map = {}
         super().__init__(*args, **kwargs)
+
+    @property
+    def resources(self):
+        return self.all
+
+    @property
+    def free(self):
+        return self.filter(free=True)
+
+    @property
+    def allocated(self):
+        return self.filter(allocated=True)
+
+    @property
+    def computing(self):
+        return self.filter(computing=True)
 
     def __getitem__(self, items):
         if isinstance(items, slice):
@@ -170,15 +186,7 @@ class Resources(ObserveList):
         if resource.id:
             del self._resource_map[resource.id]
 
-    @property
-    def resources(self):
-        return self.all
-
-    @property
-    def free(self):
-        return self.filter(free=True)
-
-    def first_frame_for_walltime_combined(
+    def find_first_time_and_resources_to_fit_walltime(
             self,
             requested_walltime,
             time,
@@ -189,7 +197,8 @@ class Resources(ObserveList):
             time_updated = False
             found_resources = []
             for i, r in enumerate(self._data):
-                new_time = r.first_frame_for_walltime(requested_walltime, time)
+                new_time = r.find_first_time_to_fit_walltime(
+                    requested_walltime, time)
                 if new_time != time:
                     if max_matches is None or len(
                             found_resources) < max_matches:
@@ -213,7 +222,7 @@ class Resources(ObserveList):
             *args, free=True, allocated=has_time_sharing,
             computing=has_time_sharing, **kwargs)
 
-        start_time, found_resources = resources.first_frame_for_walltime_combined(
+        start_time, found_resources = resources.find_first_time_and_resources_to_fit_walltime(
             job.requested_time, job._scheduler.time, job.requested_resources, job.requested_resources)
 
         if not allow_future_allocations and start_time != job._scheduler.time:
@@ -224,14 +233,6 @@ class Resources(ObserveList):
     def find_sufficient_resources_for_job(self, *args, **kwargs):
         return self.find_sufficient_resources_for_job_with_earliest_start_time(
             *args, **kwargs)[0]
-
-    @property
-    def allocated(self):
-        return self.filter(allocated=True)
-
-    @property
-    def computing(self):
-        return self.filter(computing=True)
 
     def filter(
             self,

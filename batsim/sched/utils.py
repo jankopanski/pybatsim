@@ -16,6 +16,10 @@ class ObserveList:
         for i in from_list:
             self.add(i)
 
+    @property
+    def data(self):
+        return tuple(self._data)
+
     def _check_new_elem(self, element):
         return True
 
@@ -44,15 +48,13 @@ class ObserveList:
             self._element_new(element)
 
     def remove(self, element):
-        self._data.remove(element)
         self._data_set.remove(element)
+        self._data.remove(element)
         self._element_del(element)
 
     def discard(self, element):
         try:
-            self._data_set.remove(element)
-            self._data.remove(element)
-            self._element_del(element)
+            self.remove(element)
         except KeyError:
             pass
 
@@ -71,10 +73,6 @@ class ObserveList:
 
     def __str__(self):
         return str([str(entry) for entry in self._data])
-
-    @property
-    def data(self):
-        return tuple(self._data)
 
     def apply(self, apply):
         """Apply a function to modify the list (e.g. sorting the list).
@@ -102,9 +100,8 @@ def filter_list(
         max=None,
         min=None,
         num=None,
-        prefer_min=False,
         min_or_max=False):
-    """Filter the list.
+    """Filters a list.
 
     :param filter: a list of generators through which the entries will be piped.
 
@@ -115,8 +112,6 @@ def filter_list(
     :param min: the minimum number of returned entries (if less entries are available no entries will be returned at all).
 
     :param num: the exact number of returned entries.
-
-    :param prefer_min: return the minimum specified number of entries as soon as found.
 
     :param min_or_max: either return the minimum or maximum number but nothing between.
 
@@ -148,8 +143,6 @@ def filter_list(
     while True:
         # Do not yield more entries than requested
         if max and num_elems >= max:
-            break
-        if min and prefer_min and num_elems == min:
             break
 
         try:

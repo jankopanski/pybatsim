@@ -15,12 +15,12 @@ class Profile(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def to_dict(self):
+    def to_dict(self, scheduler):
         """Convert this profile to a dictionary."""
         pass
 
-    def __call__(self):
-        return self.to_dict()
+    def __call__(self, scheduler):
+        return self.to_dict(scheduler)
 
 
 class Profiles(metaclass=ABCMeta):

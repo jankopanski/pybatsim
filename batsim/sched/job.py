@@ -45,6 +45,188 @@ class Job:
     def start_time(self):
         return self._start_time
 
+    @property
+    def dependencies(self):
+        return tuple(
+            (self.get_batsim_job_data("deps") or []) +
+            self._own_dependencies)
+
+    @property
+    def qos(self):
+        return self._get_overwritable_value("qos")
+
+    @qos.setter
+    def qos(self, value):
+        self._qos = value
+
+    @property
+    def priority(self):
+        return self._get_overwritable_value("priority", 1)
+
+    @priority.setter
+    def priority(self, value):
+        self._priority = value
+
+    @property
+    def user(self):
+        return self._get_overwritable_value("user")
+
+    @user.setter
+    def user(self, value):
+        self._user = value
+
+    @property
+    def partition(self):
+        return self._get_overwritable_value("partition")
+
+    @partition.setter
+    def partition(self, value):
+        self._partition = value
+
+    @property
+    def job_group(self):
+        return self._get_overwritable_value("group")
+
+    @job_group.setter
+    def job_group(self, value):
+        self._group = value
+
+    @property
+    def comment(self):
+        return self._get_overwritable_value("comment")
+
+    @comment.setter
+    def comment(self, value):
+        self._comment = value
+
+    @property
+    def application(self):
+        return self._get_overwritable_value("application")
+
+    @application.setter
+    def application(self, value):
+        self._application = value
+
+    @property
+    def open(self):
+        """Whether or not this job is still open."""
+        return True not in [
+            self.completed,
+            self.marked_for_scheduling, self.scheduled,
+            self.marked_for_killing, self.killed,
+            self.marked_for_rejection, self.rejected]
+
+    @property
+    def parent_job(self):
+        return self._parent_job
+
+    @property
+    def sub_jobs(self):
+        return tuple(self._sub_jobs)
+
+    @property
+    def running(self):
+        """Whether or not this job is currently running."""
+        return self.scheduled and not self.completed and not self.killed
+
+    @property
+    def completed(self):
+        """Whether or not this job has been completed."""
+        return self._batsim_job.status in ["SUCCESS", "TIMEOUT"]
+
+    @property
+    def marked_for_scheduling(self):
+        """Whether or not this job was marked for scheduling at the end of the iteration."""
+        return self._marked_for_scheduling
+
+    @property
+    def scheduled(self):
+        """Whether or not this job was already submitted to Batsim for exection."""
+        return self._scheduled
+
+    @property
+    def marked_for_rejection(self):
+        """Whether or not this job will be rejected at the end of the iteration."""
+        return self._marked_for_rejection
+
+    @property
+    def rejected(self):
+        """Whether or not this job was submitted for rejection to batsim."""
+        return self._rejected
+
+    @property
+    def rejected_reason(self):
+        """The reason for the rejection"""
+        return self._rejected_reason
+
+    @property
+    def marked_for_killing(self):
+        """Whether or not this job was marked for killing at the end of the iteration."""
+        return self._marked_for_killing
+
+    @property
+    def killed(self):
+        """Whether or not this job has been sent to Batsim for killing."""
+        return self._killed
+
+    @property
+    def running(self):
+        return not self.open and self.scheduled and not self.completed
+
+    @property
+    def allocation(self):
+        """Returns the current allocation of this job."""
+        return self._allocation
+
+    @property
+    def id(self):
+        assert self._batsim_job
+        return self._batsim_job.id
+
+    @property
+    def submit_time(self):
+        assert self._batsim_job
+        return self._batsim_job.submit_time
+
+    @property
+    def requested_time(self):
+        assert self._batsim_job
+        return self._batsim_job.requested_time
+
+    @property
+    def requested_resources(self):
+        assert self._batsim_job
+        return self._batsim_job.requested_resources
+
+    @property
+    def profile(self):
+        assert self._batsim_job
+        return self._batsim_job.profile
+
+    @property
+    def finish_time(self):
+        assert self._batsim_job
+        return self._batsim_job.finish_time
+
+    @property
+    def status(self):
+        assert self._batsim_job
+        return self._batsim_job.status
+
+    @property
+    def job_state(self):
+        assert self._batsim_job
+        return self._batsim_job.job_state
+
+    @property
+    def kill_reason(self):
+        assert self._batsim_job
+        return self._batsim_job.kill_reason
+
+    @property
+    def is_dynamic_job(self):
+        return self.id.startswith(Batsim.DYNAMIC_JOB_PREFIX + "!")
+
     def free(self):
         """Free the current allocation for this job.
         """
@@ -112,12 +294,6 @@ class Job:
                 result.append(dep)
         return tuple(result)
 
-    @property
-    def dependencies(self):
-        return tuple(
-            (self.get_batsim_job_data("deps") or []) +
-            self._own_dependencies)
-
     def add_dependency(self, job):
         assert self.open
         return self._own_dependencies.append(job)
@@ -125,62 +301,6 @@ class Job:
     def remove_dependency(self, job):
         assert self.open
         return self._own_dependencies.remove(job)
-
-    @property
-    def qos(self):
-        return self._get_overwritable_value("qos")
-
-    @qos.setter
-    def qos(self, value):
-        self._qos = value
-
-    @property
-    def priority(self):
-        return self._get_overwritable_value("priority", 1)
-
-    @priority.setter
-    def priority(self, value):
-        self._priority = value
-
-    @property
-    def user(self):
-        return self._get_overwritable_value("user")
-
-    @user.setter
-    def user(self, value):
-        self._user = value
-
-    @property
-    def partition(self):
-        return self._get_overwritable_value("partition")
-
-    @partition.setter
-    def partition(self, value):
-        self._partition = value
-
-    @property
-    def job_group(self):
-        return self._get_overwritable_value("group")
-
-    @job_group.setter
-    def job_group(self, value):
-        self._group = value
-
-    @property
-    def comment(self):
-        return self._get_overwritable_value("comment")
-
-    @comment.setter
-    def comment(self, value):
-        self._comment = value
-
-    @property
-    def application(self):
-        return self._get_overwritable_value("application")
-
-    @application.setter
-    def application(self, value):
-        self._application = value
 
     def _get_overwritable_value(self, field_name, default=None):
         try:
@@ -196,43 +316,6 @@ class Job:
     def is_runnable(self, jobs):
         """Whether the job is open and has only fulfilled dependencies."""
         return self.dependencies_fulfilled(jobs) and self.open
-
-    @property
-    def open(self):
-        """Whether or not this job is still open."""
-        return True not in [
-            self.completed,
-            self.marked_for_scheduling, self.scheduled,
-            self.marked_for_killing, self.killed,
-            self.marked_for_rejection, self.rejected]
-
-    @property
-    def parent_job(self):
-        return self._parent_job
-
-    @property
-    def sub_jobs(self):
-        return tuple(self._sub_jobs)
-
-    @property
-    def running(self):
-        """Whether or not this job is currently running."""
-        return self.scheduled and not self.completed and not self.killed
-
-    @property
-    def completed(self):
-        """Whether or not this job has been completed."""
-        return self._batsim_job.status in ["SUCCESS", "TIMEOUT"]
-
-    @property
-    def marked_for_scheduling(self):
-        """Whether or not this job was marked for scheduling at the end of the iteration."""
-        return self._marked_for_scheduling
-
-    @property
-    def scheduled(self):
-        """Whether or not this job was already submitted to Batsim for exection."""
-        return self._scheduled
 
     def _do_execute(self, scheduler):
         """Internal method to execute the execution of the job."""
@@ -294,21 +377,6 @@ class Job:
             parent_job._sub_jobs.remove(otherjob)
         self._own_dependencies = list(otherjob._own_dependencies)
 
-    @property
-    def marked_for_rejection(self):
-        """Whether or not this job will be rejected at the end of the iteration."""
-        return self._marked_for_rejection
-
-    @property
-    def rejected(self):
-        """Whether or not this job was submitted for rejection to batsim."""
-        return self._rejected
-
-    @property
-    def rejected_reason(self):
-        """The reason for the rejection"""
-        return self._rejected_reason
-
     def reject(self, reason=""):
         """Reject the job. A reason can be given which will show up in the scheduler logs.
         However, it will currently not show up in Batsim directly as a rejecting reason is
@@ -331,25 +399,11 @@ class Job:
             self._rejected = True
             self._marked_for_rejection = False
 
-    @property
-    def marked_for_killing(self):
-        """Whether or not this job was marked for killing at the end of the iteration."""
-        return self._marked_for_killing
-
-    @property
-    def killed(self):
-        """Whether or not this job has been sent to Batsim for killing."""
-        return self._killed
-
     def kill(self):
         """Kill the current job during its execution."""
         assert self._batsim_job
         assert self.running
         self._killed = True
-
-    @property
-    def running(self):
-        return not self.open and self.scheduled and not self.completed
 
     def _do_kill(self, scheduler):
         """Internal method to execute the killing of the job."""
@@ -359,11 +413,6 @@ class Job:
 
             self._killed = True
             self._marked_for_killing = True
-
-    @property
-    def allocation(self):
-        """Returns the current allocation of this job."""
-        return self._allocation
 
     def schedule(self, resource=None):
         """Mark this job for scheduling. This can also be done even when not enough resources are
@@ -393,61 +442,12 @@ class Job:
                 self.finish_time, self.status,
                 self.job_state, self.kill_reason))
 
-    @property
-    def id(self):
-        assert self._batsim_job
-        return self._batsim_job.id
-
-    @property
-    def submit_time(self):
-        assert self._batsim_job
-        return self._batsim_job.submit_time
-
-    @property
-    def requested_time(self):
-        assert self._batsim_job
-        return self._batsim_job.requested_time
-
-    @property
-    def requested_resources(self):
-        assert self._batsim_job
-        return self._batsim_job.requested_resources
-
-    @property
-    def profile(self):
-        assert self._batsim_job
-        return self._batsim_job.profile
-
-    @property
-    def finish_time(self):
-        assert self._batsim_job
-        return self._batsim_job.finish_time
-
-    @property
-    def status(self):
-        assert self._batsim_job
-        return self._batsim_job.status
-
-    @property
-    def job_state(self):
-        assert self._batsim_job
-        return self._batsim_job.job_state
-
-    @property
-    def kill_reason(self):
-        assert self._batsim_job
-        return self._batsim_job.kill_reason
-
     @classmethod
     def create_dynamic_job(cls, *args, **kwargs):
         return DynamicJob(*args, **kwargs)
 
     def create_sub_job(self, *args, **kwargs):
         return DynamicJob(*args, parent_job=self, **kwargs)
-
-    @property
-    def is_user_job(self):
-        return self.id.startswith(Batsim.DYNAMIC_JOB_PREFIX + "!")
 
 
 class DynamicJob(Job):
@@ -532,12 +532,6 @@ class DynamicJob(Job):
     def kill_reason(self):
         return None
 
-    def submit(self, scheduler):
-        """Marks a dynamic job for submission in the `scheduler`."""
-        if not self._dyn_marked_submission and not self._dyn_submitted:
-            self._dyn_marked_submission = True
-            scheduler.jobs.append(self)
-
     @property
     def marked_for_dynamic_submission(self):
         """Whether or not this job object was marked for dynamic submission."""
@@ -552,6 +546,12 @@ class DynamicJob(Job):
         """Whether or not this job object was dynamically submitted."""
         return self._dyn_submitted
 
+    def submit(self, scheduler):
+        """Marks a dynamic job for submission in the `scheduler`."""
+        if not self._dyn_marked_submission and not self._dyn_submitted:
+            self._dyn_marked_submission = True
+            scheduler.jobs.append(self)
+
     def _do_dyn_submit(self, scheduler):
         """Execute the dynamic job submission in the `scheduler`."""
         if self._dyn_marked_submission and not self._dyn_submitted:
@@ -559,7 +559,7 @@ class DynamicJob(Job):
             # allow complex Profile objects.
             profile = self._user_profile
             if not isinstance(profile, dict):
-                profile = profile()
+                profile = profile(scheduler)
 
             parent_job_id = None
             try:
@@ -597,27 +597,6 @@ class Jobs(ObserveList):
     def __init__(self, *args, **kwargs):
         self._job_map = {}
         super().__init__(*args, **kwargs)
-
-    def __getitem__(self, items):
-        if isinstance(items, slice):
-            return self.create(self._data[items])
-        else:
-            return self._job_map[items]
-
-    def __delitem__(self, index):
-        job = self._job_map[items]
-        self.remove(job)
-
-    def __setitem__(self, index, element):
-        raise ValueError("Cannot override a job id")
-
-    def _element_new(self, job):
-        if job.id:
-            self._job_map[job.id] = job
-
-    def _element_del(self, job):
-        if job.id:
-            del self._job_map[job.id]
 
     @property
     def runnable(self):
@@ -666,6 +645,27 @@ class Jobs(ObserveList):
     @property
     def marked_for_dynamic_submission(self):
         return self.filter(marked_for_dyanmic_submission=True)
+
+    def __getitem__(self, items):
+        if isinstance(items, slice):
+            return self.create(self._data[items])
+        else:
+            return self._job_map[items]
+
+    def __delitem__(self, index):
+        job = self._job_map[items]
+        self.remove(job)
+
+    def __setitem__(self, index, element):
+        raise ValueError("Cannot override a job id")
+
+    def _element_new(self, job):
+        if job.id:
+            self._job_map[job.id] = job
+
+    def _element_del(self, job):
+        if job.id:
+            del self._job_map[job.id]
 
     def filter(
             self,

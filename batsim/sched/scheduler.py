@@ -93,7 +93,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler.info("Received job submission from Batsim ({job})",
                              job=newjob, type="job_submission_received")
 
-        if newjob.is_user_job:
+        if newjob.is_dynamic_job:
             for job2 in self._scheduler.jobs.dynamically_submitted:
                 if job.id == job2.id:
                     newjob.move_properties_from(job2)
@@ -128,7 +128,7 @@ class BaseBatsimScheduler(BatsimScheduler):
 
         resource.update_pstate_change(pstate)
 
-        self._scheduler.on_machine_pstate_changed(nodeid, pstate)
+        self._scheduler.on_machine_pstate_changed(resource, pstate)
         self._scheduler._do_schedule()
 
     def onReportEnergyConsumed(self, consumed_energy):
@@ -261,6 +261,10 @@ class Scheduler(metaclass=ABCMeta):
         """The current simulation time."""
         return self._time
 
+    @property
+    def has_time_sharing(self):
+        return self._batsim.time_sharing
+
     def run_scheduler_at(self, time):
         """Wake the scheduler at the given point in time (of the simulation)."""
         self._batsim.wake_me_up_at(time)
@@ -273,9 +277,39 @@ class Scheduler(metaclass=ABCMeta):
         """Return the underlying Pybatsim scheduler."""
         return self._scheduler
 
-    @property
-    def has_time_sharing(self):
-        return self._batsim.time_sharing
+    def _format_log_msg(self, msg, **kwargs):
+        msg = msg.format(**kwargs)
+        return "{:.6f} | {}".format(self.time, msg)
+
+    def _format_event_msg(self, level, msg, type="msg", **kwargs):
+        msg = msg.format(**kwargs)
+
+        event = Scheduler.Event(self.time, level, msg, type, kwargs)
+
+        self._events.append(event)
+        self.on_event(event)
+
+        return str(event)
+
+    def debug(self, msg, **kwargs):
+        """Writes a debug message to the logging facility."""
+        self._logger.debug(self._format_log_msg(msg, **kwargs))
+        self._event_logger.info(self._format_event_msg(1, msg, **kwargs))
+
+    def info(self, msg, **kwargs):
+        """Writes a info message to the logging facility."""
+        self._logger.info(self._format_log_msg(msg, **kwargs))
+        self._event_logger.info(self._format_event_msg(2, msg, **kwargs))
+
+    def warn(self, msg, **kwargs):
+        """Writes a warn message to the logging facility."""
+        self._logger.warn(self._format_log_msg(msg, **kwargs))
+        self._event_logger.info(self._format_event_msg(3, msg, **kwargs))
+
+    def error(self, msg, **kwargs):
+        """Writes a error message to the logging facility."""
+        self._logger.error(self._format_log_msg(msg, **kwargs))
+        self._event_logger.info(self._format_event_msg(4, msg, **kwargs))
 
     def _on_pre_init(self):
         """The _pre_init method called during the start-up phase of the scheduler.
@@ -315,40 +349,6 @@ class Scheduler(metaclass=ABCMeta):
         self.debug(
             "Starting scheduling iteration",
             type="scheduling_iteration_started")
-
-    def _format_log_msg(self, msg, **kwargs):
-        msg = msg.format(**kwargs)
-        return "{:.6f} | {}".format(self.time, msg)
-
-    def _format_event_msg(self, level, msg, type="msg", **kwargs):
-        msg = msg.format(**kwargs)
-
-        event = Scheduler.Event(self.time, level, msg, type, kwargs)
-
-        self._events.append(event)
-        self.on_event(event)
-
-        return str(event)
-
-    def debug(self, msg, **kwargs):
-        """Writes a debug message to the logging facility."""
-        self._logger.debug(self._format_log_msg(msg, **kwargs))
-        self._event_logger.info(self._format_event_msg(1, msg, **kwargs))
-
-    def info(self, msg, **kwargs):
-        """Writes a info message to the logging facility."""
-        self._logger.info(self._format_log_msg(msg, **kwargs))
-        self._event_logger.info(self._format_event_msg(2, msg, **kwargs))
-
-    def warn(self, msg, **kwargs):
-        """Writes a warn message to the logging facility."""
-        self._logger.warn(self._format_log_msg(msg, **kwargs))
-        self._event_logger.info(self._format_event_msg(3, msg, **kwargs))
-
-    def error(self, msg, **kwargs):
-        """Writes a error message to the logging facility."""
-        self._logger.error(self._format_log_msg(msg, **kwargs))
-        self._event_logger.info(self._format_event_msg(4, msg, **kwargs))
 
     @abstractmethod
     def schedule(self):
@@ -431,7 +431,7 @@ class Scheduler(metaclass=ABCMeta):
     def on_job_completion(self, job):
         pass
 
-    def on_machine_pstate_changed(self, nodeid, pstate):
+    def on_machine_pstate_changed(self, resource, pstate):
         pass
 
     def on_report_energy_consumed(self, consumed_energy):
