@@ -63,6 +63,26 @@ class Resource:
                 return True
         return False
 
+    def first_frame_for_walltime(self, requested_walltime, time=None):
+        if time is None:
+            time = self._scheduler.time
+        time_updated = True
+        while time_updated:
+            time_updated = False
+            # Search the earliest time when a slot for an allocation is
+            # available
+            for alloc in self._allocations:
+                if alloc.start_time < time and alloc.end_time >= time:
+                    time = alloc.end_time + 1
+                    time_updated = True
+            estimated_end_time = time + requested_walltime
+            for alloc in self._allocations:
+                if alloc.start_time > time and alloc.start_time < (estimated_end_time + 1):
+                    time = alloc.end_time + 1
+                    estimated_end_time = time + requested_walltime
+                    time_updated = True
+        return time
+
     def _update_pstate_change(self, pstate):
         self._old_pstate = self._pstate
         self._pstate = pstate
