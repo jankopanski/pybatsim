@@ -73,7 +73,7 @@ class ObserveList:
         return str([str(entry) for entry in self._data])
 
     @property
-    def all(self):
+    def data(self):
         return tuple(self._data)
 
     def apply(self, apply):
@@ -86,6 +86,9 @@ class ObserveList:
 
     def create(self, *args, **kwargs):
         return self.__class__(*args, **kwargs)
+
+    def sorted(self, field_getter=None):
+        return self.create(sorted(self._data, key=field_getter))
 
 
 def filter_list(

@@ -177,8 +177,43 @@ class Resources(ObserveList):
     def free(self):
         return self.filter(free=True)
 
-    def for_job_requirements(self, job, *args, **kwargs):
-        return self.filter(*args, for_job_requirements=job, **kwargs)
+    def first_frame_for_walltime_combined(self,
+            requested_walltime, time, min_matches, max_matches):
+        time_updated = True
+        while time_updated:
+            time_updated = False
+            found_resources = []
+            for i, r in enumerate(self._data):
+                new_time = r.first_frame_for_walltime(requested_walltime, time)
+                if new_time != time:
+                    if max_matches is None or len(found_resources) < max_matches:
+                        time = new_time
+                        time_updated = True
+                        break
+                    elif len(found_resources) >= max_matches:
+                        break
+                else:
+                    found_resources.append(r)
+                    if len(found_resources) >= max_matches:
+                        break
+        if len(found_resources) < min_matches:
+            found_resources = []
+        return time, self.create(found_resources)
+
+    def find_sufficient_resources_for_job_with_earliest_start_time(self, job, *args, allow_future_allocations=False, **kwargs):
+        has_time_sharing = job._scheduler.has_time_sharing
+        resources = self.filter(*args, free=True, allocated=has_time_sharing, computing=has_time_sharing, **kwargs)
+
+        start_time, found_resources = resources.first_frame_for_walltime_combined(job.requested_time, job._scheduler.time,
+                job.requested_resources, job.requested_resources)
+
+        if not allow_future_allocations and start_time != job._scheduler.time:
+            found_resources = self.create()
+
+        return found_resources, start_time
+
+    def find_sufficient_resources_for_job(self, *args, **kwargs):
+        return self.find_sufficient_resources_for_job_with_earliest_start_time(*args, **kwargs)[0]
 
     @property
     def allocated(self):
@@ -194,7 +229,6 @@ class Resources(ObserveList):
             allocated=False,
             computing=False,
             num=None,
-            for_job_requirements=None,
             **kwargs):
         """Filter the resources lists to search for resources.
 
@@ -202,20 +236,16 @@ class Resources(ObserveList):
 
         :param allocated: whether or not already allocated resources should be returned.
 
-        :param for_job_requirements: for the common case that sufficient resources for a job should be found the exact number of required resources for this particular job are returned. The result can still be filtered with a condition or sorted with a sorting function.
+        :param computing: whether or not currently computing resources should be returned.
         """
-        # Pre-defined filter to find resources for a job submission
-        if for_job_requirements is not None:
-            free = True
-            allocated = False
-            computing = False
-            num = for_job_requirements.requested_resources
 
         # Yield all resources if not filtered
         if not free and not allocated and not computing:
             free = True
             allocated = True
             computing = True
+
+        filter_objects = []
 
         # Filter free or allocated resources
         def filter_free_or_allocated_resources(res):
@@ -229,8 +259,9 @@ class Resources(ObserveList):
                 else:
                     if free:
                         yield r
+        filter_objects.append(filter_free_or_allocated_resources)
 
         return self.create(filter_list(self._data,
-                                       [filter_free_or_allocated_resources],
+                                       filter_objects,
                                        num=num,
                                        **kwargs))
