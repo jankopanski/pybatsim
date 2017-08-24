@@ -149,7 +149,10 @@ class Resources(ObserveList):
         super().__init__(*args, **kwargs)
 
     def __getitem__(self, items):
-        return self._resource_map[items]
+        if isinstance(items, slice):
+            return self.create(self.all[items])
+        else:
+            return self._resource_map[items]
 
     def __delitem__(self, index):
         resource = self._resource_map[items]
