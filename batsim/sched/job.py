@@ -242,55 +242,55 @@ class Job:
     @property
     def id(self):
         """The id of this job as known by Batsim."""
-        assert self._batsim_job
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.id
 
     @property
     def submit_time(self):
         """The time of submission of this job as known by Batsim."""
-        assert self._batsim_job
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.submit_time
 
     @property
     def requested_time(self):
         """The requested time of this job as known by Batsim."""
-        assert self._batsim_job
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.requested_time
 
     @property
     def requested_resources(self):
         """The requested resources of this job as known by Batsim."""
-        assert self._batsim_job
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.requested_resources
 
     @property
     def profile(self):
         """The profile of this job as known by Batsim."""
-        assert self._batsim_job
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.profile
 
     @property
     def finish_time(self):
         """The finish time of this job as known by Batsim."""
-        assert self._batsim_job
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.finish_time
 
     @property
     def status(self):
         """The status of this job as known by Batsim."""
-        assert self._batsim_job
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.status
 
     @property
     def job_state(self):
         """The state of this job as known by Batsim."""
-        assert self._batsim_job
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.job_state
 
     @property
     def kill_reason(self):
         """The kill reason (if any exists) of this job as known by Batsim."""
-        assert self._batsim_job
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.kill_reason
 
     @property
@@ -300,14 +300,15 @@ class Job:
 
     def free(self):
         """Free the current allocation of this job."""
-        assert self._batsim_job
-        assert self._allocation is not None
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        assert self._allocation is not None, "Job has no allocation"
 
         # To free resources the job does either have to be not submitted yet
         # or the job has to be completed (i.e. the job status is set by
         # batsim).
         assert (
-            not self.marked_for_scheduling and not self.scheduled) or self.completed
+            not self.marked_for_scheduling and not self.scheduled) or self.completed, \
+            "Job is in invalid state: not completed yet or currently scheduled"
 
         if self.completed:
             self._allocation._free_job_from_allocation()
@@ -332,9 +333,9 @@ class Job:
         :param resource: either a single `Resource` a list in the form of a `Resources`
         object or an `Allocation`
         """
-        assert self._batsim_job
-        assert self._allocation is None
-        assert self.open
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        assert self._allocation is None, "Job has already an allocation"
+        assert self.open, "Job is not open"
 
         if isinstance(resource, Allocation):
             resource._reserve_job_on_allocation(self)
@@ -394,7 +395,7 @@ class Job:
 
         :param job: the job which should be added as a dependency
         """
-        assert self.open
+        assert self.open, "Job is not open"
         self._own_dependencies.append(job)
         self._jobs_list.update_element(self)
 
@@ -404,7 +405,7 @@ class Job:
 
         :param job: the job which should be removed as a dependency
         """
-        assert self.open
+        assert self.open, "Job is not open"
         self._own_dependencies.remove(job)
         self._jobs_list.update_element(self)
 
@@ -433,9 +434,9 @@ class Job:
 
     def _do_execute(self):
         """Internal method to execute the execution of the job."""
-        assert self._batsim_job is not None
-        assert not self.scheduled and not self.rejected
-        assert self.allocation is not None
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        assert not self.scheduled and not self.rejected, "Job is either already scheduled or rejected"
+        assert self.allocation is not None, "Job has no allocation"
 
         if self.marked_for_scheduling and not self.scheduled:
             if self._batsim_job.requested_resources < len(self.allocation):
@@ -504,8 +505,8 @@ class Job:
         """Reject the job. A reason can be given which will show up in the scheduler logs.
         However, it will currently not show up in Batsim directly as a rejecting reason is
         not part of the protocol."""
-        assert self._batsim_job
-        assert self.open
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        assert self.open, "Job is not open"
 
         self._marked_for_rejection = True
         self._rejected_reason = reason
@@ -526,8 +527,8 @@ class Job:
 
     def kill(self):
         """Kill the current job during its execution."""
-        assert self._batsim_job
-        assert self.running
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        assert self.running, "Job is not running"
         self._killed = True
         self._jobs_list.update_element(self)
 
@@ -547,8 +548,8 @@ class Job:
     def schedule(self, resource=None):
         """Mark this job for scheduling. This can also be done even when not enough resources are
         reserved. The job will not be sent to Batsim until enough resources were reserved."""
-        assert self._batsim_job
-        assert self.open
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        assert self.open, "Job is not open"
 
         if resource:
             self.reserve(resource)
@@ -560,8 +561,8 @@ class Job:
         """Change the state of a job. This is only needed in rare cases where the real job
         should not be executed but instead the state should be set manually.
         """
-        assert self._batsim_job
-        assert self.open
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        assert self.open, "Job is not open"
         self._scheduler._batsim.change_job_state(job, state, kill_reason)
         self._jobs_list.update_element(self)
 

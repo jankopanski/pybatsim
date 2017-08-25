@@ -514,7 +514,8 @@ def as_scheduler(*args, base_class=Scheduler, **kwargs):
 
     :param kwargs: additional arguments passed to the scheduler function (in each iteration)
     """
-    assert issubclass(base_class, Scheduler)
+    assert issubclass(
+        base_class, Scheduler), "Given base class is no subclass of Scheduler"
 
     def convert_to_scheduler(schedule_function):
         class InheritedScheduler(base_class):
