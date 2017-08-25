@@ -140,9 +140,9 @@ class BaseBatsimScheduler(BatsimScheduler):
             energy_consumed=consumed_energy,
             type="reply_energy_received")
 
-        self._scheduler.on_report_energy_consumed(consumed_energy)
-        self._scheduler._do_schedule(
-            BatsimReply(consumed_energy=consumed_energy))
+        reply = BatsimReply(consumed_energy=consumed_energy)
+        self._scheduler.on_report_energy_consumed(reply)
+        self._scheduler._do_schedule(reply)
 
 
 class Scheduler(metaclass=ABCMeta):
