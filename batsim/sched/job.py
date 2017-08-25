@@ -166,7 +166,7 @@ class Job:
     @property
     def runnable(self):
         """Whether the job is still open and has only fulfilled dependencies."""
-        return self.dependencies_fulfilled(self._scheduler.jobs) and self.open
+        return self.dependencies_fulfilled and self.open
 
     @property
     def parent_job(self):
@@ -298,6 +298,37 @@ class Job:
         """Whether or not this job is a dynamic job."""
         return self.id.startswith(Batsim.DYNAMIC_JOB_PREFIX + "!")
 
+    @property
+    def dependencies_fulfilled(self):
+        """Whether or not all dependencies of this job are fulfilled.
+
+        :param jobs: a list of all jobs in the system which is needed to resolve
+        the actual jobs to which the dependencies are referring
+        """
+        for dep in self.resolved_dependencies:
+            if not isinstance(dep, Job) or not dep.completed:
+                return False
+        return True
+
+    @property
+    def resolved_dependencies(self):
+        """Resolve the dependencies of this job (converting job ids to concrete job objects)."""
+        jobparts = self.id.split("!")
+        job_id = jobparts[-1]
+        workload_name = "!".join(jobparts[:len(jobparts) - 1])
+        result = []
+        for dep in self.dependencies:
+            # If the workload is missing: assume that the dependency refers
+            # to the same workload.
+            if "!" not in dep:
+                dep = str(workload_name) + "!" + str(dep)
+            try:
+                dep_job = self._scheduler.jobs[dep]
+                result.append(dep_job)
+            except KeyError:
+                result.append(dep)
+        return tuple(result)
+
     def free(self):
         """Free the current allocation of this job."""
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
@@ -356,39 +387,6 @@ class Job:
         :param num_resources: the number of available resources
         """
         return remaining_time >= self.requested_time and num_resources >= self.requested_resources
-
-    def dependencies_fulfilled(self, jobs):
-        """Whether or not all dependencies of this job are fulfilled.
-
-        :param jobs: a list of all jobs in the system which is needed to resolve
-        the actual jobs to which the dependencies are referring
-        """
-        for dep in self.get_resolved_dependencies(jobs):
-            if not isinstance(dep, Job) or not dep.completed:
-                return False
-        return True
-
-    def get_resolved_dependencies(self, jobs):
-        """Resolve the dependencies of this job (converting job ids to concrete job objects).
-
-        :param jobs: a list of all jobs in the system which is needed to resolve
-        the actual jobs to which the dependencies are referring
-        """
-        jobparts = self.id.split("!")
-        job_id = jobparts[-1]
-        workload_name = "!".join(jobparts[:len(jobparts) - 1])
-        result = []
-        for dep in self.dependencies:
-            # If the workload is missing: assume that the dependency refers
-            # to the same workload.
-            if "!" not in dep:
-                dep = str(workload_name) + "!" + str(dep)
-            try:
-                dep_job = jobs[dep]
-                result.append(dep_job)
-            except KeyError:
-                result.append(dep)
-        return tuple(result)
 
     def add_dependency(self, job):
         """Adds a dependency to this job.
