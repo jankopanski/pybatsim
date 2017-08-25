@@ -23,6 +23,8 @@ class Allocation:
         self._job = None
         self._resources = []
 
+        self._scheduler = None
+
         self._allocated = False
         self._previously_allocated = False
 
@@ -240,24 +242,25 @@ class Allocation:
                 self._allocated_resources.add(res)
                 res._do_allocate_allocation(self)
         self._allocated = True
+        self._scheduler = scheduler
 
-    def free(self, scheduler=None):
+    def free(self):
         """Either free a finished allocation or clear an allocation which was not started yet.
 
         :param scheduler: The scheduler argument is required when a finished allocation
         should be freed. It is not required to clear an allocation which was not started
         yet.
         """
-        if not self._allocated and not self._previously_allocated:
+        assert not self._previously_allocated, "Allocation is in invalid state"
+        if not self._allocated:
             if self._job is not None:
                 self._free_job_from_allocation()
             self.remove_all_resources()
             return
-        assert scheduler is not None, "A scheduler object has to be given since the allocation was previously allocated"
 
         for r in self.resources:
             r._do_free_allocation(self)
 
-        self._end_time = scheduler.time
+        self._end_time = self._scheduler.time
         self._allocated = False
         self._previously_allocated = True

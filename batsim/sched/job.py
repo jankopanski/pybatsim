@@ -486,7 +486,7 @@ class Job:
         """Complete a job."""
         self._scheduler.info("Remove completed job and free resources: {job}",
                              job=self, type="job_completed")
-        self.allocation.free(self._scheduler)
+        self.allocation.free()
         self._jobs_list.update_element(self)
 
     def move_properties_from(self, otherjob):
