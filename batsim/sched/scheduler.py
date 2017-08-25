@@ -75,7 +75,7 @@ class BaseBatsimScheduler(BatsimScheduler):
                              jobs=jobobjs, type="jobs_killed_received")
 
         for job in jobobjs:
-            job._do_complete_job(self._scheduler)
+            job._do_complete_job()
 
         self._scheduler.on_jobs_killed(jobobjs)
         self._scheduler._do_schedule()
@@ -85,7 +85,10 @@ class BaseBatsimScheduler(BatsimScheduler):
             "decision process received job submission({job})",
             job=job,
             type="job_submission_received2")
-        newjob = Job(batsim_job=job, scheduler=self._scheduler)
+        newjob = Job(
+            batsim_job=job,
+            scheduler=self._scheduler,
+            jobs_list=self._scheduler.jobs)
         self._jobmap[job.id] = newjob
 
         self._scheduler.jobs.add(newjob)
@@ -113,7 +116,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler.info("Job has completed its execution ({job})",
                              job=jobobj, type="job_completion_received")
 
-        jobobj._do_complete_job(self._scheduler)
+        jobobj._do_complete_job()
 
         self._scheduler.on_job_completion(jobobj)
         self._scheduler._do_schedule()
@@ -152,6 +155,18 @@ class Scheduler(metaclass=ABCMeta):
     """
 
     class Event:
+        """Class for storing data about events triggered by the scheduler.
+
+        :param time: the simulation time when the event occurred
+
+        :param level: the importance level of the event
+
+        :param msg: the actual message of the event
+
+        :param type: the type of the event (`str`)
+
+        :param data: additional data attached to the event (`dict`)
+        """
 
         def __init__(self, time, level, msg, type, data):
             self.time = time
@@ -205,6 +220,7 @@ class Scheduler(metaclass=ABCMeta):
         formatter = logging.Formatter(
             '[%(name)s::%(levelname)s] %(message)s')
 
+        # Add the stream handler (stdout)
         handler = logging.StreamHandler()
         handler.setLevel(logging.INFO)
         handler.setFormatter(formatter)
@@ -215,12 +231,15 @@ class Scheduler(metaclass=ABCMeta):
         self._event_logger.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(message)s')
 
+        # Add the persistent event logging handler (not purged between runs)
         handler = logging.FileHandler(
             "out_scheduler_events_{}.csv".format(self.__class__.__name__))
         handler.setLevel(logging.DEBUG)
         handler.setFormatter(formatter)
         self._event_logger.addHandler(handler)
 
+        # Add the event logging handler for the last run (purged when the next
+        # run starts)
         filename_lastschedule = "out_scheduler_events_{}_lastschedule.csv".format(
             self.__class__.__name__)
         try:
@@ -234,6 +253,7 @@ class Scheduler(metaclass=ABCMeta):
 
     @property
     def events(self):
+        """The events happened in the scheduler (`tuple`)"""
         return tuple(self._events)
 
     @property
@@ -263,6 +283,7 @@ class Scheduler(metaclass=ABCMeta):
 
     @property
     def has_time_sharing(self):
+        """Whether or not time sharing is enabled."""
         return self._batsim.time_sharing
 
     def run_scheduler_at(self, time):
@@ -311,19 +332,25 @@ class Scheduler(metaclass=ABCMeta):
         self._logger.error(self._format_log_msg(msg, **kwargs))
         self._event_logger.info(self._format_event_msg(4, msg, **kwargs))
 
+    def fatal(self, msg, **kwargs):
+        """Writes a fatal message to the logging facility and terminates the scheduler."""
+        error_msg = self._format_log_msg(msg, **kwargs)
+        self._logger.error(error_msg)
+        self._event_logger.info(self._format_event_msg(5, msg, **kwargs))
+        raise ValueError("Fatal error: {}".format(error_msg))
+
     def _on_pre_init(self):
         """The _pre_init method called during the start-up phase of the scheduler.
         If the _pre_init method is overridden the super method should be called with:
         `super()._pre_init()`
         """
-        resources = []
         for r in self._batsim.resources:
-            resources.append(Resource(self,
-                                      r["id"],
-                                      r["name"],
-                                      r["state"],
-                                      r["properties"]))
-        self._resources = Resources(resources)
+            self._resources.add(Resource(self,
+                                         r["id"],
+                                         r["name"],
+                                         r["state"],
+                                         r["properties"],
+                                         self.resources))
         self.info(
             "{num_resources} resources registered",
             num_resources=len(
@@ -365,16 +392,16 @@ class Scheduler(metaclass=ABCMeta):
                 r._do_change_state(self)
 
         for j in self.jobs.filter(marked_for_dynamic_submission=True):
-            j._do_dyn_submit(self)
+            j._do_dyn_submit()
 
         for j in self.jobs.marked_for_rejection:
-            j._do_reject(self)
+            j._do_reject()
 
         for j in self.jobs.marked_for_killing:
-            j._do_kill(self)
+            j._do_kill()
 
         for j in self.jobs.marked_for_scheduling:
-            j._do_execute(self)
+            j._do_execute()
 
         if self.jobs.open:
             self.debug(
@@ -388,12 +415,18 @@ class Scheduler(metaclass=ABCMeta):
             type="scheduling_iteration_ended")
 
     def _do_schedule(self, reply=None):
+        """Internal method to execute a scheduling iteration.
+
+        :param reply: the reply set by Batsim (most of the time there is no reply object)
+        """
         self._time = self._batsim.time()
         self._reply = reply
         self._pre_schedule()
         self.schedule()
         self._post_schedule()
 
+        # Fast forward the time after the iteration. The time can be set through
+        # a scheduler starting option.
         self._batsim.consume_time(self._sched_delay)
 
     def _on_pre_end(self):
@@ -420,28 +453,69 @@ class Scheduler(metaclass=ABCMeta):
         pass
 
     def on_nop(self):
+        """Hook similar to the low-level API."""
         pass
 
     def on_jobs_killed(self, jobs):
+        """Hook similar to the low-level API.
+
+        :param jobs: the killed jobs (higher-level job objects)
+        """
         pass
 
     def on_job_submission(self, job):
+        """Hook similar to the low-level API.
+
+        :param job: the submitted job (higher-level job object)
+        """
         pass
 
     def on_job_completion(self, job):
+        """Hook similar to the low-level API.
+
+        :param job: the completed job (higher-level job object)
+        """
         pass
 
     def on_machine_pstate_changed(self, resource, pstate):
+        """Hook similar to the low-level API.
+
+        :param resource: the changed resource (higher-level job object)
+
+        :param pstate: the new pstate
+        """
         pass
 
     def on_report_energy_consumed(self, consumed_energy):
+        """Hook similar to the low-level API.
+
+        :param consumed_energy: the consumed energy
+        """
         pass
 
     def on_event(self, event):
+        """Hook called on each event triggered by the scheduler.
+
+        :param event: the triggered event (class: `Scheduler.Event`)
+        """
         pass
 
 
 def as_scheduler(*args, base_class=Scheduler, **kwargs):
+    """Decorator to convert a function to a scheduler class.
+
+    The function should accept the scheduler as first argument and optionally
+    *args and **kwargs arguments which will be given from additional arguments
+    to the call of the decorator.
+
+    :param args: additional arguments passed to the scheduler function (in each iteration)
+
+    :param base_class: the class to use as a base class for the scheduler (must be a subclass of Scheduler)
+
+    :param kwargs: additional arguments passed to the scheduler function (in each iteration)
+    """
+    assert issubclass(base_class, Scheduler)
+
     def convert_to_scheduler(schedule_function):
         class InheritedScheduler(base_class):
             def schedule(self):

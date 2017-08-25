@@ -12,6 +12,9 @@ from . import utils
 
 
 def backfilling_jobs_sjf(scheduler, reservation_depth):
+    """Backfill jobs using the shortest-job-first strategy (relying on the user guesses for the
+    requested time).
+    """
     runnable_jobs = scheduler.jobs.runnable
 
     reserved_jobs = runnable_jobs[:reservation_depth]
@@ -32,6 +35,13 @@ def backfilling_jobs_sjf(scheduler, reservation_depth):
 
 
 def backfilling_sched(scheduler, strategy=None, reservation_depth=None):
+    """Backfilling algorithm using the filler scheduler to run the first jobs and
+    using a backfilling strategy to backfill low-priority jobs afterwards.
+
+    :param strategy: the strategy (`str`) or fallback to the shortest-job-first strategy
+
+    :param reservation_depth: the number of priority jobs to be reserved during the backfilling
+    """
     strategy = strategy or scheduler.options.get("backfilling_strategy", "sjf")
     reservation_depth = reservation_depth or scheduler.options.get(
         "backfilling_reservation_depth",

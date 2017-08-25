@@ -17,12 +17,25 @@ class Job:
     object oriented approaches on the implementation of the scheduler.
 
     :param batsim_job: the batsim job object from the underlying Pybatsim scheduler.
+
+    :param scheduler: the associated scheduler managing this job.
+
+    :param job_list: the main job list where this job is contained
+
+    :param parent_job: the parent job if this is a sub job
     """
 
-    def __init__(self, batsim_job=None, scheduler=None, parent_job=None):
+    def __init__(
+            self,
+            batsim_job=None,
+            scheduler=None,
+            jobs_list=None,
+            parent_job=None):
         self._scheduler = scheduler
         self._batsim_job = batsim_job
         self._parent_job = parent_job
+
+        self._jobs_list = jobs_list
 
         self._marked_for_scheduling = False
         self._scheduled = False
@@ -43,69 +56,103 @@ class Job:
 
     @property
     def start_time(self):
+        """The starting time of this job."""
         return self._start_time
 
     @property
     def dependencies(self):
+        """The dependencies of this job.
+
+        They are either given in the workload through the custom `deps` field of a job
+        or added by the scheduler as manual dependencies.
+        """
         return tuple(
             (self.get_batsim_job_data("deps") or []) +
             self._own_dependencies)
 
     @property
     def qos(self):
+        """The quality of service value of this job (`qos` field of the job).
+
+        This has currently no impact to the automatic handling of jobs and has to be
+        utilised manually by the scheduler.
+        """
         return self._get_overwritable_value("qos")
 
     @qos.setter
     def qos(self, value):
         self._qos = value
+        self._jobs_list.update_element(self)
 
     @property
     def priority(self):
+        """The priority of this job (`priority` field of the job).
+
+        This has currently no impact to the automatic handling of jobs and has to be
+        utilised manually by the scheduler.
+        """
         return self._get_overwritable_value("priority", 1)
 
     @priority.setter
     def priority(self, value):
         self._priority = value
+        self._jobs_list.update_element(self)
 
     @property
     def user(self):
+        """The user who has submitted the job (`user` field of the job).
+
+        This has currently no impact to the automatic handling of jobs and has to be
+        utilised manually by the scheduler.
+        """
         return self._get_overwritable_value("user")
 
     @user.setter
     def user(self, value):
         self._user = value
-
-    @property
-    def partition(self):
-        return self._get_overwritable_value("partition")
-
-    @partition.setter
-    def partition(self, value):
-        self._partition = value
+        self._jobs_list.update_element(self)
 
     @property
     def job_group(self):
+        """The group to which the job belongs to (`group` field of the job).
+
+        This has currently no impact to the automatic handling of jobs and has to be
+        utilised manually by the scheduler.
+        """
         return self._get_overwritable_value("group")
 
     @job_group.setter
     def job_group(self, value):
         self._group = value
+        self._jobs_list.update_element(self)
 
     @property
     def comment(self):
+        """Additional comments related to this job sumbission (`comment` field of the job).
+
+        This has currently no impact to the automatic handling of jobs and has to be
+        utilised manually by the scheduler.
+        """
         return self._get_overwritable_value("comment")
 
     @comment.setter
     def comment(self, value):
         self._comment = value
+        self._jobs_list.update_element(self)
 
     @property
     def application(self):
+        """Description of the application which is tested in this job (`application` field of the job).
+
+        This has currently no impact to the automatic handling of jobs and has to be
+        utilised manually by the scheduler.
+        """
         return self._get_overwritable_value("application")
 
     @application.setter
     def application(self, value):
         self._application = value
+        self._jobs_list.update_element(self)
 
     @property
     def open(self):
@@ -117,11 +164,24 @@ class Job:
             self.marked_for_rejection, self.rejected]
 
     @property
+    def runnable(self):
+        """Whether the job is still open and has only fulfilled dependencies."""
+        return self.dependencies_fulfilled(self._scheduler.jobs) and self.open
+
+    @property
     def parent_job(self):
+        """The parent job of this job. This is relevant if a sub job is dynamically
+        created and executed by the scheduler.
+        """
         return self._parent_job
 
     @property
     def sub_jobs(self):
+        """The sub jobs of this job.
+
+        Sub jobs cannot be added manually and instead have to be submitted as dynamic sub
+        jobs which are then added automatically.
+        """
         return tuple(self._sub_jobs)
 
     @property
@@ -171,6 +231,7 @@ class Job:
 
     @property
     def running(self):
+        """Whether or not this job is currently running."""
         return not self.open and self.scheduled and not self.completed
 
     @property
@@ -180,56 +241,65 @@ class Job:
 
     @property
     def id(self):
+        """The id of this job as known by Batsim."""
         assert self._batsim_job
         return self._batsim_job.id
 
     @property
     def submit_time(self):
+        """The time of submission of this job as known by Batsim."""
         assert self._batsim_job
         return self._batsim_job.submit_time
 
     @property
     def requested_time(self):
+        """The requested time of this job as known by Batsim."""
         assert self._batsim_job
         return self._batsim_job.requested_time
 
     @property
     def requested_resources(self):
+        """The requested resources of this job as known by Batsim."""
         assert self._batsim_job
         return self._batsim_job.requested_resources
 
     @property
     def profile(self):
+        """The profile of this job as known by Batsim."""
         assert self._batsim_job
         return self._batsim_job.profile
 
     @property
     def finish_time(self):
+        """The finish time of this job as known by Batsim."""
         assert self._batsim_job
         return self._batsim_job.finish_time
 
     @property
     def status(self):
+        """The status of this job as known by Batsim."""
         assert self._batsim_job
         return self._batsim_job.status
 
     @property
     def job_state(self):
+        """The state of this job as known by Batsim."""
         assert self._batsim_job
         return self._batsim_job.job_state
 
     @property
     def kill_reason(self):
+        """The kill reason (if any exists) of this job as known by Batsim."""
         assert self._batsim_job
         return self._batsim_job.kill_reason
 
     @property
     def is_dynamic_job(self):
+        """Whether or not this job is a dynamic job."""
         return self.id.startswith(Batsim.DYNAMIC_JOB_PREFIX + "!")
 
     def free(self):
-        """Free the current allocation for this job.
-        """
+        """Free the current allocation of this job."""
         assert self._batsim_job
         assert self._allocation is not None
 
@@ -243,6 +313,7 @@ class Job:
             self._allocation._free_job_from_allocation()
         else:
             self._allocation.free()
+        self._jobs_list.update_element(self)
 
     def reserve(self, resource):
         """Reserves a given `resource` to ensure exclusive access.
@@ -256,7 +327,11 @@ class Job:
         As an alternative an Allocation can be created manually (with a longer
         walltime) and then be given as parameter to the `reserve(resource)` method.
         In this case the times of the allocation are not touched as long as the job
-        fits in the walltime."""
+        fits in the walltime.
+
+        :param resource: either a single `Resource` a list in the form of a `Resources`
+        object or an `Allocation`
+        """
         assert self._batsim_job
         assert self._allocation is None
         assert self.open
@@ -270,14 +345,34 @@ class Job:
                 job=self,
                 resources=resource,
                 walltime=self.requested_time)
+        self._jobs_list.update_element(self)
+
+    def fits_in_frame(self, remaining_time, num_resources):
+        """Determines if the job fits in the specified frame of time and resources.
+
+        :param remaining_time: the remaining time in the frame
+
+        :param num_resources: the number of available resources
+        """
+        return remaining_time >= self.requested_time and num_resources >= self.requested_resources
 
     def dependencies_fulfilled(self, jobs):
+        """Whether or not all dependencies of this job are fulfilled.
+
+        :param jobs: a list of all jobs in the system which is needed to resolve
+        the actual jobs to which the dependencies are referring
+        """
         for dep in self.get_resolved_dependencies(jobs):
             if not isinstance(dep, Job) or not dep.completed:
                 return False
         return True
 
     def get_resolved_dependencies(self, jobs):
+        """Resolve the dependencies of this job (converting job ids to concrete job objects).
+
+        :param jobs: a list of all jobs in the system which is needed to resolve
+        the actual jobs to which the dependencies are referring
+        """
         jobparts = self.id.split("!")
         job_id = jobparts[-1]
         workload_name = "!".join(jobparts[:len(jobparts) - 1])
@@ -295,29 +390,48 @@ class Job:
         return tuple(result)
 
     def add_dependency(self, job):
+        """Adds a dependency to this job.
+
+        :param job: the job which should be added as a dependency
+        """
         assert self.open
-        return self._own_dependencies.append(job)
+        self._own_dependencies.append(job)
+        self._jobs_list.update_element(self)
 
     def remove_dependency(self, job):
+        """Removes a dependency from this job. Jobs which are defined in the workload
+        definition can not be removed.
+
+        :param job: the job which should be removed as a dependency
+        """
         assert self.open
-        return self._own_dependencies.remove(job)
+        self._own_dependencies.remove(job)
+        self._jobs_list.update_element(self)
 
     def _get_overwritable_value(self, field_name, default=None):
+        """Helper function to either evaluate a field in the job object or
+        (if non-existing) try to get it from Batsim's job dictionary. If both approaches
+        fails either the default or `None` is returned.
+
+        :param field_name: the name of the field to be resolved
+
+        :param default: the default value as fallback
+        """
         try:
             return getattr(self, "_" + field_name)
         except AttributeError:
             return self.get_batsim_job_data(field_name) or default
 
     def get_batsim_job_data(self, key):
+        """Get data from the dictionary of the underlying Batsim job.
+
+        :param key: the key to search in the underlying job dictionary
+        """
         if not self._batsim_job:
             return None
         return self._batsim_job.json_dict.get(key, None)
 
-    def is_runnable(self, jobs):
-        """Whether the job is open and has only fulfilled dependencies."""
-        return self.dependencies_fulfilled(jobs) and self.open
-
-    def _do_execute(self, scheduler):
+    def _do_execute(self):
         """Internal method to execute the execution of the job."""
         assert self._batsim_job is not None
         assert not self.scheduled and not self.rejected
@@ -325,13 +439,12 @@ class Job:
 
         if self.marked_for_scheduling and not self.scheduled:
             if self._batsim_job.requested_resources < len(self.allocation):
-                scheduler.warn(
+                self._scheduler.warn(
                     "Scheduling of job ({job}) is postponed since not enough resources are allocated",
-                    job=self,
-                    type="job_starting_postponed_too_few_resources")
+                    job=self, type="job_starting_postponed_too_few_resources")
                 return
 
-            if not scheduler.has_time_sharing:
+            if not self._scheduler.has_time_sharing:
                 for r in self.allocation.resources:
                     if len(r.allocations) != 1:
                         raise ValueError(
@@ -342,40 +455,50 @@ class Job:
                     "Job does not fit in the remaining time frame of the allocation")
 
             # Abort job start if allocation is in the future
-            if self.allocation.start_time > scheduler.time:
-                scheduler.run_scheduler_at(self.allocation.start_time)
+            if self.allocation.start_time > self._scheduler.time:
+                self._scheduler.run_scheduler_at(self.allocation.start_time)
                 return
 
+            # If the allocation is larger than required only choose as many resources
+            # as necessary.
             r = range(0, self.requested_resources)
-            self.allocation.allocate(scheduler, r)
+            self.allocation.allocate(self._scheduler, r)
 
             alloc = []
             for res in self.allocation.allocated_resources:
                 alloc.append(res.id)
 
-            scheduler._batsim.start_jobs(
+            # Start the jobs
+            self._scheduler._batsim.start_jobs(
                 [self._batsim_job], {self.id: alloc})
 
-            scheduler.info(
+            self._scheduler.info(
                 "Scheduled job ({job})",
                 job=self,
                 type="job_scheduled")
             self._marked_for_scheduling = False
             self._scheduled = True
-            self._start_time = scheduler.time
+            self._start_time = self._scheduler.time
+            self._jobs_list.update_element(self)
 
-    def _do_complete_job(self, scheduler):
-        scheduler.info("Remove completed job and free resources: {job}",
-                       job=self, type="job_completed")
-        self.allocation.free(scheduler)
+    def _do_complete_job(self):
+        """Complete a job."""
+        self._scheduler.info("Remove completed job and free resources: {job}",
+                             job=self, type="job_completed")
+        self.allocation.free(self._scheduler)
+        self._jobs_list.update_element(self)
 
     def move_properties_from(self, otherjob):
+        """Move properties from one job to another.
+
+        This is used internally to convert dynamic jobs to submitted jobs."""
         parent_job = otherjob.parent_job
         if parent_job:
             parent_job._sub_jobs.append(self)
             self._parent_job = parent_job
             parent_job._sub_jobs.remove(otherjob)
         self._own_dependencies = list(otherjob._own_dependencies)
+        self._jobs_list.update_element(self)
 
     def reject(self, reason=""):
         """Reject the job. A reason can be given which will show up in the scheduler logs.
@@ -386,33 +509,40 @@ class Job:
 
         self._marked_for_rejection = True
         self._rejected_reason = reason
+        self._jobs_list.update_element(self)
 
-    def _do_reject(self, scheduler):
+    def _do_reject(self):
         """Internal method to execute the rejecting of the job."""
         if self.marked_for_rejection and not self.rejected:
-            scheduler.info(
+            self._scheduler.info(
                 "Rejecting job ({job}), reason={reason}",
                 job=self, reason=self.rejected_reason, type="job_rejection")
-            scheduler._batsim.reject_jobs([self._batsim_job])
-            del scheduler._scheduler._jobmap[self._batsim_job.id]
+            self._scheduler._batsim.reject_jobs([self._batsim_job])
+            del self._scheduler._scheduler._jobmap[self._batsim_job.id]
 
             self._rejected = True
             self._marked_for_rejection = False
+            self._jobs_list.update_element(self)
 
     def kill(self):
         """Kill the current job during its execution."""
         assert self._batsim_job
         assert self.running
         self._killed = True
+        self._jobs_list.update_element(self)
 
-    def _do_kill(self, scheduler):
+    def _do_kill(self):
         """Internal method to execute the killing of the job."""
         if self.marked_for_killing and not self.killed:
-            scheduler.info("Killing job ({job})", job=self, type="job_killing")
-            scheduler._batsim.kill_jobs([self._batsim_job])
+            self._scheduler.info(
+                "Killing job ({job})",
+                job=self,
+                type="job_killing")
+            self._scheduler._batsim.kill_jobs([self._batsim_job])
 
             self._killed = True
             self._marked_for_killing = True
+            self._jobs_list.update_element(self)
 
     def schedule(self, resource=None):
         """Mark this job for scheduling. This can also be done even when not enough resources are
@@ -424,14 +554,16 @@ class Job:
             self.reserve(resource)
 
         self._marked_for_scheduling = True
+        self._jobs_list.update_element(self)
 
-    def change_state(self, scheduler, state, kill_reason=""):
+    def change_state(self, state, kill_reason=""):
         """Change the state of a job. This is only needed in rare cases where the real job
         should not be executed but instead the state should be set manually.
         """
         assert self._batsim_job
         assert self.open
-        scheduler._batsim.change_job_state(job, state, kill_reason)
+        self._scheduler._batsim.change_job_state(job, state, kill_reason)
+        self._jobs_list.update_element(self)
 
     def __str__(self):
         return (
@@ -444,9 +576,39 @@ class Job:
 
     @classmethod
     def create_dynamic_job(cls, *args, **kwargs):
+        """Create a dynamic job.
+
+        :param requested_resources: the number of requested resources.
+
+        :param requested_time: the number of requested time (walltime)
+
+        :param profile: The profile object (either a `Profile` object or a dictionary containing the
+        actual Batsim profile configuration).
+
+        :param profile_name: The name of the profile to be stored in Batsim (will be dynamically generated if omitted).
+
+        :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
+        """
         return DynamicJob(*args, **kwargs)
 
     def create_sub_job(self, *args, **kwargs):
+        """Create a dynamic job as a sub job.
+
+        A sub job has no other meaning besides annotating that this new dynamic job is somehow related
+        to its parent job. A use case could be to generate various dynamic jobs to prepare the running of a jub
+        and create these dynamic jobs as sub jobs to make it easier keeping track of the related dynamic jobs.
+
+        :param requested_resources: the number of requested resources.
+
+        :param requested_time: the number of requested time (walltime)
+
+        :param profile: The profile object (either a `Profile` object or a dictionary containing the
+        actual Batsim profile configuration).
+
+        :param profile_name: The name of the profile to be stored in Batsim (will be dynamically generated if omitted).
+
+        :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
+        """
         return DynamicJob(*args, parent_job=self, **kwargs)
 
 
@@ -454,8 +616,6 @@ class DynamicJob(Job):
     """A DynamicJob may be used to construct dynamic jobs afterwards submitted to the scheduler.
     It has no related batsim_job since it is not known by Batsim yet. Instead it should be submitted
     and will be bounced back to the scheduler as a job known by Batsim and can be executed in this state.
-
-    :param job_id: the id of the job (a dynamic job id will be generated, so this id is always guaranteed to be unique).
 
     :param requested_resources: the number of requested resources.
 
@@ -467,6 +627,8 @@ class DynamicJob(Job):
     :param profile_name: The name of the profile to be stored in Batsim (will be dynamically generated if omitted).
 
     :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
+
+    :param parent_job: the parental job object if this job should be a sub job
     """
 
     def __init__(
@@ -487,6 +649,9 @@ class DynamicJob(Job):
 
         self._dyn_marked_submission = False
         self._dyn_submitted = False
+
+        if parent_job is not None:
+            parent_job._jobs_list.update_element(self)
 
     @property
     def id(self):
@@ -550,16 +715,18 @@ class DynamicJob(Job):
         """Marks a dynamic job for submission in the `scheduler`."""
         if not self._dyn_marked_submission and not self._dyn_submitted:
             self._dyn_marked_submission = True
-            scheduler.jobs.append(self)
+            scheduler.jobs.add(self)
+            self._jobs_list = scheduler.jobs
+            self._scheduler = scheduler
 
-    def _do_dyn_submit(self, scheduler):
+    def _do_dyn_submit(self):
         """Execute the dynamic job submission in the `scheduler`."""
         if self._dyn_marked_submission and not self._dyn_submitted:
             # The profile object will be executed if it is no dictionary already to
             # allow complex Profile objects.
             profile = self._user_profile
             if not isinstance(profile, dict):
-                profile = profile(scheduler)
+                profile = profile(self._scheduler)
 
             parent_job_id = None
             try:
@@ -567,14 +734,14 @@ class DynamicJob(Job):
             except AttributeError:
                 pass
 
-            scheduler.info(
+            self._scheduler.info(
                 "Submit dynamic job ({job})",
                 job=self,
                 subjob_of=parent_job_id,
                 subjob_of_obj=self.parent_job,
                 is_subjob=(parent_job_id is not None),
                 type="dynamic_job_submit")
-            self._user_job_id = scheduler._batsim.submit_job(
+            self._user_job_id = self._scheduler._batsim.submit_job(
                 self._user_requested_resources,
                 self._user_requested_time,
                 profile,
@@ -583,9 +750,11 @@ class DynamicJob(Job):
 
             if self.parent_job:
                 self.parent_job._sub_jobs.append(self)
+                self.parent_job._jobs_list.update_element(self)
 
             self._dyn_submitted = True
             self._dyn_marked_submission = False
+            self._jobs_list.update_element(self)
 
 
 class Jobs(ObserveList):
@@ -600,50 +769,62 @@ class Jobs(ObserveList):
 
     @property
     def runnable(self):
+        """Returns all job which are runnable."""
         return self.filter(runnable=True)
 
     @property
     def running(self):
+        """Returns all job which are currently running."""
         return self.filter(running=True)
 
     @property
     def open(self):
+        """Returns all job which are currently open."""
         return self.filter(open=True)
 
     @property
     def completed(self):
+        """Returns all job which are completed."""
         return self.filter(completed=True)
 
     @property
     def rejected(self):
+        """Returns all job which were rejected."""
         return self.filter(rejected=True)
 
     @property
     def marked_for_rejection(self):
+        """Returns all job which are marked for rejection (executed at the end of the scheduling iteration)."""
         return self.filter(marked_for_rejection=True)
 
     @property
     def scheduled(self):
+        """Returns all job which were scheduled."""
         return self.filter(scheduled=True)
 
     @property
     def marked_for_scheduling(self):
+        """Returns all job which are marked for scheduling (executed at the end of the scheduling iteration)."""
         return self.filter(marked_for_scheduling=True)
 
     @property
     def killed(self):
+        """Returns all job which were killed."""
         return self.filter(killed=True)
 
     @property
     def marked_for_killing(self):
+        """Returns all job which are marked for killing (executed at the end of the scheduling iteration)."""
         return self.filter(marked_for_killing=True)
 
     @property
     def dynamically_submitted(self):
+        """Returns all job which were dynamically submitted."""
         return self.filter(dynamically_submitted=True)
 
     @property
     def marked_for_dynamic_submission(self):
+        """Returns all job which are marked for dynamic submission (executed at the end of the scheduling iteration)."""
         return self.filter(marked_for_dyanmic_submission=True)
 
     def __getitem__(self, items):
@@ -669,6 +850,7 @@ class Jobs(ObserveList):
 
     def filter(
             self,
+            *args,
             runnable=False,
             running=False,
             open=False,
@@ -773,7 +955,7 @@ class Jobs(ObserveList):
                 else:  # open job
                     if open:
                         yield j
-                    elif j.is_runnable(self):
+                    elif j.runnable:
                         if runnable:
                             yield j
 
@@ -781,4 +963,5 @@ class Jobs(ObserveList):
             filter_list(
                 self._data,
                 [filter_jobs],
+                *args,
                 **kwargs))

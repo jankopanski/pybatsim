@@ -8,7 +8,10 @@
 
 
 class ObserveList:
-    """Helper class implementing a filtered list."""
+    """Helper class implementing a filtered list.
+
+    :param from_list: the initial entries of the list
+    """
 
     def __init__(self, from_list=[]):
         self._data = list()
@@ -18,47 +21,85 @@ class ObserveList:
 
     @property
     def data(self):
+        """A copy of the content of the list."""
         return tuple(self._data)
 
     def _check_new_elem(self, element):
+        """Checks whether a new element should be added.
+
+        Can be overriden by sub-classes.
+        """
         return True
 
     def _element_new(self, element):
+        """Hook which is called when a new element was added.
+
+        Can be overriden by sub-classes.
+
+        :param element: the added element
+        """
         pass
 
     def _element_del(self, element):
+        """Hook which is called when an element was removed.
+
+        Can be overriden by sub-classes.
+
+        :param element: the removed element
+        """
         pass
 
     def update_element(self, element):
+        """Hook which should be called my elements to notify the list about changes.
+
+        Can be overriden by sub-classes.
+
+        :param element: the changed element
+        """
         pass
 
     def __len__(self):
+        """The number of elements in this collection."""
         return len(self._data)
 
     def __contains__(self, element):
+        """Check whether or not an element is in this collection.
+
+        :param element: the element to be checked
+        """
         return element in self._data_set
 
-    def __str__(self):
-        return str(self._data)
-
     def add(self, element):
-        if self._check_new_elem(element):
+        """Adds a new element to this collection.
+
+        :param element: the element to be added
+        """
+        if self._check_new_elem(element) and element not in self:
             self._data.append(element)
             self._data_set.add(element)
             self._element_new(element)
 
     def remove(self, element):
+        """Removes an element from this collection.
+
+        :param element: the element to be removed
+        """
         self._data_set.remove(element)
         self._data.remove(element)
         self._element_del(element)
 
     def discard(self, element):
+        """Removes an element from this collection or fail silently.
+
+        :param element: the element to be removed
+        """
         try:
             self.remove(element)
         except KeyError:
             pass
 
     def clear(self):
+        """Remove all elements from the collection."""
         for e in self._data:
             self._element_del(e)
         self._data.clear()
@@ -68,7 +109,10 @@ class ObserveList:
         return iter(self._data)
 
     def __add__(self, other):
-        """Concatenate two lists."""
+        """Concatenate two lists.
+
+        :param other: the list to be added after the tail of this list.
+        """
         return self.create(set(self._data + other._data))
 
     def __str__(self):
@@ -83,9 +127,16 @@ class ObserveList:
         return self.create(apply(self._data))
 
     def create(self, *args, **kwargs):
+        """Create a new list of this type."""
         return self.__class__(*args, **kwargs)
 
     def sorted(self, field_getter=None, reverse=False):
+        """Return a new list with the same elements sorted.
+
+        :param field_getter: a function which returns the field to be sorted
+
+        :param reverse: whether or not the sorting should be reversed
+        """
         return self.create(
             sorted(
                 self._data,
@@ -103,7 +154,10 @@ def filter_list(
         min_or_max=False):
     """Filters a list.
 
-    :param filter: a list of generators through which the entries will be piped.
+    :param data: the list to be filtered.
+
+    :param filter: a list of generators through which the entries will be piped. The generators
+    should iterate through the data (first argument) and should `yield` the searched elements.
 
     :param cond: a function evaluating the entries and returns True or False whether or not the entry should be returned.
 
@@ -111,7 +165,7 @@ def filter_list(
 
     :param min: the minimum number of returned entries (if less entries are available no entries will be returned at all).
 
-    :param num: the exact number of returned entries.
+    :param num: the exact number of returned entries (overwrites `min` and `max`).
 
     :param min_or_max: either return the minimum or maximum number but nothing between.
 
@@ -129,8 +183,7 @@ def filter_list(
                 if cond(r):
                     yield r
         else:
-            for r in res:
-                yield r
+            yield from res
 
     def do_filter(res):
         for gen in reversed(filter):
