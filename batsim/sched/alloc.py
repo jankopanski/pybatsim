@@ -10,7 +10,7 @@ from .resource import Resources, Resource
 
 
 class Allocation:
-    """A allocation is a reservation of resources. To finally allocate a set of
+    """An allocation is a reservation of resources. To finally allocate a set of
     resources also a job has to be assigned. It is valid for a given walltime.
 
     :param start_time: the start time of the allocation

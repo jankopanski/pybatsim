@@ -489,7 +489,7 @@ class Scheduler(metaclass=ABCMeta):
     def on_report_energy_consumed(self, consumed_energy):
         """Hook similar to the low-level API.
 
-        :param consumed_energy: the consumed energy
+        :param consumed_energy: the consumed energy (higher-level reply object)
         """
         pass
 

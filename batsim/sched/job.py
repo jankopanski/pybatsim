@@ -504,7 +504,10 @@ class Job:
     def reject(self, reason=""):
         """Reject the job. A reason can be given which will show up in the scheduler logs.
         However, it will currently not show up in Batsim directly as a rejecting reason is
-        not part of the protocol."""
+        not part of the protocol.
+
+        :param reason: the reason for the job rejection
+        """
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         assert self.open, "Job is not open"
 
