@@ -121,6 +121,15 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler.on_job_completion(jobobj)
         self._scheduler._do_schedule()
 
+    def onJobMessage(self, job, message):
+        self._scheduler.debug(
+            "decision process received from job message({job} => {message})",
+            job=job,
+            message=message,
+            type="job_message_received")
+        jobobj = self._jobmap[job.id]
+        jobobj._messages.append(message)
+
     def onMachinePStateChanged(self, nodeid, pstate):
         resource = self._scheduler.resources[nodeid]
         self._scheduler.info(

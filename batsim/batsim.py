@@ -92,6 +92,16 @@ class Batsim(object):
             }
         })
 
+    def send_message_to_job(self, job, message):
+        self._events_to_send.append({
+            "timestamp": self.time(),
+            "type": "TO_JOB_MSG",
+            "data": {
+                    "job_id": job.id,
+                    "msg": message,
+            }
+        })
+
     def start_jobs_continuous(self, allocs):
         """
         allocs should have the followinf format:
@@ -329,6 +339,11 @@ class Batsim(object):
                     self.nb_jobs_failed += 1
                 else:
                     self.nb_jobs_completed += 1
+            elif event_type == "FROM_JOB_MSG":
+                job_id = event_data["job_id"]
+                j = self.jobs[job_id]
+                msg = event_data["msg"]
+                self.scheduler.onJobMessage(j, msg)
             elif event_type == "RESOURCE_STATE_CHANGED":
                 intervals = event_data["resources"].split(" ")
                 for interval in intervals:
@@ -483,6 +498,9 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onJobCompletion(self, job):
+        raise NotImplementedError()
+
+    def onJobMessage(self, job, message):
         raise NotImplementedError()
 
     def onJobsKilled(self, jobs):

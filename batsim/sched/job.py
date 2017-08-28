@@ -54,6 +54,23 @@ class Job:
         self._allocation = None
         self._start_time = None
 
+        self._messages = []
+
+    @property
+    def messages(self):
+        """The buffer of incoming messages"""
+        return self._message_buffer
+
+    def send(self, message):
+        """Send a message to a running job (assuming that this job will try to receive
+        a message at any time in the future of its execution).
+
+        :param message: the message to send to the job
+        """
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        assert self.running, "Job is not running"
+        self._scheduler._batsim.send_message_to_job(self._batsim_job, message)
+
     @property
     def start_time(self):
         """The starting time of this job."""
