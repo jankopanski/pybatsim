@@ -294,6 +294,12 @@ class Job:
         return self._batsim_job.kill_reason
 
     @property
+    def return_code(self):
+        """The return code of this job as known by Batsim."""
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        return self._batsim_job.return_code
+
+    @property
     def is_dynamic_job(self):
         """Whether or not this job is a dynamic job."""
         return self.id.startswith(Batsim.DYNAMIC_JOB_PREFIX + "!")
@@ -569,12 +575,13 @@ class Job:
 
     def __str__(self):
         return (
-            "<Job {}; sub:{} reqtime:{} res:{} prof:{} fin:{} stat:{} jstat:{} kill:{}>"
+            "<Job {}; sub:{} reqtime:{} res:{} prof:{} fin:{} stat:{} jstat:{} killreason:{} ret:{}>"
             .format(
                 self.id, self.submit_time, self.requested_time,
                 self.requested_resources, self.profile,
                 self.finish_time, self.status,
-                self.job_state, self.kill_reason))
+                self.job_state, self.kill_reason,
+                self.return_code))
 
     @classmethod
     def create_dynamic_job(cls, *args, **kwargs):

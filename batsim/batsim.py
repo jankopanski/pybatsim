@@ -47,6 +47,7 @@ class Batsim(object):
         self.nb_jobs_rejected = 0
         self.nb_jobs_scheduled = 0
         self.nb_jobs_completed = 0
+        self.nb_jobs_failed = 0
         self.nb_jobs_timeout = 0
 
         self.has_dynamic_job_submissions = False
@@ -319,10 +320,13 @@ class Batsim(object):
                 except KeyError:
                     j.job_state = Job.State.UNKNOWN
                 j.kill_reason = event["data"]["kill_reason"]
+                j.return_code = event["data"]["return_code"]
 
                 self.scheduler.onJobCompletion(j)
                 if j.status == "TIMEOUT":
                     self.nb_jobs_timeout += 1
+                elif j.status == "FAILED":
+                    self.nb_jobs_failed += 1
                 else:
                     self.nb_jobs_completed += 1
             elif event_type == "RESOURCE_STATE_CHANGED":
@@ -347,7 +351,10 @@ class Batsim(object):
                 raise Exception("Unknow event type {}".format(event_type))
 
         if self.handle_dynamic_notify and not finished_received:
-            if ((self.nb_jobs_completed + self.nb_jobs_timeout + self.nb_jobs_killed) == self.nb_jobs_scheduled
+            if ((self.nb_jobs_completed
+                        + self.nb_jobs_failed
+                        + self.nb_jobs_timeout
+                        + self.nb_jobs_killed) == self.nb_jobs_scheduled
                     and not self.has_dynamic_job_submissions):
                 self.notify_submission_finished()
             else:
@@ -411,8 +418,9 @@ class Job(object):
         SUBMITTED = 1
         RUNNING = 2
         COMPLETED_SUCCESSFULLY = 3
-        COMPLETED_KILLED = 4
-        REJECTED = 5
+        COMPLETED_FAILED = 4
+        COMPLETED_KILLED = 5
+        REJECTED = 6
 
     def __init__(self, id, subtime, walltime, res, profile, json_dict):
         self.id = id
@@ -424,13 +432,15 @@ class Job(object):
         self.status = None
         self.job_state = Job.State.UNKNOWN
         self.kill_reason = None
+        self.return_code = None
         self.json_dict = json_dict
 
     def __repr__(self):
-        return("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} stat:{5} jstat:{6} kill:{7}>".format(
+        return("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} stat:{5} jstat:{6} killreason:{7} ret:{8}>".format(
             self.id, self.submit_time, self.requested_resources,
             self.requested_time, self.profile, self.status,
-            self.job_state, self.kill_reason))
+            self.job_state, self.kill_reason,
+            self.return_code))
 
     @staticmethod
     def from_json_string(json_str):
