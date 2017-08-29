@@ -59,7 +59,7 @@ class Job:
     @property
     def messages(self):
         """The buffer of incoming messages"""
-        return self._message_buffer
+        return self._messages
 
     def send(self, message):
         """Send a message to a running job (assuming that this job will try to receive
