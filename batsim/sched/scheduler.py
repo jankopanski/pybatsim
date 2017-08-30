@@ -285,6 +285,23 @@ class Scheduler(metaclass=ABCMeta):
         return tuple(self._events)
 
     @property
+    def hpst(self):
+        """The hpst (high-performance storage tier) host managed by Batsim."""
+        return self._hpst
+
+    @property
+    def lcst(self):
+        """The lcst (large-capacity storage tier) host managed by Batsim."""
+        return self._lcst
+
+    @property
+    def pfs(self):
+        """The pfs (parallel file system) host managed by Batsim. This is an alias
+        to the host of the large-capacity storage tier.
+        """
+        return self.lcst
+
+    @property
     def options(self):
         """The options given to the launcher."""
         return self._options
@@ -384,6 +401,9 @@ class Scheduler(metaclass=ABCMeta):
             num_resources=len(
                 self.resources),
             type="resources_registered")
+
+        self._hpst = DictWrapper(self._batsim.hpst)
+        self._lcst = DictWrapper(self._batsim.hpst)
 
     def on_init(self):
         """The init method called during the start-up phase of the scheduler."""
