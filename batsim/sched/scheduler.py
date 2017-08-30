@@ -551,7 +551,7 @@ class Scheduler(metaclass=ABCMeta):
         pass
 
 
-def as_scheduler(*args, base_class=Scheduler, **kwargs):
+def as_scheduler(*args, on_init=[], on_end=[], base_classes=[], **kwargs):
     """Decorator to convert a function to a scheduler class.
 
     The function should accept the scheduler as first argument and optionally
@@ -564,13 +564,26 @@ def as_scheduler(*args, base_class=Scheduler, **kwargs):
 
     :param kwargs: additional arguments passed to the scheduler function (in each iteration)
     """
-    assert issubclass(
-        base_class, Scheduler), "Given base class is no subclass of Scheduler"
-
+    base_classes = base_classes[:]
+    base_classes.append(Scheduler)
     def convert_to_scheduler(schedule_function):
-        class InheritedScheduler(base_class):
+        class InheritedScheduler(*base_classes):
+            def __init__(self, *init_args, **init_kwargs):
+                super().__init__(*init_args, **init_kwargs)
+
+            def _on_pre_init(self):
+                super()._on_pre_init()
+                for i in on_init:
+                    i(self)
+
             def schedule(self):
                 schedule_function(self, *args, **kwargs)
+
+            def _on_pre_end(self):
+                super()._on_pre_end()
+                for e in on_end:
+                    e(self)
+
         InheritedScheduler.__name__ = schedule_function.__name__
 
         return InheritedScheduler
