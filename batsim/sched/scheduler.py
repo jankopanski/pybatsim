@@ -38,6 +38,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler.debug(
             "decision process is executing after batsim init", type="on_init")
         self._scheduler._batsim = self.bs
+        self._scheduler._update_time()
         self._scheduler._on_pre_init()
         self._scheduler.on_init()
         self._scheduler._on_post_init()
@@ -48,6 +49,7 @@ class BaseBatsimScheduler(BatsimScheduler):
             type="simulation_begins_received")
 
     def onSimulationEnds(self):
+        self._scheduler._update_time()
         self._scheduler.info(
             "Simulation ends",
             type="simulation_ends_received")
@@ -56,6 +58,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler._on_post_end()
 
     def onNOP(self):
+        self._scheduler._update_time()
         self._scheduler.debug(
             "decision process received NOP",
             type="nop_received")
@@ -63,6 +66,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler._do_schedule()
 
     def onJobsKilled(self, jobs):
+        self._scheduler._update_time()
         self._scheduler.debug(
             "decision process received jobs kills({jobs})",
             jobs=jobs,
@@ -83,6 +87,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler._do_schedule()
 
     def onJobSubmission(self, job):
+        self._scheduler._update_time()
         self._scheduler.debug(
             "decision process received job submission({job})",
             job=job,
@@ -108,6 +113,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler._do_schedule()
 
     def onJobCompletion(self, job):
+        self._scheduler._update_time()
         self._scheduler.debug(
             "decision process received job completion({job})",
             job=job,
@@ -124,6 +130,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler._do_schedule()
 
     def onJobMessage(self, timestamp, job, message):
+        self._scheduler._update_time()
         self._scheduler.debug(
             "decision process received from job message({job} => {message})",
             job=job,
@@ -139,6 +146,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler._do_schedule()
 
     def onMachinePStateChanged(self, nodeid, pstate):
+        self._scheduler._update_time()
         resource = self._scheduler.resources[nodeid]
         self._scheduler.info(
             "Resource state was updated ({resource}) to {pstate}",
@@ -152,6 +160,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler._do_schedule()
 
     def onReportEnergyConsumed(self, consumed_energy):
+        self._scheduler._update_time()
         self._scheduler.info(
             "Received reply from Batsim (energy_consumed={energy_consumed})",
             energy_consumed=consumed_energy,
@@ -433,12 +442,14 @@ class Scheduler(metaclass=ABCMeta):
             "Ending scheduling iteration",
             type="scheduling_iteration_ended")
 
+    def _update_time(self):
+        self._time = self._batsim.time()
+
     def _do_schedule(self, reply=None):
         """Internal method to execute a scheduling iteration.
 
         :param reply: the reply set by Batsim (most of the time there is no reply object)
         """
-        self._time = self._batsim.time()
         self._reply = reply
         self._pre_schedule()
         self.schedule()
