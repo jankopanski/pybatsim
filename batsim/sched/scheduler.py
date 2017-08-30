@@ -566,6 +566,7 @@ def as_scheduler(*args, on_init=[], on_end=[], base_classes=[], **kwargs):
     """
     base_classes = base_classes[:]
     base_classes.append(Scheduler)
+
     def convert_to_scheduler(schedule_function):
         class InheritedScheduler(*base_classes):
             def __init__(self, *init_args, **init_kwargs):
