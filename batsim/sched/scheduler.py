@@ -403,7 +403,7 @@ class Scheduler(metaclass=ABCMeta):
             type="resources_registered")
 
         self._hpst = DictWrapper(self._batsim.hpst)
-        self._lcst = DictWrapper(self._batsim.hpst)
+        self._lcst = DictWrapper(self._batsim.lcst)
 
     def on_init(self):
         """The init method called during the start-up phase of the scheduler."""
