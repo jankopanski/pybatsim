@@ -90,7 +90,7 @@ class Job:
         or added by the scheduler as manual dependencies.
         """
         return tuple(
-            (self.get_batsim_job_data("deps") or []) +
+            self.get_job_data("deps", []) +
             self._own_dependencies)
 
     @property
@@ -448,16 +448,19 @@ class Job:
         try:
             return getattr(self, "_" + field_name)
         except AttributeError:
-            return self.get_batsim_job_data(field_name) or default
+            return self.get_job_data(field_name, default)
 
-    def get_batsim_job_data(self, key):
+    def get_job_data(self, key, default=None):
         """Get data from the dictionary of the underlying Batsim job.
 
         :param key: the key to search in the underlying job dictionary
         """
         if not self._batsim_job:
-            return None
-        return self._batsim_job.json_dict.get(key, None)
+            return default
+        try:
+            return self._batsim_job.json_dict[key]
+        except KeyError:
+            return default
 
     def _do_execute(self):
         """Internal method to execute the execution of the job."""
