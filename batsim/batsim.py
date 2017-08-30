@@ -342,8 +342,9 @@ class Batsim(object):
             elif event_type == "FROM_JOB_MSG":
                 job_id = event_data["job_id"]
                 j = self.jobs[job_id]
+                timestamp = event["timestamp"]
                 msg = event_data["msg"]
-                self.scheduler.onJobMessage(j, msg)
+                self.scheduler.onJobMessage(timestamp, j, msg)
             elif event_type == "RESOURCE_STATE_CHANGED":
                 intervals = event_data["resources"].split(" ")
                 for interval in intervals:
@@ -500,7 +501,7 @@ class BatsimScheduler(object):
     def onJobCompletion(self, job):
         raise NotImplementedError()
 
-    def onJobMessage(self, job, message):
+    def onJobMessage(self, timestamp, job, message):
         raise NotImplementedError()
 
     def onJobsKilled(self, jobs):

@@ -51,8 +51,8 @@ class ValidatingMachine(BatsimScheduler):
         self.previousAllocations.pop(job.id)
         self.scheduler.onJobCompletion(job)
 
-    def onJobMessage(self, job, message):
-        self.scheduler.onJobMessage(job, message)
+    def onJobMessage(self, timestamp, job, message):
+        self.scheduler.onJobMessage(timestamp, job, message)
 
     def onJobsKilled(self, jobs):
         self.scheduler.onJobsKilled(jobs)
