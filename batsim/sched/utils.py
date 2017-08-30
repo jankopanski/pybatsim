@@ -217,3 +217,34 @@ def filter_list(
 
     # Construct a new list which can be filtered again
     return result
+
+
+class DictWrapper:
+    """Wrapper for dictionaries.
+
+    This wrapper allows to define new fields which do not exist in the underlying
+    dictionary and should be stored in the object rather than in the dictionary
+    itself (because it might be directly changed by a different actor).
+    The wrapper also allows to access the dictionary values as attributes.
+
+    :param obj: the dictionary to be wrapped inside this object.
+    """
+
+    def __init__(self, obj):
+        self._obj = obj
+
+    def __getattr__(self, name):
+        return self._obj[name]
+
+    def __getitem__(self, name):
+        return self._obj[name]
+
+    def __setitem__(self, name, value):
+        self._obj[name] = value
+
+
+class SafeIterList(list):
+    """A list which can be safely iterated over while removing current elements."""
+
+    def __iter__(self):
+        return iter(self[:])

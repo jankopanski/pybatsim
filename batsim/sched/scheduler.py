@@ -16,6 +16,8 @@ from batsim.batsim import BatsimScheduler
 from .resource import Resources, Resource
 from .job import Job, Jobs
 from .reply import ConsumedEnergyReply
+from .utils import DictWrapper
+from .messages import Message
 
 
 class BaseBatsimScheduler(BatsimScheduler):
@@ -121,14 +123,20 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler.on_job_completion(jobobj)
         self._scheduler._do_schedule()
 
-    def onJobMessage(self, job, message):
+    def onJobMessage(self, timestamp, job, message):
         self._scheduler.debug(
             "decision process received from job message({job} => {message})",
             job=job,
             message=message,
-            type="job_message_received")
+            type="job_message_received2")
         jobobj = self._jobmap[job.id]
-        jobobj._messages.append(message)
+        self._scheduler.info(
+            "Got from job message({job} => {message})",
+            job=jobobj,
+            message=message,
+            type="job_message_received")
+        jobobj.messages.append(Message(timestamp, message))
+        self._scheduler._do_schedule()
 
     def onMachinePStateChanged(self, nodeid, pstate):
         resource = self._scheduler.resources[nodeid]

@@ -10,6 +10,7 @@ from batsim.batsim import Job as BatsimJob, Batsim
 
 from .utils import ObserveList, filter_list
 from .alloc import Allocation
+from .messages import MessageBuffer
 
 
 class Job:
@@ -54,7 +55,7 @@ class Job:
         self._allocation = None
         self._start_time = None
 
-        self._messages = []
+        self._messages = MessageBuffer()
 
     @property
     def messages(self):
@@ -69,6 +70,11 @@ class Job:
         """
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         assert self.running, "Job is not running"
+        self._scheduler.info(
+            "Send message ({message}) to job ({job})",
+            job=self,
+            message=message,
+            type="send_message_to_job")
         self._scheduler._batsim.send_message_to_job(self._batsim_job, message)
 
     @property
