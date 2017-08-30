@@ -18,6 +18,8 @@ import sys
 import time
 import types
 from datetime import timedelta
+import importlib.util
+import os.path
 
 from batsim.batsim import Batsim, BatsimScheduler
 from batsim.sched import as_scheduler
@@ -37,19 +39,33 @@ def filename_to_module(fn):
 
 
 def instanciate_scheduler(name, options):
-    my_module = name  # filename_to_module(my_filename)
-    my_class = module_to_class(my_module)
+    # A scheduler module in the package "schedulers" is expected.
+    if "." not in name and "/" not in name:
+        my_module = name  # filename_to_module(my_filename)
+        my_class = module_to_class(my_module)
 
-    # load module(or file)
-    package = __import__('schedulers', fromlist=[my_module])
-    if my_module not in package.__dict__:
-        print("No such scheduler (module file not found).", flush=True)
-        sys.exit(1)
-    if my_class not in package.__dict__[my_module].__dict__:
-        print("No such scheduler (class within the module file not found).", flush=True)
-        sys.exit(1)
-    # load the class
-    scheduler_non_instancied = package.__dict__[my_module].__dict__[my_class]
+        # load module(or file)
+        package = __import__('schedulers', fromlist=[my_module])
+        if my_module not in package.__dict__:
+            print("No such scheduler (module file not found).", flush=True)
+            sys.exit(1)
+        if my_class not in package.__dict__[my_module].__dict__:
+            print("No such scheduler (class within the module file not found).", flush=True)
+            sys.exit(1)
+        # load the class
+        scheduler_non_instancied = package.__dict__[my_module].__dict__[my_class]
+
+    # A full file path to the scheduler is expected
+    else:
+        module_name = os.path.basename(name).split(".")[0]
+        my_class = module_to_class(module_name)
+
+        spec = importlib.util.spec_from_file_location("schedulers." + module_name, name)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        scheduler_non_instancied = mod.__dict__[my_class]
+
     if isinstance(scheduler_non_instancied, types.FunctionType):
         scheduler = as_scheduler()(scheduler_non_instancied)
         scheduler = scheduler(options)
