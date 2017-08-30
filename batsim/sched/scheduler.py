@@ -240,17 +240,19 @@ class Scheduler(metaclass=ABCMeta):
         self._event_logger.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(message)s')
 
+        export_prefix = self.options.get("export_prefix", "out")
+
         # Add the persistent event logging handler (not purged between runs)
         handler = logging.FileHandler(
-            "out_scheduler_events_{}.csv".format(self.__class__.__name__))
+            "{}_events.csv".format(export_prefix))
         handler.setLevel(logging.DEBUG)
         handler.setFormatter(formatter)
         self._event_logger.addHandler(handler)
 
         # Add the event logging handler for the last run (purged when the next
         # run starts)
-        filename_lastschedule = "out_scheduler_events_{}_lastschedule.csv".format(
-            self.__class__.__name__)
+        filename_lastschedule = "{}_last_events.csv".format(
+            export_prefix)
         try:
             os.remove(filename_lastschedule)
         except OSError:
