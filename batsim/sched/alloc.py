@@ -271,10 +271,14 @@ class Allocation:
             jobid = self.job.id
 
         resources = []
-        for r in self._allocated_resources:
+        for r in self._resources:
             resources.append(r.name)
 
+        allocated = []
+        for r in self._allocated_resources:
+            allocated.append(r.name)
+
         return (
-            "<Allocation starttime:{} endtime:{} walltime:{} resources:{} job:{}>"
+            "<Allocation starttime:{} endtime:{} walltime:{} resources:{} allocated:{} job:{}>"
             .format(
-                self.start_time, self.end_time, self.walltime, resources, jobid))
+                self.start_time, self.end_time, self.walltime, resources, allocated, jobid))
