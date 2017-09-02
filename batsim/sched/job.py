@@ -64,6 +64,28 @@ class Job:
 
         self._profile = None
 
+    def __setattr__(self, field, value):
+        object.__setattr__(self, field, value)
+        try:
+            self._job_list.update_element(self)
+        except AttributeError:
+            pass
+
+    def get_job_data(self, key, default=None):
+        """Get data from the dictionary of the underlying Batsim job.
+
+        :param key: the key to search in the underlying job dictionary
+
+        :param default: the default value if the key is missing
+        """
+        try:
+            return self._batsim_job.json_dict[key]
+        except KeyError:
+            try:
+                return self._batsim_job.__dict__[key]
+            except KeyError:
+                return default
+
     @property
     def messages(self):
         """The buffer of incoming messages"""
@@ -360,32 +382,6 @@ class Job:
         assert self.open, "Job is not open"
         self._own_dependencies.remove(job)
         self._jobs_list.update_element(self)
-
-    def _get_overwritable_value(self, field_name, default=None):
-        """Helper function to either evaluate a field in the job object or
-        (if non-existing) try to get it from Batsim's job dictionary. If both approaches
-        fails either the default or `None` is returned.
-
-        :param field_name: the name of the field to be resolved
-
-        :param default: the default value as fallback
-        """
-        try:
-            return getattr(self, "_" + field_name)
-        except AttributeError:
-            return self.get_job_data(field_name, default)
-
-    def get_job_data(self, key, default=None):
-        """Get data from the dictionary of the underlying Batsim job.
-
-        :param key: the key to search in the underlying job dictionary
-        """
-        if not self._batsim_job:
-            return default
-        try:
-            return self._batsim_job.json_dict[key]
-        except KeyError:
-            return default
 
     def _do_execute(self):
         """Internal method to execute the execution of the job."""
