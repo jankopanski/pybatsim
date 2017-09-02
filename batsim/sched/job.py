@@ -611,12 +611,12 @@ class Job:
 
     def __str__(self):
         return (
-            "<Job {}; sub:{} reqtime:{} res:{} prof:{} fin:{} stat:{} jstat:{} killreason:{} ret:{}>"
+            "<Job {}; sub:{} reqtime:{} res:{} prof:{} fin:{} stat:{} killreason:{} ret:{}>"
             .format(
                 self.id, self.submit_time, self.requested_time,
                 self.requested_resources, self.profile,
-                self.finish_time, self.status,
-                self.job_state, self.kill_reason,
+                self.finish_time, self.state,
+                self.kill_reason,
                 self.return_code))
 
     @classmethod
