@@ -399,9 +399,12 @@ class Job:
 
             if not self._scheduler.has_time_sharing:
                 for r in self.allocation.resources:
-                    if len(r.allocations) != 1:
-                        raise ValueError(
-                            "Time sharing is not enabled in Batsim")
+                    for a1 in r.allocations:
+                        for a2 in r.allocations:
+                            if a1 != a2:
+                                if a1.overlaps_with(a2):
+                                    raise ValueError(
+                                        "Time sharing is not enabled in Batsim (resource allocations are overlapping)")
 
             if not self.allocation.fits_job_for_remaining_time(self):
                 raise ValueError(
