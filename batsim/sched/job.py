@@ -27,17 +27,21 @@ class Job:
     :param parent_job: the parent job if this is a sub job
     """
 
+    State = BatsimJob.State
+
     def __init__(
             self,
             batsim_job=None,
             scheduler=None,
             jobs_list=None,
             parent_job=None):
+        self._jobs_list = jobs_list
+
+        self._changed_state = None
+
         self._scheduler = scheduler
         self._batsim_job = batsim_job
         self._parent_job = parent_job
-
-        self._jobs_list = jobs_list
 
         self._marked_for_scheduling = False
         self._scheduled = False
@@ -187,7 +191,8 @@ class Job:
             self.completed,
             self.marked_for_scheduling, self.scheduled,
             self.marked_for_killing, self.killed,
-            self.marked_for_rejection, self.rejected]
+            self.marked_for_rejection, self.rejected] \
+            and self._changed_state is None
 
     @property
     def runnable(self):
@@ -218,7 +223,11 @@ class Job:
     @property
     def completed(self):
         """Whether or not this job has been completed."""
-        return self._batsim_job.status in ["SUCCESS", "TIMEOUT"]
+        completed_states = [
+            BatsimJob.State.COMPLETED_KILLED,
+            BatsimJob.State.COMPLETED_SUCCESSFULLY,
+            BatsimJob.State.COMPLETED_FAILED]
+        return self._changed_state in completed_states or self._batsim_job.job_state in completed_states
 
     @property
     def marked_for_scheduling(self):
@@ -258,7 +267,7 @@ class Job:
     @property
     def running(self):
         """Whether or not this job is currently running."""
-        return not self.open and self.scheduled and not self.completed
+        return self._changed_state == BatsimJob.State.RUNNING or (not self.open and self.scheduled and not self.completed)
 
     @property
     def allocation(self):
@@ -305,13 +314,7 @@ class Job:
         return self._batsim_job.finish_time
 
     @property
-    def status(self):
-        """The status of this job as known by Batsim."""
-        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
-        return self._batsim_job.status
-
-    @property
-    def job_state(self):
+    def state(self):
         """The state of this job as known by Batsim."""
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.job_state
@@ -601,8 +604,9 @@ class Job:
         should not be executed but instead the state should be set manually.
         """
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
-        assert self.open, "Job is not open"
-        self._scheduler._batsim.change_job_state(job, state, kill_reason)
+        self._scheduler._batsim.change_job_state(
+            self._batsim_job, state, kill_reason)
+        self._changed_state = state
         self._jobs_list.update_element(self)
 
     def __str__(self):
@@ -715,11 +719,7 @@ class DynamicJob(Job):
         return None
 
     @property
-    def status(self):
-        return None
-
-    @property
-    def job_state(self):
+    def state(self):
         return BatsimJob.State.UNKNOWN
 
     @property
