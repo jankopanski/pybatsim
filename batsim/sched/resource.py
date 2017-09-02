@@ -61,6 +61,11 @@ class Resource:
         return self._id
 
     @property
+    def name(self):
+        """The name of this resource."""
+        return self._name
+
+    @property
     def is_allocated(self):
         """Whether or not this resource is currently allocated."""
         return bool(self._allocations)
@@ -195,6 +200,13 @@ class Resource:
         """
         self._allocations.remove(allocation)
         self._resources_list.update_element(self)
+
+    def __str__(self):
+        return (
+            "<Resource {}; name:{} pstate:{} allocs:{}>"
+            .format(
+                self.id, self.name, self.pstate,
+                [str(a) for a in self.allocations]))
 
 
 class Resources(ObserveList):

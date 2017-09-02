@@ -35,7 +35,7 @@ class Allocation:
         self._end_time = None
         self._walltime = walltime
 
-        if isinstance(resources, (list, Resources)):
+        if isinstance(resources, (list, tuple, Resources)):
             for r in resources:
                 self.add_resource(r)
         elif isinstance(resources, Resource):
@@ -264,3 +264,17 @@ class Allocation:
         self._end_time = self._scheduler.time
         self._allocated = False
         self._previously_allocated = True
+
+    def __str__(self):
+        jobid = None
+        if self.job:
+            jobid = self.job.id
+
+        resources = []
+        for r in self._allocated_resources:
+            resources.append(r.name)
+
+        return (
+            "<Allocation starttime:{} endtime:{} walltime:{} resources:{} job:{}>"
+            .format(
+                self.start_time, self.end_time, self.walltime, resources, jobid))

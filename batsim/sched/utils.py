@@ -242,6 +242,9 @@ class DictWrapper:
     def __setitem__(self, name, value):
         self._obj[name] = value
 
+    def __str__(self):
+        return str(self._obj)
+
 
 class SafeIterList(list):
     """A list which can be safely iterated over while removing current elements."""
