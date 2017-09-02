@@ -243,7 +243,8 @@ class Batsim(object):
             job = self.redis.get_job(event["data"]["job_id"])
         else:
             json_dict = event["data"]["job"]
-            job = Job.from_json_dict(json_dict)
+            profile_dict = event["data"]["profile"]
+            job = Job.from_json_dict(json_dict, profile_dict)
         return job
 
     def request_consumed_energy(self):
@@ -438,7 +439,7 @@ class Job(object):
         COMPLETED_KILLED = 5
         REJECTED = 6
 
-    def __init__(self, id, subtime, walltime, res, profile, json_dict):
+    def __init__(self, id, subtime, walltime, res, profile, json_dict, profile_dict):
         self.id = id
         self.submit_time = subtime
         self.requested_time = walltime
@@ -450,6 +451,7 @@ class Job(object):
         self.kill_reason = None
         self.return_code = None
         self.json_dict = json_dict
+        self.profile_dict = profile_dict
 
     def __repr__(self):
         return("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} stat:{5} jstat:{6} killreason:{7} ret:{8}>".format(
@@ -464,13 +466,13 @@ class Job(object):
         return Job.from_json_dict(json_dict)
 
     @staticmethod
-    def from_json_dict(json_dict):
+    def from_json_dict(json_dict, profile_dict):
         return Job(json_dict["id"],
                    json_dict["subtime"],
                    json_dict["walltime"],
                    json_dict["res"],
                    json_dict["profile"],
-                   json_dict)
+                   json_dict, profile_dict)
     # def __eq__(self, other):
         # return self.id == other.id
     # def __ne__(self, other):

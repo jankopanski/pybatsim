@@ -11,6 +11,7 @@ from batsim.batsim import Job as BatsimJob, Batsim
 from .utils import ObserveList, filter_list
 from .alloc import Allocation
 from .messages import MessageBuffer
+from .profiles import Profiles
 
 
 class Job:
@@ -56,6 +57,8 @@ class Job:
         self._start_time = None
 
         self._messages = MessageBuffer()
+
+        self._profile = None
 
     @property
     def messages(self):
@@ -290,7 +293,10 @@ class Job:
     def profile(self):
         """The profile of this job as known by Batsim."""
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
-        return self._batsim_job.profile
+        if self._profile is None:
+            self._profile = Profiles.profile_from_dict(
+                self._batsim_job.profile_dict, name=self._batsim_job.profile)
+        return self._profile
 
     @property
     def finish_time(self):
@@ -620,8 +626,6 @@ class Job:
         :param profile: The profile object (either a `Profile` object or a dictionary containing the
         actual Batsim profile configuration).
 
-        :param profile_name: The name of the profile to be stored in Batsim (will be dynamically generated if omitted).
-
         :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
         """
         return DynamicJob(*args, **kwargs)
@@ -640,8 +644,6 @@ class Job:
         :param profile: The profile object (either a `Profile` object or a dictionary containing the
         actual Batsim profile configuration).
 
-        :param profile_name: The name of the profile to be stored in Batsim (will be dynamically generated if omitted).
-
         :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
         """
         return DynamicJob(*args, parent_job=self, **kwargs)
@@ -659,8 +661,6 @@ class DynamicJob(Job):
     :param profile: The profile object (either a `Profile` object or a dictionary containing the
     actual Batsim profile configuration).
 
-    :param profile_name: The name of the profile to be stored in Batsim (will be dynamically generated if omitted).
-
     :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
 
     :param parent_job: the parental job object if this job should be a sub job
@@ -671,7 +671,6 @@ class DynamicJob(Job):
             requested_resources,
             requested_time,
             profile,
-            profile_name=None,
             workload_name=None,
             parent_job=None):
         super().__init__(parent_job=parent_job)
@@ -679,7 +678,6 @@ class DynamicJob(Job):
         self._user_requested_resources = requested_resources
         self._user_requested_time = requested_time
         self._user_profile = profile
-        self._user_profile_name = profile_name
         self._user_workload_name = workload_name
 
         self._dyn_marked_submission = False
@@ -706,11 +704,7 @@ class DynamicJob(Job):
 
     @property
     def profile(self):
-        return self._user_profile_name
-
-    @property
-    def profile_object(self):
-        return self._user_profile
+        return self._profile
 
     @property
     def workload_name(self):
@@ -780,7 +774,7 @@ class DynamicJob(Job):
                 self._user_requested_resources,
                 self._user_requested_time,
                 profile,
-                self._user_profile_name,
+                self._user_profile.name,
                 self._user_workload_name)
 
             if self.parent_job:
