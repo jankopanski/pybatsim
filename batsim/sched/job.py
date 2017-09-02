@@ -205,7 +205,8 @@ class Job:
     @property
     def running(self):
         """Whether or not this job is currently running."""
-        return self._changed_state == BatsimJob.State.RUNNING or (not self.open and self.scheduled and not self.completed)
+        return self._changed_state == BatsimJob.State.RUNNING or (
+            not self.open and self.scheduled and not self.completed)
 
     @property
     def allocation(self):
