@@ -213,7 +213,7 @@ class Job:
         Sub jobs cannot be added manually and instead have to be submitted as dynamic sub
         jobs which are then added automatically.
         """
-        return tuple(self._sub_jobs)
+        return Jobs(self._sub_jobs)
 
     @property
     def running(self):
@@ -678,11 +678,11 @@ class DynamicJob(Job):
             workload_name=None,
             parent_job=None):
         super().__init__(parent_job=parent_job)
-        self._user_job_id = None
-        self._user_requested_resources = requested_resources
-        self._user_requested_time = requested_time
-        self._user_profile = profile
-        self._user_workload_name = workload_name
+        self._job_id = None
+        self._requested_resources = requested_resources
+        self._requested_time = requested_time
+        self._profile = profile
+        self._workload_name = workload_name
 
         self._dyn_marked_submission = False
         self._dyn_submitted = False
@@ -692,7 +692,7 @@ class DynamicJob(Job):
 
     @property
     def id(self):
-        return self._user_job_id
+        return self._job_id
 
     @property
     def submit_time(self):
@@ -700,11 +700,11 @@ class DynamicJob(Job):
 
     @property
     def requested_time(self):
-        return self._user_requested_time
+        return self._requested_time
 
     @property
     def requested_resources(self):
-        return self._user_requested_resources
+        return self._requested_resources
 
     @property
     def profile(self):
@@ -712,7 +712,7 @@ class DynamicJob(Job):
 
     @property
     def workload_name(self):
-        return self._user_workload_name
+        return self._workload_name
 
     @property
     def finish_time(self):
@@ -724,6 +724,10 @@ class DynamicJob(Job):
 
     @property
     def kill_reason(self):
+        return None
+
+    @property
+    def return_code(self):
         return None
 
     @property
@@ -740,6 +744,10 @@ class DynamicJob(Job):
         """Whether or not this job object was dynamically submitted."""
         return self._dyn_submitted
 
+    @property
+    def is_dynamic_job(self):
+        return True
+
     def submit(self, scheduler):
         """Marks a dynamic job for submission in the `scheduler`."""
         if not self._dyn_marked_submission and not self._dyn_submitted:
@@ -753,7 +761,7 @@ class DynamicJob(Job):
         if self._dyn_marked_submission and not self._dyn_submitted:
             # The profile object will be executed if it is no dictionary already to
             # allow complex Profile objects.
-            profile = self._user_profile
+            profile = self._profile
             if not isinstance(profile, dict):
                 profile = profile(self._scheduler)
 
@@ -770,12 +778,12 @@ class DynamicJob(Job):
                 subjob_of_obj=self.parent_job,
                 is_subjob=(parent_job_id is not None),
                 type="dynamic_job_submit")
-            self._user_job_id = self._scheduler._batsim.submit_job(
-                self._user_requested_resources,
-                self._user_requested_time,
+            self._job_id = self._scheduler._batsim.submit_job(
+                self._requested_resources,
+                self._requested_time,
                 profile,
-                self._user_profile.name,
-                self._user_workload_name)
+                self._profile.name,
+                self._workload_name)
 
             if self.parent_job:
                 self.parent_job._sub_jobs.append(self)
