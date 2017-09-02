@@ -450,9 +450,9 @@ class Job:
         This is used internally to convert dynamic jobs to submitted jobs."""
         parent_job = otherjob.parent_job
         if parent_job:
-            parent_job._sub_jobs.append(self)
+            i = parent_job._sub_jobs.index(otherjob)
+            parent_job._sub_jobs[i] = self
             self._parent_job = parent_job
-            parent_job._sub_jobs.remove(otherjob)
         self._own_dependencies = list(otherjob._own_dependencies)
         self._jobs_list.update_element(self)
 
