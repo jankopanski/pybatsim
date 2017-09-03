@@ -53,7 +53,6 @@ class Resource:
         self._pstate = None
         self._old_pstate = None
         self._pstate_update_in_progress = False
-        self._pstate_update_request_necessary = False
 
     @property
     def id(self):
@@ -103,7 +102,8 @@ class Resource:
         if not self.pstate_update_in_progress:
             self._old_pstate = self._pstate
 
-        self._pstate_update_request_necessary = True
+        scheduler._batsim.set_resource_state([self.id], self._pstate)
+
         self._pstate_update_in_progress = True
 
         self._pstate = newval
@@ -151,16 +151,7 @@ class Resource:
         self._old_pstate = self._pstate
         self._pstate = pstate
         self._pstate_update_in_progress = False
-        self._pstate_update_request_necessary = False
         self._resources_list.update_element(self)
-
-    def _do_change_state(self, scheduler):
-        """Instruct Batsim to change the state of the resource.
-
-        :param scheduler: the scheduler handling this resource
-        """
-        self._pstate_update_request_necessary = False
-        scheduler._batsim.set_resource_state([self.id], self._pstate)
 
     def _do_add_allocation(self, allocation):
         """Adds an allocation to this resource.

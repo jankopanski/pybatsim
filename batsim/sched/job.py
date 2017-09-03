@@ -43,14 +43,13 @@ class Job:
         self._batsim_job = batsim_job
         self._parent_job = parent_job
 
-        self._marked_for_scheduling = False
         self._scheduled = False
 
         self._killed = False
-        self._marked_for_killing = False
+
+        self._submitted = self._batsim_job is not None
 
         self._rejected = False
-        self._marked_for_rejection = False
         self._rejected_reason = None
 
         self._sub_jobs = []
@@ -127,9 +126,9 @@ class Job:
         """Whether or not this job is still open."""
         return True not in [
             self.completed,
-            self.marked_for_scheduling, self.scheduled,
-            self.marked_for_killing, self.killed,
-            self.marked_for_rejection, self.rejected] \
+            self.scheduled,
+            self.killed,
+            self.rejected] \
             and self._changed_state is None
 
     @property
@@ -161,16 +160,11 @@ class Job:
     @property
     def completed(self):
         """Whether or not this job has been completed."""
-        completed_states = [
+        completed_states = set([
             BatsimJob.State.COMPLETED_KILLED,
             BatsimJob.State.COMPLETED_SUCCESSFULLY,
-            BatsimJob.State.COMPLETED_FAILED]
+            BatsimJob.State.COMPLETED_FAILED])
         return self._changed_state in completed_states or self._batsim_job.job_state in completed_states
-
-    @property
-    def marked_for_scheduling(self):
-        """Whether or not this job was marked for scheduling at the end of the iteration."""
-        return self._marked_for_scheduling
 
     @property
     def scheduled(self):
@@ -178,24 +172,28 @@ class Job:
         return self._scheduled
 
     @property
-    def marked_for_rejection(self):
-        """Whether or not this job will be rejected at the end of the iteration."""
-        return self._marked_for_rejection
-
-    @property
     def rejected(self):
         """Whether or not this job was submitted for rejection to batsim."""
         return self._rejected
 
     @property
+    def submitted(self):
+        """Whether or not this job was submitted to Batsim."""
+        return self._submitted
+
+    @property
+    def is_dynamic_submission_request(self):
+        """Whether or not this job is a request sent for dynamic submission.
+
+        To check whether this job was originally dynamically submitted use the property:
+        `is_dynamic_job` instead.
+        """
+        return False
+
+    @property
     def rejected_reason(self):
         """The reason for the rejection"""
         return self._rejected_reason
-
-    @property
-    def marked_for_killing(self):
-        """Whether or not this job was marked for killing at the end of the iteration."""
-        return self._marked_for_killing
 
     @property
     def killed(self):
@@ -314,8 +312,7 @@ class Job:
         # To free resources the job does either have to be not submitted yet
         # or the job has to be completed (i.e. the job status is set by
         # batsim).
-        assert (
-            not self.marked_for_scheduling and not self.scheduled) or self.completed, \
+        assert not self.scheduled or self.completed, \
             "Job is in invalid state: not completed yet or currently scheduled"
 
         if self.completed:
@@ -384,59 +381,6 @@ class Job:
         self._own_dependencies.remove(job)
         self._jobs_list.update_element(self)
 
-    def _do_execute(self):
-        """Internal method to execute the execution of the job."""
-        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
-        assert not self.scheduled and not self.rejected, "Job is either already scheduled or rejected"
-        assert self.allocation is not None, "Job has no allocation"
-
-        if self.marked_for_scheduling and not self.scheduled:
-            if self._batsim_job.requested_resources < len(self.allocation):
-                self._scheduler.warn(
-                    "Scheduling of job ({job}) is postponed since not enough resources are allocated",
-                    job=self, type="job_starting_postponed_too_few_resources")
-                return
-
-            if not self._scheduler.has_time_sharing:
-                for r in self.allocation.resources:
-                    for a1 in r.allocations:
-                        for a2 in r.allocations:
-                            if a1 != a2:
-                                if a1.overlaps_with(a2):
-                                    raise ValueError(
-                                        "Time sharing is not enabled in Batsim (resource allocations are overlapping)")
-
-            if not self.allocation.fits_job_for_remaining_time(self):
-                raise ValueError(
-                    "Job does not fit in the remaining time frame of the allocation")
-
-            # Abort job start if allocation is in the future
-            if self.allocation.start_time > self._scheduler.time:
-                self._scheduler.run_scheduler_at(self.allocation.start_time)
-                return
-
-            # If the allocation is larger than required only choose as many resources
-            # as necessary.
-            r = range(0, self.requested_resources)
-            self.allocation.allocate(self._scheduler, r)
-
-            alloc = []
-            for res in self.allocation.allocated_resources:
-                alloc.append(res.id)
-
-            # Start the jobs
-            self._scheduler._batsim.start_jobs(
-                [self._batsim_job], {self.id: alloc})
-
-            self._scheduler.info(
-                "Scheduled job ({job})",
-                job=self,
-                type="job_scheduled")
-            self._marked_for_scheduling = False
-            self._scheduled = True
-            self._start_time = self._scheduler.time
-            self._jobs_list.update_element(self)
-
     def _do_complete_job(self):
         """Complete a job."""
         self._scheduler.info("Remove completed job and free resources: {job}",
@@ -465,54 +409,91 @@ class Job:
         """
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         assert self.open, "Job is not open"
+        assert not self.rejected, "Job is alrady rejected"
 
-        self._marked_for_rejection = True
         self._rejected_reason = reason
+
+        self._scheduler.info(
+            "Rejecting job ({job}), reason={reason}",
+            job=self, reason=self.rejected_reason, type="job_rejection")
+        self._scheduler._batsim.reject_jobs([self._batsim_job])
+        del self._scheduler._scheduler._jobmap[self._batsim_job.id]
+
+        self._rejected = True
         self._jobs_list.update_element(self)
-
-    def _do_reject(self):
-        """Internal method to execute the rejecting of the job."""
-        if self.marked_for_rejection and not self.rejected:
-            self._scheduler.info(
-                "Rejecting job ({job}), reason={reason}",
-                job=self, reason=self.rejected_reason, type="job_rejection")
-            self._scheduler._batsim.reject_jobs([self._batsim_job])
-            del self._scheduler._scheduler._jobmap[self._batsim_job.id]
-
-            self._rejected = True
-            self._marked_for_rejection = False
-            self._jobs_list.update_element(self)
 
     def kill(self):
         """Kill the current job during its execution."""
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         assert self.running, "Job is not running"
+        assert not self.killed, "Job is already killed"
+        assert not self.open, "Job is still open"
+        assert self.running, "Job is not currently not running"
+
+        self._scheduler.info(
+            "Killing job ({job})",
+            job=self,
+            type="job_killing")
+        self._scheduler._batsim.kill_jobs([self._batsim_job])
+
         self._killed = True
         self._jobs_list.update_element(self)
-
-    def _do_kill(self):
-        """Internal method to execute the killing of the job."""
-        if self.marked_for_killing and not self.killed:
-            self._scheduler.info(
-                "Killing job ({job})",
-                job=self,
-                type="job_killing")
-            self._scheduler._batsim.kill_jobs([self._batsim_job])
-
-            self._killed = True
-            self._marked_for_killing = True
-            self._jobs_list.update_element(self)
 
     def schedule(self, resource=None):
         """Mark this job for scheduling. This can also be done even when not enough resources are
         reserved. The job will not be sent to Batsim until enough resources were reserved."""
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         assert self.open, "Job is not open"
+        assert not self.scheduled and not self.rejected, "Job is either already scheduled or rejected"
 
         if resource:
             self.reserve(resource)
 
-        self._marked_for_scheduling = True
+        assert self.allocation is not None, "Job has no allocation"
+
+        if self._batsim_job.requested_resources < len(self.allocation):
+            self._scheduler.warn(
+                "Scheduling of job ({job}) is postponed since not enough resources are allocated",
+                job=self, type="job_starting_postponed_too_few_resources")
+            return
+
+        if not self._scheduler.has_time_sharing:
+            for r in self.allocation.resources:
+                for a1 in r.allocations:
+                    for a2 in r.allocations:
+                        if a1 != a2:
+                            if a1.overlaps_with(a2):
+                                raise ValueError(
+                                    "Time sharing is not enabled in Batsim (resource allocations are overlapping)")
+
+        if not self.allocation.fits_job_for_remaining_time(self):
+            raise ValueError(
+                "Job does not fit in the remaining time frame of the allocation")
+
+        # Abort job start if allocation is in the future
+        if self.allocation.start_time > self._scheduler.time:
+            self._scheduler.run_scheduler_at(self.allocation.start_time)
+            return
+
+        # If the allocation is larger than required only choose as many resources
+        # as necessary.
+        r = range(0, self.requested_resources)
+        self.allocation.allocate(self._scheduler, r)
+
+        alloc = []
+        for res in self.allocation.allocated_resources:
+            alloc.append(res.id)
+
+        # Start the jobs
+        self._scheduler._batsim.start_jobs(
+            [self._batsim_job], {self.id: alloc})
+
+        self._scheduler.info(
+            "Scheduled job ({job})",
+            job=self,
+            type="job_scheduled")
+        self._scheduled = True
+        self._start_time = self._scheduler.time
         self._jobs_list.update_element(self)
 
     def change_state(self, state, kill_reason=""):
@@ -600,8 +581,7 @@ class DynamicJob(Job):
         self._profile = profile
         self._workload_name = workload_name
 
-        self._dyn_marked_submission = False
-        self._dyn_submitted = False
+        self._submitted = False
 
         if parent_job is not None:
             parent_job._jobs_list.update_element(self)
@@ -647,18 +627,16 @@ class DynamicJob(Job):
         return None
 
     @property
-    def marked_for_dynamic_submission(self):
-        """Whether or not this job object was marked for dynamic submission."""
-        return self._dyn_marked_submission
-
-    @property
     def completed(self):
         return False
 
     @property
-    def dynamically_submitted(self):
-        """Whether or not this job object was dynamically submitted."""
-        return self._dyn_submitted
+    def submitted(self):
+        return self._submitted
+
+    @property
+    def is_dynamic_submission_request(self):
+        return True
 
     @property
     def is_dynamic_job(self):
@@ -666,48 +644,43 @@ class DynamicJob(Job):
 
     def submit(self, scheduler):
         """Marks a dynamic job for submission in the `scheduler`."""
-        if not self._dyn_marked_submission and not self._dyn_submitted:
-            self._dyn_marked_submission = True
-            scheduler.jobs.add(self)
-            self._jobs_list = scheduler.jobs
-            self._scheduler = scheduler
+        assert not self._submitted, "Dynamic job was already submitted"
+        scheduler.jobs.add(self)
+        self._jobs_list = scheduler.jobs
+        self._scheduler = scheduler
 
-    def _do_dyn_submit(self):
-        """Execute the dynamic job submission in the `scheduler`."""
-        if self._dyn_marked_submission and not self._dyn_submitted:
-            # The profile object will be executed if it is no dictionary already to
-            # allow complex Profile objects.
-            profile = self._profile
-            if not isinstance(profile, dict):
-                profile = profile(self._scheduler)
+        # The profile object will be executed if it is no dictionary already to
+        # allow complex Profile objects.
+        profile = self._profile
+        if not isinstance(profile, dict):
+            profile = profile(self._scheduler)
 
-            parent_job_id = None
-            try:
-                parent_job_id = self.parent_job.id
-            except AttributeError:
-                pass
+        parent_job_id = None
+        try:
+            parent_job_id = self.parent_job.id
+        except AttributeError:
+            pass
 
-            self._scheduler.info(
-                "Submit dynamic job ({job})",
-                job=self,
-                subjob_of=parent_job_id,
-                subjob_of_obj=self.parent_job,
-                is_subjob=(parent_job_id is not None),
-                type="dynamic_job_submit")
-            self._job_id = self._scheduler._batsim.submit_job(
-                self._requested_resources,
-                self._requested_time,
-                profile,
-                self._profile.name,
-                self._workload_name)
+        self._scheduler.info(
+            "Submit dynamic job ({job})",
+            job=self,
+            subjob_of=parent_job_id,
+            subjob_of_obj=self.parent_job,
+            is_subjob=(parent_job_id is not None),
+            type="dynamic_job_submit")
+        self._job_id = self._scheduler._batsim.submit_job(
+            self._requested_resources,
+            self._requested_time,
+            profile,
+            self._profile.name,
+            self._workload_name)
 
-            if self.parent_job:
-                self.parent_job._sub_jobs.append(self)
-                self.parent_job._jobs_list.update_element(self)
+        if self.parent_job:
+            self.parent_job._sub_jobs.append(self)
+            self.parent_job._jobs_list.update_element(self)
 
-            self._dyn_submitted = True
-            self._dyn_marked_submission = False
-            self._jobs_list.update_element(self)
+        self._submitted = True
+        self._jobs_list.update_element(self)
 
 
 class Jobs(ObserveList):
@@ -722,63 +695,48 @@ class Jobs(ObserveList):
 
     @property
     def runnable(self):
-        """Returns all job which are runnable."""
+        """Returns all jobs which are runnable."""
         return self.filter(runnable=True)
 
     @property
     def running(self):
-        """Returns all job which are currently running."""
+        """Returns all jobs which are currently running."""
         return self.filter(running=True)
 
     @property
     def open(self):
-        """Returns all job which are currently open."""
+        """Returns all jobs which are currently open."""
         return self.filter(open=True)
 
     @property
     def completed(self):
-        """Returns all job which are completed."""
+        """Returns all jobs which are completed."""
         return self.filter(completed=True)
 
     @property
     def rejected(self):
-        """Returns all job which were rejected."""
+        """Returns all jobs which were rejected."""
         return self.filter(rejected=True)
 
     @property
-    def marked_for_rejection(self):
-        """Returns all job which are marked for rejection (executed at the end of the scheduling iteration)."""
-        return self.filter(marked_for_rejection=True)
-
-    @property
     def scheduled(self):
-        """Returns all job which were scheduled."""
+        """Returns all jobs which were scheduled."""
         return self.filter(scheduled=True)
 
     @property
-    def marked_for_scheduling(self):
-        """Returns all job which are marked for scheduling (executed at the end of the scheduling iteration)."""
-        return self.filter(marked_for_scheduling=True)
-
-    @property
     def killed(self):
-        """Returns all job which were killed."""
+        """Returns all jobs which were killed."""
         return self.filter(killed=True)
 
     @property
-    def marked_for_killing(self):
-        """Returns all job which are marked for killing (executed at the end of the scheduling iteration)."""
-        return self.filter(marked_for_killing=True)
+    def submitted(self):
+        """Returns all jobs which are submitted to Batsim."""
+        return self.filter(submitted=True)
 
     @property
-    def dynamically_submitted(self):
-        """Returns all job which were dynamically submitted."""
-        return self.filter(dynamically_submitted=True)
-
-    @property
-    def marked_for_dynamic_submission(self):
-        """Returns all job which are marked for dynamic submission (executed at the end of the scheduling iteration)."""
-        return self.filter(marked_for_dyanmic_submission=True)
+    def dynamic_submission_request(self):
+        """Returns all jobs which are requests for dynamic submissions."""
+        return self.filter(dynamic_submission_request=True)
 
     def __getitem__(self, items):
         if isinstance(items, slice):
@@ -809,13 +767,10 @@ class Jobs(ObserveList):
             open=False,
             completed=False,
             rejected=False,
-            marked_for_rejection=False,
             scheduled=False,
-            marked_for_scheduling=False,
             killed=False,
-            marked_for_killing=False,
-            dynamically_submitted=False,
-            marked_for_dynamic_submission=False,
+            submitted=False,
+            dynamic_submission_request=False,
             **kwargs):
         """Filter the jobs lists to search for jobs.
 
@@ -829,88 +784,64 @@ class Jobs(ObserveList):
 
         :param rejected: whether the job has already been rejected.
 
-        :param marked_for_rejection: whether the job has been marked for rejection.
-
         :param scheduled: whether the job has already been scheduled.
-
-        :param marked_for_scheduling: whether the job has been marked for scheduling.
 
         :param killed: whether the job has been sent for killing.
 
-        :param marked_for_killing: whether the job has been marked for killing.
+        :param submitted: whether the job has been submitted.
 
-        :param dynamically_submitted: whether the job has been submited as dynamic job.
-
-        :param marked_for_dynamic_submission: whether the job has been marked for dynamic job submission.
-
+        :param dynamic_submission_request: whether the job is a request for dynamic submission.
         """
 
         # Yield all jobs if not filtered
         if True not in [
                 runnable, running,
                 open, completed,
-                rejected, marked_for_rejection,
-                scheduled, marked_for_scheduling,
-                killed, marked_for_killing,
-                dynamically_submitted, marked_for_dynamic_submission]:
+                rejected,
+                scheduled,
+                killed,
+                submitted,
+                dynamic_submission_request]:
             runnable = True
             running = True
-
             open = True
             completed = True
-
             rejected = True
-            marked_for_rejection = True
-
             scheduled = True
-            marked_for_scheduling = True
-
             killed = True
-            marked_for_killing = True
-
-            dynamically_submitted = True
-            marked_for_dynamic_submission = True
+            submitted = True
+            dynamic_submission_request = True
 
         # Filter jobs
         def filter_jobs(jobs):
             for j in jobs:
-                if j.running:
-                    if running:
+                if j.is_dynamic_submission_request:
+                    if dynamic_submission_request or submitted:
+                        yield j
+                elif j.running:
+                    if running or submitted:
                         yield j
                 elif j.completed:
-                    if completed:
+                    if completed or submitted:
                         yield j
                 elif j.rejected:
-                    if rejected:
-                        yield j
-                elif j.marked_for_rejection:
-                    if marked_for_rejection:
+                    if rejected or submitted:
                         yield j
                 elif j.scheduled:
-                    if scheduled:
-                        yield j
-                elif j.marked_for_scheduling:
-                    if marked_for_scheduling:
+                    if scheduled or submitted:
                         yield j
                 elif j.killed:
-                    if killed:
+                    if killed or submitted:
                         yield j
-                elif j.marked_for_killing:
-                    if marked_for_killing:
+                elif j.runnable:
+                    if runnable or open or submitted:
                         yield j
-                elif isinstance(j, DynamicJob):
-                    if j.dynamically_submitted:
-                        if dynamically_submitted:
-                            yield j
-                    elif j.marked_for_dynamic_submission:
-                        if marked_for_dynamic_submission:
-                            yield j
-                else:  # open job
-                    if open:
+                elif j.open:
+                    if open or submitted:
                         yield j
-                    elif j.runnable:
-                        if runnable:
-                            yield j
+                elif j.submitted:
+                    if submitted:
+                        yield j
 
         return self.create(
             filter_list(

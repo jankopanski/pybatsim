@@ -104,7 +104,7 @@ class BaseBatsimScheduler(BatsimScheduler):
                              job=newjob, type="job_submission_received")
 
         if newjob.is_dynamic_job:
-            for job2 in self._scheduler.jobs.dynamically_submitted:
+            for job2 in self._scheduler.jobs.dynamic_submission_request:
                 if job.id == job2.id:
                     newjob.move_properties_from(job2)
                     self._scheduler.jobs.remove(job2)
@@ -435,22 +435,6 @@ class Scheduler(metaclass=ABCMeta):
         If the _post_schedule method is overridden the super method should be called with:
         `super()._post_schedule()`
         """
-        for r in self._resources:
-            if r._pstate_update_request_necessary:
-                r._do_change_state(self)
-
-        for j in self.jobs.filter(marked_for_dynamic_submission=True):
-            j._do_dyn_submit()
-
-        for j in self.jobs.marked_for_rejection:
-            j._do_reject()
-
-        for j in self.jobs.marked_for_killing:
-            j._do_kill()
-
-        for j in self.jobs.marked_for_scheduling:
-            j._do_execute()
-
         if self.jobs.open:
             self.debug(
                 "{num_jobs} jobs open at end of scheduling iteration",
