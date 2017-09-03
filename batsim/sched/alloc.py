@@ -238,8 +238,9 @@ class Allocation:
                 res = self._resources[i]
                 if res in self._allocated_resources:
                     self._allocated_resources.clear()
-                    raise ValueError(
-                        "Resource ranges in allocation are invalid")
+                    scheduler.fatal("Resource ranges in allocation are invalid: {res}",
+                            res=res,
+                            type="resource_ranges_invalid")
                 self._allocated_resources.add(res)
                 res._do_allocate_allocation(self)
         self._allocated = True
