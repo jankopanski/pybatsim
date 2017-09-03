@@ -18,6 +18,7 @@ from .job import Job, Jobs
 from .reply import ConsumedEnergyReply
 from .utils import DictWrapper
 from .messages import Message
+from .utils import ListView
 
 
 class BaseBatsimScheduler(BatsimScheduler):
@@ -281,8 +282,8 @@ class Scheduler(metaclass=ABCMeta):
 
     @property
     def events(self):
-        """The events happened in the scheduler (`tuple`)"""
-        return tuple(self._events)
+        """The events happened in the scheduler."""
+        return ListView(self._events)
 
     @property
     def hpst(self):
@@ -555,7 +556,7 @@ def as_scheduler(*args, on_init=[], on_end=[], base_classes=[], **kwargs):
 
     :param kwargs: additional arguments passed to the scheduler function (in each iteration)
     """
-    base_classes = base_classes[:]
+    base_classes = base_classes.copy()
     base_classes.append(Scheduler)
 
     def convert_to_scheduler(schedule_function):

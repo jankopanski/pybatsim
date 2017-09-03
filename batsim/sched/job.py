@@ -8,7 +8,7 @@
 """
 from batsim.batsim import Job as BatsimJob, Batsim
 
-from .utils import ObserveList, filter_list
+from .utils import ObserveList, filter_list, ListView
 from .alloc import Allocation
 from .messages import MessageBuffer
 from .profiles import Profiles
@@ -117,7 +117,7 @@ class Job:
         They are either given in the workload through the custom `deps` field of a job
         or added by the scheduler as manual dependencies.
         """
-        return tuple(
+        return ListView(
             self.get_job_data("deps", []) +
             self._own_dependencies)
 
@@ -302,7 +302,7 @@ class Job:
                 result.append(dep_job)
             except KeyError:
                 result.append(dep)
-        return tuple(result)
+        return ListView(result)
 
     def free(self):
         """Free the current allocation of this job."""

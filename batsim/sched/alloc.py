@@ -7,6 +7,7 @@
 import sys
 
 from .resource import Resources, Resource
+from .utils import ListView
 
 
 class Allocation:
@@ -35,11 +36,11 @@ class Allocation:
         self._end_time = None
         self._walltime = walltime
 
-        if isinstance(resources, (list, tuple, Resources)):
+        if isinstance(resources, Resource):
+            self.add_resource(resources)
+        else:  # Assume some kind of list type
             for r in resources:
                 self.add_resource(r)
-        elif isinstance(resources, Resource):
-            self.add_resource(resources)
 
         if job is not None:
             if walltime is None:
@@ -54,7 +55,7 @@ class Allocation:
     @property
     def resources(self):
         """The list of assigned resources."""
-        return tuple(self._resources)
+        return ListView(self._resources)
 
     @property
     def allocated(self):
@@ -92,7 +93,7 @@ class Allocation:
     @property
     def allocated_resources(self):
         """The list of allocated resources (currently assigned as computing)."""
-        return tuple(self._allocated_resources)
+        return ListView(self._allocated_resources)
 
     @property
     def previously_allocated(self):
@@ -212,7 +213,7 @@ class Allocation:
     def remove_all_resources(self):
         """Removes all resources from this allocation."""
         assert not self.allocated and not self.previously_allocated, "Allocation is in invalid state"
-        for r in self._resources[:]:
+        for r in self._resources.copy():
             self.remove_resource(r)
 
     def allocate(self, scheduler, range1, *more_ranges):
@@ -258,7 +259,7 @@ class Allocation:
             self.remove_all_resources()
             return
 
-        for r in self.resources:
+        for r in self.resources.copy():
             r._do_free_allocation(self)
 
         self._end_time = self._scheduler.time

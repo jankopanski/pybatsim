@@ -7,7 +7,7 @@
 """
 from enum import Enum
 
-from .utils import ObserveList, filter_list
+from .utils import ObserveList, filter_list, ListView
 
 
 class Resource:
@@ -72,7 +72,7 @@ class Resource:
     @property
     def allocations(self):
         """A copy of the allocations (current and future) where this resource is part of."""
-        return tuple(self._allocations)
+        return ListView(self._allocations)
 
     @property
     def computing(self):

@@ -21,8 +21,8 @@ class ObserveList:
 
     @property
     def data(self):
-        """A copy of the content of the list."""
-        return tuple(self._data)
+        """A view of the content of the list."""
+        return ListView(self._data)
 
     def _check_new_elem(self, element):
         """Checks whether a new element should be added.
@@ -251,3 +251,48 @@ class SafeIterList(list):
 
     def __iter__(self):
         return iter(self[:])
+
+
+class ContainerView:
+    """A view for various containers (e.g. sets, lists, or dicts)."""
+
+    def __init__(self, l):
+        self._data = l
+
+    def copy(self):
+        return self._data.copy()
+
+    def __getitem__(self, *args, **kwargs):
+        return self._data.__getitem__(*args, **kwargs)
+
+    def __len__(self, *args, **kwargs):
+        return self._data.__len__(*args, **kwargs)
+
+    def __contains__(self, *args, **kwargs):
+        return self._data.__contains__(*args, **kwargs)
+
+    def __iter__(self, *args, **kwargs):
+        return self._data.__iter__(*args, **kwargs)
+
+    def __add__(self, *args, **kwargs):
+        return self._data.__add__(*args, **kwargs)
+
+    def __str__(self, *args, **kwargs):
+        return self._data.__str__(*args, **kwargs)
+
+
+class ListView(ContainerView):
+    """A view for dictionaries."""
+
+    def index(self, *args, **kwargs):
+        return self._data.index(*args, **kwargs)
+
+    def count(self, x):
+        return self._data.count(*args, **kwargs)
+
+
+class DictView(ContainerView):
+    """A view for dictionaries."""
+
+    def get(self, *args, **kwargs):
+        return self._data.get(*args, **kwargs)
