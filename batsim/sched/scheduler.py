@@ -143,7 +143,9 @@ class BaseBatsimScheduler(BatsimScheduler):
             job=jobobj,
             message=message,
             type="job_message_received")
-        jobobj.messages.append(Message(timestamp, message))
+        msg = Message(timestamp, message)
+        jobobj.messages.append(msg)
+        self._scheduler.on_job_message(jobobj, msg)
         self._scheduler._do_schedule()
 
     def onMachinePStateChanged(self, nodeid, pstate):
@@ -516,6 +518,15 @@ class Scheduler(metaclass=ABCMeta):
         """Hook similar to the low-level API.
 
         :param job: the completed job (higher-level job object)
+        """
+        pass
+
+    def on_job_message(self, job, message):
+        """Hook similar to the low-level API.
+
+        :param job: the sending job
+
+        :param message: the sent message
         """
         pass
 
