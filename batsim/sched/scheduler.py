@@ -228,7 +228,7 @@ class Scheduler(metaclass=ABCMeta):
         self._sched_delay = float(
             options.get(
                 "sched_delay",
-                None) or 0.00000000000001)
+                None) or 0.000000000000000000001)
 
         self._jobs = Jobs()
         self._resources = Resources()

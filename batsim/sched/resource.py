@@ -44,8 +44,11 @@ class Resource:
         try:
             self._state = Resource.State[(state or "").upper()]
         except KeyError:
-            raise ValueError("Invalid machine state: {}, {}={}"
-                             .format(id, name, state))
+            scheduler.fatal("Invalid machine state: {id}, {name}={state}",
+                            id=id,
+                            name=name,
+                            state=state,
+                            type="invalid_machine_state")
         self._properties = properties
 
         self._allocations = set()
@@ -164,8 +167,10 @@ class Resource:
         if not self._scheduler.has_time_sharing:
             for alloc in self._allocations:
                 if alloc.overlaps_with(allocation):
-                    raise ValueError(
-                        "Overlapping resource allocation while time-sharing is not enabled")
+                    self._scheduler.fatal(
+                        "Overlapping resource allocation while time-sharing is not enabled, {own} overlaps with {other}",
+                        own=alloc,
+                        other=allocation)
         self._allocations.add(allocation)
         self._resources_list.update_element(self)
 
@@ -358,14 +363,16 @@ class Resources(ObserveList):
         # Filter after the resource type
         def filter_free_or_allocated_resources(res):
             for r in res:
-                if r.is_allocated:
-                    if allocated:
-                        yield r
-                elif r.computing:
-                    if computing:
-                        yield r
-                else:
-                    if free:
+                if allocated:
+                    if r.is_allocated:
+                        yield j
+                        continue
+                if computing:
+                    if r.computing:
+                        yield j
+                        continue
+                if free:
+                    if not r.is_allocated and not r.computing:
                         yield r
         filter_objects.append(filter_free_or_allocated_resources)
 
