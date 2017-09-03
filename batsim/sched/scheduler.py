@@ -425,6 +425,13 @@ class Scheduler(metaclass=ABCMeta):
             "Starting scheduling iteration",
             type="scheduling_iteration_started")
 
+        if self.jobs.open:
+            self.debug(
+                "{num_jobs} jobs open at start of scheduling iteration",
+                num_jobs=len(
+                    self.jobs.open),
+                type="jobs_open_at_start")
+
     @abstractmethod
     def schedule(self):
         """The schedule method called during the scheduling phase of the scheduler."""
