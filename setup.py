@@ -7,7 +7,9 @@ from setuptools import setup, find_packages
 requirements = [
     "sortedcontainers",
     "pyzmq",
-    "redis"
+    "redis",
+    "click",
+    "pandas"
 ]
 
 if sys.argv[-1] == 'test':
@@ -39,5 +41,10 @@ setup(
         'Development Status :: 4 - Beta',
         'Programming Language :: Python :: 3',
         'Topic :: System :: Clustering',
-    ]
+    ],
+    entry_points={
+        "console_scripts": [
+            "pybatsim-postprocess-jobs=batsim.tools.postprocess_jobs:main"
+        ]
+    }
 )
