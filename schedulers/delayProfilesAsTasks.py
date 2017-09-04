@@ -56,7 +56,7 @@ class DelayProfilesAsTasks(Scheduler):
         # is runnable and start it.
         for job in self.jobs.static_job.runnable:
             for sj in job.sub_jobs.runnable:
-                start_time, res = self.resources.find_earliest_start_time_and_sufficient_resources_for_job(
+                start_time, res = self.resources.find_with_earliest_start_time(
                     job)
 
                 # If no resources are found this time, it will be tried again at

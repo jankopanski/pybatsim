@@ -295,7 +295,7 @@ class Resources(ObserveList):
             found_resources = []
         return time, self.create(found_resources)
 
-    def find_earliest_start_time_and_sufficient_resources_for_job(
+    def find_with_earliest_start_time(
             self, job, *args, allow_future_allocations=False, **kwargs):
         """Find sufficient resources and the earlierst start time for a given job.
 
@@ -333,7 +333,7 @@ class Resources(ObserveList):
 
         :param kwargs: forwarded to filter the resources
         """
-        return self.find_earliest_start_time_and_sufficient_resources_for_job(
+        return self.find_with_earliest_start_time(
             *args, **kwargs)[1]
 
     def filter(

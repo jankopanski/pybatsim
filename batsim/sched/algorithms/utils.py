@@ -21,7 +21,7 @@ def find_resources_without_delaying_priority_jobs(
     for j in priority_jobs:
         # Allow allocations in the future to find the first fit for all priority
         # jobs which is possible.
-        start_time, res = resources.find_earliest_start_time_and_sufficient_resources_for_job(
+        start_time, res = resources.find_with_earliest_start_time(
             j, allow_future_allocations=True)
         a = Allocation(start_time, j.requested_time, res)
         temporary_allocations.append(a)
