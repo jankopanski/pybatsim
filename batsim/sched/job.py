@@ -545,7 +545,7 @@ class Job:
 
         :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
         """
-        return DynamicJob(*args, **kwargs)
+        return DynamicJobRequest(*args, **kwargs)
 
     def create_sub_job(self, *args, **kwargs):
         """Create a dynamic job as a sub job.
@@ -564,11 +564,11 @@ class Job:
         :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
         """
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
-        return DynamicJob(*args, parent_job=self, **kwargs)
+        return DynamicJobRequest(*args, parent_job=self, **kwargs)
 
 
-class DynamicJob(Job):
-    """A DynamicJob may be used to construct dynamic jobs afterwards submitted to the scheduler.
+class DynamicJobRequest(Job):
+    """A DynamicJobRequest may be used to construct dynamic jobs afterwards submitted to the scheduler.
     It has no related batsim_job since it is not known by Batsim yet. Instead it should be submitted
     and will be bounced back to the scheduler as a job known by Batsim and can be executed in this state.
 
