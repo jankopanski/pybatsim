@@ -130,8 +130,7 @@ class Job:
             self.completed,
             self.scheduled,
             self.killed,
-            self.rejected] \
-            and self._changed_state is None
+            self.rejected]
 
     @property
     def runnable(self):
@@ -162,11 +161,10 @@ class Job:
     @property
     def completed(self):
         """Whether or not this job has been completed."""
-        completed_states = set([
+        return self.state in [
             BatsimJob.State.COMPLETED_KILLED,
             BatsimJob.State.COMPLETED_SUCCESSFULLY,
-            BatsimJob.State.COMPLETED_FAILED])
-        return self._changed_state in completed_states or self._batsim_job.job_state in completed_states
+            BatsimJob.State.COMPLETED_FAILED]
 
     @property
     def scheduled(self):
@@ -205,7 +203,7 @@ class Job:
     @property
     def running(self):
         """Whether or not this job is currently running."""
-        return self._changed_state == BatsimJob.State.RUNNING or (
+        return self.state == BatsimJob.State.RUNNING or (
             not self.open and self.scheduled and not self.completed)
 
     @property
@@ -256,6 +254,8 @@ class Job:
     def state(self):
         """The state of this job as known by Batsim."""
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        if self._changed_state is not None:
+            return self._changed_state
         return self._batsim_job.job_state
 
     @property
@@ -501,7 +501,7 @@ class Job:
         self._start_time = self._scheduler.time
         self._jobs_list.update_element(self)
 
-    def change_state(self, state, kill_reason=""):
+    def change_state(self, state, kill_reason="", return_code=None):
         """Change the state of a job. This is only needed in rare cases where the real job
         should not be executed but instead the state should be set manually.
         """
@@ -509,14 +509,25 @@ class Job:
         self._scheduler._batsim.change_job_state(
             self._batsim_job, state, kill_reason)
         self._changed_state = state
+
+        if state == Job.State.RUNNING:
+            self._start_time = self._scheduler.time
+            self._scheduled = True
+        elif state in [Job.State.COMPLETED_FAILED,
+                       Job.State.COMPLETED_SUCCESSFULLY,
+                       Job.State.COMPLETED_KILLED]:
+            self._batsim_job.finish_time = self._scheduler.time
+            self._batsim_job.kill_reason = kill_reason
+            self._batsim_job.return_code = return_code or 0 if state == Job.State.COMPLETED_SUCCESSFULLY else 1
         self._jobs_list.update_element(self)
 
     def __str__(self):
         return (
-            "<Job {}; sub:{} reqtime:{} res:{} prof:{} fin:{} stat:{} killreason:{} ret:{}>"
+            "<Job {}; sub:{} reqtime:{} res:{} prof:{} start:{} fin:{} stat:{} killreason:{} ret:{}>"
             .format(
                 self.id, self.submit_time, self.requested_time,
                 self.requested_resources, self.profile,
+                self.start_time,
                 self.finish_time, self.state,
                 self.kill_reason,
                 self.return_code))
