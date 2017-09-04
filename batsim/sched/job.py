@@ -543,7 +543,8 @@ class Job:
         :param profile: The profile object (either a `Profile` object or a dictionary containing the
         actual Batsim profile configuration).
 
-        :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
+        :param workload_name: The name of the workload which should be chosen if the profiles should be cached,
+        since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
         """
         return DynamicJobRequest(*args, **kwargs)
 
@@ -561,7 +562,8 @@ class Job:
         :param profile: The profile object (either a `Profile` object or a dictionary containing the
         actual Batsim profile configuration).
 
-        :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
+        :param workload_name: The name of the workload which should be chosen if the profiles should be cached,
+        since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
         """
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return DynamicJobRequest(*args, parent_job=self, **kwargs)
@@ -579,7 +581,8 @@ class DynamicJobRequest(Job):
     :param profile: The profile object (either a `Profile` object or a dictionary containing the
     actual Batsim profile configuration).
 
-    :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
+    :param workload_name: The name of the workload which should be chosen if the profiles should be cached,
+    since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
 
     :param parent_job: the parental job object if this job should be a sub job
     """

@@ -23,6 +23,12 @@ class Message(DictWrapper):
         self.timestamp = timestamp
         super().__init__(message)
 
+    def __str__(self):
+        return (
+            "<Message {}; data:{}>"
+            .format(
+                self.timestamp, super().__str__()))
+
 
 class MessageBuffer(SafeIterList):
     """Buffer for all received messages.

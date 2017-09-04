@@ -8,15 +8,14 @@
 
 from .scheduler import *
 from .job import *
-from .reply import *
 from .resource import *
 from .profiles import *
 from .alloc import *
 
 __all__ = [
-    Scheduler,
-    Job,
-    Profile,
-    Profiles,
-    Allocation
+    Scheduler, as_scheduler,
+    Job, Jobs,
+    Resource, Resources,
+    Profiles, Profile,
+    Allocation,
 ]
