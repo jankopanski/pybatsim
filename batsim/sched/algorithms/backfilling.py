@@ -11,11 +11,14 @@ from .filling import filler_sched
 from . import utils
 
 
-def backfilling_jobs_sjf(scheduler, reservation_depth):
+def backfilling_jobs_sjf(scheduler, reservation_depth, jobs=None):
     """Backfill jobs using the shortest-job-first strategy (relying on the user guesses for the
     requested time).
     """
-    runnable_jobs = scheduler.jobs.runnable
+    if jobs is None:
+        jobs = scheduler.jobs
+
+    runnable_jobs = jobs.runnable
 
     reserved_jobs = runnable_jobs[:reservation_depth]
     remaining_jobs = runnable_jobs[reservation_depth:]
@@ -34,7 +37,11 @@ def backfilling_jobs_sjf(scheduler, reservation_depth):
             job.schedule(res)
 
 
-def backfilling_sched(scheduler, strategy=None, reservation_depth=None):
+def backfilling_sched(
+        scheduler,
+        strategy=None,
+        reservation_depth=None,
+        jobs=None):
     """Backfilling algorithm using the filler scheduler to run the first jobs and
     using a backfilling strategy to backfill low-priority jobs afterwards.
 
@@ -47,14 +54,17 @@ def backfilling_sched(scheduler, strategy=None, reservation_depth=None):
         "backfilling_reservation_depth",
         1)
 
+    if jobs is None:
+        jobs = scheduler.jobs
+
     # Start earlier submitted jobs first until a job doesn't fit.
-    filler_sched(scheduler, abort_on_first_nonfitting=True)
+    filler_sched(scheduler, abort_on_first_nonfitting=True, jobs=jobs)
 
     # Do backfilling if there are still runnable jobs and free resources.
     if scheduler.resources.free and len(
-            scheduler.jobs.runnable) > reservation_depth:
+            jobs.runnable) > reservation_depth:
         if strategy == "sjf":
-            backfilling_jobs_sjf(scheduler, reservation_depth)
+            backfilling_jobs_sjf(scheduler, reservation_depth, jobs=jobs)
         else:
             raise NotImplementedError(
                 "Unimplemented backfilling strategy: {}".format(strategy))

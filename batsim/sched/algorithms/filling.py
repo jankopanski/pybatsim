@@ -7,7 +7,7 @@
 """
 
 
-def filler_sched(scheduler, abort_on_first_nonfitting=False):
+def filler_sched(scheduler, abort_on_first_nonfitting=False, jobs=None):
     """Filler algorithm which will try to schedule all jobs but will reject jobs which will
     never fit into the machine.
 
@@ -19,7 +19,10 @@ def filler_sched(scheduler, abort_on_first_nonfitting=False):
         abort_on_first_nonfitting or scheduler.options.get(
             "filler_sched_abort_on_first_nonfitting", False))
 
-    for job in scheduler.jobs.runnable:
+    if jobs is None:
+        jobs = scheduler.jobs
+
+    for job in jobs.runnable:
         res = scheduler.resources.find_sufficient_resources_for_job(job)
         if res:
             job.schedule(res)
