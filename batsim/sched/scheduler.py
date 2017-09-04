@@ -212,7 +212,7 @@ class Scheduler(metaclass=ABCMeta):
             return "{:.6f};{};{};{};{}".format(
                 self.time, self.level, self.type, self.msg, data)
 
-    def __init__(self, options):
+    def __init__(self, options={}):
         self._options = options
 
         self._init_logger()
