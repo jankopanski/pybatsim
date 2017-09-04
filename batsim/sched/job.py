@@ -63,6 +63,8 @@ class Job:
 
         self._profile = None
 
+        self._comment = None
+
     def __setattr__(self, field, value):
         object.__setattr__(self, field, value)
         try:
@@ -111,6 +113,16 @@ class Job:
     def start_time(self):
         """The starting time of this job."""
         return self._start_time
+
+    @property
+    def comment(self):
+        """The comment will be written to the log file on job completion.
+        This field can be used to write additional data to the out_sched_jobs file."""
+        return self._comment
+
+    @comment.setter
+    def comment(self, value):
+        self._comment = value
 
     @property
     def dependencies(self):
@@ -205,6 +217,18 @@ class Job:
         """Whether or not this job is currently running."""
         return self.state == BatsimJob.State.RUNNING or (
             not self.open and self.scheduled and not self.completed)
+
+    @property
+    def success(self):
+        """Whether this job has successfully finished its execution."""
+        return self.state == BatsimJob.State.COMPLETED_SUCCESSFULLY
+
+    @property
+    def failure(self):
+        """Whether this job has failed its execution."""
+        return self.state in [
+            BatsimJob.State.COMPLETED_KILLED,
+            BatsimJob.State.COMPLETED_FAILED]
 
     @property
     def allocation(self):
@@ -418,6 +442,8 @@ class Job:
         self._scheduler.info(
             "Rejecting job ({job}), reason={reason}",
             job=self, reason=self.rejected_reason, type="job_rejection")
+        self._scheduler._log_job(
+            self._scheduler.time, self, "rejected", reason)
         self._scheduler._batsim.reject_jobs([self._batsim_job])
         del self._scheduler._scheduler._jobmap[self._batsim_job.id]
 
@@ -519,18 +545,20 @@ class Job:
             self._batsim_job.finish_time = self._scheduler.time
             self._batsim_job.kill_reason = kill_reason
             self._batsim_job.return_code = return_code or 0 if state == Job.State.COMPLETED_SUCCESSFULLY else 1
+            self._scheduler._log_job(self._scheduler.time, self, "completed")
         self._jobs_list.update_element(self)
 
     def __str__(self):
         return (
-            "<Job {}; sub:{} reqtime:{} res:{} prof:{} start:{} fin:{} stat:{} killreason:{} ret:{}>"
+            "<Job {}; sub:{} reqtime:{} res:{} prof:{} start:{} fin:{} stat:{} killreason:{} ret:{} comment:{}>"
             .format(
                 self.id, self.submit_time, self.requested_time,
                 self.requested_resources, self.profile,
                 self.start_time,
                 self.finish_time, self.state,
                 self.kill_reason,
-                self.return_code))
+                self.return_code,
+                self.comment))
 
     @classmethod
     def create_dynamic_job(cls, *args, **kwargs):

@@ -14,6 +14,8 @@ class Batsim(object):
 
     DYNAMIC_JOB_PREFIX = "dynamic_job"
     DYNAMIC_PROFILE_PREFIX = "dynamic_profile"
+    WORKLOAD_JOB_SEPARATOR = "!"
+    WORKLOAD_JOB_SEPARATOR_REPLACEMENT = "%"
 
     def __init__(self, scheduler,
                  validatingmachine=None,
@@ -178,16 +180,18 @@ class Batsim(object):
         if workload_name is None:
             workload_name=Batsim.DYNAMIC_JOB_PREFIX
 
-        workload_name = workload_name.replace("!", "%")
+        workload_name = workload_name.replace(Batsim.WORKLOAD_JOB_SEPARATOR, Batsim.WORKLOAD_JOB_SEPARATOR_REPLACEMENT)
 
         job_id = self.dynamic_id_counter.setdefault(workload_name, 0)
         self.dynamic_id_counter[workload_name] += 1
 
-        full_job_id = "{}!{}".format(workload_name, job_id)
+        full_job_id = str(workload_name) + Batsim.WORKLOAD_JOB_SEPARATOR + str(job_id)
 
         if profile_name is None:
-            profile_name = "{}!{}".format(
-                    Batsim.DYNAMIC_PROFILE_PREFIX, full_job_id)
+            profile_name = (
+                    Batsim.DYNAMIC_PROFILE_PREFIX
+                    + Batsim.WORKLOAD_JOB_SEPARATOR
+                    + str(full_job_id))
 
         msg = {
             "timestamp": self.time(),

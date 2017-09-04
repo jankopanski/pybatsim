@@ -83,6 +83,7 @@ class BaseBatsimScheduler(BatsimScheduler):
 
         for job in jobobjs:
             job._do_complete_job()
+            self._scheduler._log_job(self._scheduler.time, job, "killed")
 
         self._scheduler.on_jobs_killed(jobobjs)
         self._scheduler._do_schedule()
@@ -124,6 +125,7 @@ class BaseBatsimScheduler(BatsimScheduler):
 
         self._scheduler.info("Job has completed its execution ({job})",
                              job=jobobj, type="job_completion_received")
+        self._scheduler._log_job(self._scheduler.time, jobobj, "completed")
 
         jobobj._do_complete_job()
 
@@ -282,6 +284,24 @@ class Scheduler(metaclass=ABCMeta):
         handler.setFormatter(formatter)
         self._event_logger.addHandler(handler)
 
+        # Add the logger with information about scheduled jobs.
+        self._sched_jobs_logger = logging.getLogger(
+            self.__class__.__name__ + "SchedJobs")
+        self._sched_jobs_logger.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(message)s')
+
+        filename_sched_jobs = "{}_sched_jobs.csv".format(
+            export_prefix)
+        try:
+            os.remove(filename_sched_jobs)
+        except OSError:
+            pass
+        handler = logging.FileHandler(filename_sched_jobs)
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(formatter)
+        self._sched_jobs_logger.addHandler(handler)
+        self._log_job_header()
+
     @property
     def events(self):
         """The events happened in the scheduler."""
@@ -359,6 +379,64 @@ class Scheduler(metaclass=ABCMeta):
         self.on_event(event)
 
         return str(event)
+
+    def _log_job_header(self):
+        header = [
+            "time",
+            "full_job_id",
+            "workload_name",
+            "job_id",
+            "full_parent_job_id",
+            "parent_workload_name",
+            "parent_job_id",
+            "submission_time",
+            "requested_number_of_processors",
+            "requested_time",
+            "success",
+            "starting_time",
+            "finish_time",
+            "comment",
+            "type",
+            "reason"
+        ]
+        self._sched_jobs_logger.info(";".join([str(i) for i in header]))
+
+    def _log_job(
+            self,
+            time,
+            job,
+            type_of_completion,
+            reason_for_completion=""):
+        full_parent_job_id = ""
+        parent_job_id = ""
+        parent_workload_name = ""
+        if job.parent_job:
+            full_parent_job_id = job.parent_job.id
+            split_parent = full_parent_job_id.split(
+                Batsim.WORKLOAD_JOB_SEPARATOR)
+            parent_workload_name = split_parent[0]
+            parent_job_id = split_parent[1]
+
+        id = job.id.split(Batsim.WORKLOAD_JOB_SEPARATOR)
+        msg = [
+            time,
+            job.id,
+            id[0],
+            id[1],
+            full_parent_job_id,
+            parent_workload_name,
+            parent_job_id,
+            job.submit_time,
+            job.requested_resources,
+            job.requested_time,
+            1 if job.success else 0,
+            job.start_time,
+            job.finish_time,
+            job.comment or "",
+            type_of_completion,
+            reason_for_completion
+        ]
+        self._sched_jobs_logger.info(";".join([str(i) for i in msg]))
 
     def debug(self, msg, **kwargs):
         """Writes a debug message to the logging facility."""
