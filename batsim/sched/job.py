@@ -563,6 +563,7 @@ class Job:
 
         :param workload_name: The name of the workload which should be chosen if the profiles should be cached, since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
         """
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return DynamicJob(*args, parent_job=self, **kwargs)
 
 
@@ -657,6 +658,10 @@ class DynamicJob(Job):
     @property
     def completed(self):
         return False
+
+    @property
+    def open(self):
+        return not self.submitted
 
     @property
     def is_dynamic_submission_request(self):
