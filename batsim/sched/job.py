@@ -273,7 +273,7 @@ class Job:
     @property
     def is_dynamic_job(self):
         """Whether or not this job is a dynamic job."""
-        return self.id.startswith(Batsim.DYNAMIC_JOB_PREFIX + "!")
+        return self.id.startswith(Batsim.DYNAMIC_JOB_PREFIX + ":")
 
     @property
     def dependencies_fulfilled(self):
@@ -697,7 +697,7 @@ class DynamicJob(Job):
             self._requested_time,
             profile,
             self._profile.name,
-            self._workload_name)
+            Batsim.DYNAMIC_JOB_PREFIX + ":" + (self._workload_name or ""))
 
         if self.parent_job:
             self.parent_job._sub_jobs.append(self)
