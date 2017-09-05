@@ -7,11 +7,9 @@
     interact with the basic scheduler to provide a richer interface.
 
 """
-import logging
-import os
 from abc import ABCMeta, abstractmethod
 
-from batsim.batsim import BatsimScheduler
+from batsim.batsim import BatsimScheduler, Batsim
 
 from .resource import Resources, Resource
 from .job import Job, Jobs
@@ -19,6 +17,7 @@ from .reply import ConsumedEnergyReply
 from .utils import DictWrapper
 from .messages import Message
 from .utils import ListView
+from .logging import LoggingEvent, Logger, EventLogger
 
 
 class BaseBatsimScheduler(BatsimScheduler):
@@ -185,39 +184,26 @@ class Scheduler(metaclass=ABCMeta):
 
     """
 
-    class Event:
-        """Class for storing data about events triggered by the scheduler.
-
-        :param time: the simulation time when the event occurred
-
-        :param level: the importance level of the event
-
-        :param msg: the actual message of the event
-
-        :param type: the type of the event (`str`)
-
-        :param data: additional data attached to the event (`dict`)
-        """
-
-        def __init__(self, time, level, msg, type, data):
-            self.time = time
-            self.level = level
-            self.msg = msg
-            self.type = type
-            self.data = data
-
-        def __str__(self):
-            data = ";".join(
-                ["{}={}".format(
-                    str(k).replace(";", ","),
-                    str(v).replace(";", ",")) for k, v in self.data.items()])
-            return "{:.6f};{};{};{};{}".format(
-                self.time, self.level, self.type, self.msg, data)
-
     def __init__(self, options={}):
         self._options = options
+        debug = self.options.get("debug", False)
+        export_prefix = self.options.get("export_prefix", "out")
 
-        self._init_logger()
+        # Create the logger
+        self._logger = Logger(self, debug=debug)
+
+        self._event_logger = EventLogger(
+            self, "Events", debug=debug, to_file="{}_last_events.csv".format(
+                export_prefix),
+            append_to_file="{}_events.csv".format(export_prefix))
+
+        self._sched_jobs_logger = EventLogger(
+            self,
+            "SchedJobs",
+            debug=debug,
+            to_file="{}_sched_jobs.csv".format(export_prefix))
+        self._log_job_header()
+
         self._events = []
 
         # Use the basic Pybatsim scheduler to wrap the Batsim API
@@ -236,71 +222,6 @@ class Scheduler(metaclass=ABCMeta):
         self._resources = Resources()
 
         self.debug("Scheduler initialised", type="scheduler_initialised")
-
-    def _init_logger(self):
-        debug = self.options.get("debug", False)
-        if isinstance(debug, str):
-            debug = debug.lower() in ["y", "yes", "true", "1"]
-
-        self._logger = logging.getLogger(self.__class__.__name__)
-        if debug:
-            self._logger.setLevel(logging.DEBUG)
-        else:
-            self._logger.setLevel(logging.INFO)
-
-        formatter = logging.Formatter(
-            '[%(name)s::%(levelname)s] %(message)s')
-
-        # Add the stream handler (stdout)
-        handler = logging.StreamHandler()
-        handler.setLevel(logging.INFO)
-        handler.setFormatter(formatter)
-        self._logger.addHandler(handler)
-
-        self._event_logger = logging.getLogger(
-            self.__class__.__name__ + "Events")
-        self._event_logger.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(message)s')
-
-        export_prefix = self.options.get("export_prefix", "out")
-
-        # Add the persistent event logging handler (not purged between runs)
-        handler = logging.FileHandler(
-            "{}_events.csv".format(export_prefix))
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        self._event_logger.addHandler(handler)
-
-        # Add the event logging handler for the last run (purged when the next
-        # run starts)
-        filename_lastschedule = "{}_last_events.csv".format(
-            export_prefix)
-        try:
-            os.remove(filename_lastschedule)
-        except OSError:
-            pass
-        handler = logging.FileHandler(filename_lastschedule)
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        self._event_logger.addHandler(handler)
-
-        # Add the logger with information about scheduled jobs.
-        self._sched_jobs_logger = logging.getLogger(
-            self.__class__.__name__ + "SchedJobs")
-        self._sched_jobs_logger.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(message)s')
-
-        filename_sched_jobs = "{}_sched_jobs.csv".format(
-            export_prefix)
-        try:
-            os.remove(filename_sched_jobs)
-        except OSError:
-            pass
-        handler = logging.FileHandler(filename_sched_jobs)
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        self._sched_jobs_logger.addHandler(handler)
-        self._log_job_header()
 
     @property
     def events(self):
@@ -373,7 +294,7 @@ class Scheduler(metaclass=ABCMeta):
     def _format_event_msg(self, level, msg, type="msg", **kwargs):
         msg = msg.format(**kwargs)
 
-        event = Scheduler.Event(self.time, level, msg, type, kwargs)
+        event = LoggingEvent(self.time, level, msg, type, kwargs)
 
         self._events.append(event)
         self.on_event(event)
@@ -436,6 +357,7 @@ class Scheduler(metaclass=ABCMeta):
             type_of_completion,
             reason_for_completion
         ]
+        msg = ["" if s is None else s for s in msg]
         self._sched_jobs_logger.info(";".join([str(i) for i in msg]))
 
     def debug(self, msg, **kwargs):
@@ -627,7 +549,7 @@ class Scheduler(metaclass=ABCMeta):
     def on_event(self, event):
         """Hook called on each event triggered by the scheduler.
 
-        :param event: the triggered event (class: `Scheduler.Event`)
+        :param event: the triggered event (class: `LoggingEvent`)
         """
         pass
 
