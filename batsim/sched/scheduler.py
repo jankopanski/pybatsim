@@ -340,22 +340,22 @@ class Scheduler(metaclass=ABCMeta):
 
         id = job.id.split(Batsim.WORKLOAD_JOB_SEPARATOR)
         msg = [
-            time,
-            job.id,
-            id[0],
-            id[1],
-            full_parent_job_id,
-            parent_workload_name,
-            parent_job_id,
-            job.submit_time,
-            job.requested_resources,
-            job.requested_time,
-            1 if job.success else 0,
-            job.start_time,
-            job.finish_time,
-            job.comment or "",
-            type_of_completion,
-            reason_for_completion
+            time,                       # time
+            job.id,                     # full_job_id
+            id[0],                      # workload_name
+            id[1],                      # job_id
+            full_parent_job_id,         # full_parent_job_id
+            parent_workload_name,       # parent_workload_name
+            parent_job_id,              # parent_job_id
+            job.submit_time,            # submission_time
+            job.requested_resources,    # requested_number_of_processors
+            job.requested_time,         # requested_time
+            1 if job.success else 0,    # success
+            job.start_time,             # starting_time
+            job.finish_time,            # finish_time
+            job.comment or "",          # comment
+            type_of_completion,         # type
+            reason_for_completion       # reason
         ]
         msg = ["" if s is None else s for s in msg]
         self._sched_jobs_logger.info(";".join([str(i) for i in msg]))

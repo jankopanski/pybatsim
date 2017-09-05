@@ -36,20 +36,7 @@ def do_merge_jobs(in_jobs, in_sched_jobs, out_jobs, merge_subjobs=False):
 
     for i1, r1 in in_jobs.iterrows():
         job_id = r1["job_id"]
-        hacky_job_id = r1["hacky_job_id"]
         workload_name = r1["workload_name"]
-        submission_time = r1["submission_time"]
-        requested_number_of_processors = r1["requested_number_of_processors"]
-        requested_time = r1["requested_time"]
-        success = r1["success"]
-        starting_time = r1["starting_time"]
-        execution_time = r1["execution_time"]
-        finish_time = r1["finish_time"]
-        waiting_time = r1["waiting_time"]
-        turnaround_time = r1["turnaround_time"]
-        stretch = r1["stretch"]
-        consumed_energy = r1["consumed_energy"]
-        allocated_processors = r1["allocated_processors"]
 
         sched_job = in_sched_jobs.loc[in_sched_jobs['full_job_id'] == str(
             workload_name) + Batsim.WORKLOAD_JOB_SEPARATOR + str(job_id)].iloc[0]
@@ -70,20 +57,20 @@ def do_merge_jobs(in_jobs, in_sched_jobs, out_jobs, merge_subjobs=False):
 
         add_job(
             job_id,
-            hacky_job_id,
+            r1["hacky_job_id"],
             workload_name,
-            submission_time,
-            requested_number_of_processors,
-            requested_time,
-            success,
-            starting_time,
-            execution_time,
-            finish_time,
-            waiting_time,
-            turnaround_time,
-            stretch,
-            consumed_energy,
-            allocated_processors)
+            r1["submission_time"],
+            r1["requested_number_of_processors"],
+            r1["requested_time"],
+            r1["success"],
+            r1["starting_time"],
+            r1["execution_time"],
+            r1["finish_time"],
+            r1["waiting_time"],
+            r1["turnaround_time"],
+            r1["stretch"],
+            r1["consumed_energy"],
+            r1["allocated_processors"])
 
 
 @postprocess_jobs.command("merge-jobs", help="Merge jobs from the csv file")
