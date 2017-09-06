@@ -10,7 +10,7 @@ Options:
     -p --protect                        Protect the scheduler using a validating machine.
     -s --socket-endpoint=<endpoint>     Batsim socket endpoint to use [default: tcp://*:28000]
     -o --options=<options_string>       A Json string to pass to the scheduler [default: {}]
-    -t --timeout=<timeout>              How long to wait for responses from Batsim [default: 1000]
+    -t --timeout=<timeout>              How long to wait for responses from Batsim [default: 2000]
 '''
 
 import json
@@ -95,7 +95,7 @@ def main():
     else:
         vm = None
 
-    timeout = int(arguments['--timeout'] or 1000)
+    timeout = int(arguments['--timeout'] or 2000)
 
     options = json.loads(arguments['--options'])
 

@@ -16,7 +16,7 @@ class NetworkHandler:
             self,
             socket_endpoint='tcp://*:28000',
             verbose=0,
-            timeout=1000):
+            timeout=2000):
         self.socket_endpoint = socket_endpoint
         self.verbose = verbose
         self.timeout = timeout
@@ -30,8 +30,12 @@ class NetworkHandler:
                   flush=True)
         self.connection.send_string(json.dumps(msg))
 
-    def recv(self):
+    def recv(self, blocking=False):
         assert self.connection, "Connection not open"
+        if blocking or self.timeout is None or self.timeout <=0:
+            self.connection.RCVTIMEO = -1
+        else:
+            self.connection.RCVTIMEO = self.timeout
         try:
             msg = self.connection.recv()
         except zmq.error.Again:
@@ -52,7 +56,6 @@ class NetworkHandler:
             print("[PYBATSIM]: binding to {addr}"
                   .format(addr=self.socket_endpoint), flush=True)
         self.connection.bind(self.socket_endpoint)
-        self.connection.RCVTIMEO = self.timeout
 
     def close(self):
         if self.connection:
@@ -78,6 +81,7 @@ class Batsim(object):
                  network_handler=None,
                  validatingmachine=None,
                  handle_dynamic_notify=True):
+        self.running_simulation = False
         if network_handler is None:
             network_handler = NetworkHandler()
         self.network = network_handler
@@ -328,7 +332,7 @@ class Batsim(object):
     def _read_bat_msg(self):
         msg = None
         while msg is None:
-            msg = self.network.recv()
+            msg = self.network.recv(blocking=not self.running_simulation)
             if msg is None:
                 self.scheduler.onDeadlock()
 
@@ -346,6 +350,7 @@ class Batsim(object):
             event_type = event["type"]
             event_data = event.get("data", {})
             if event_type == "SIMULATION_BEGINS":
+                self.running_simulation = True
                 self.nb_res = event_data["nb_resources"]
                 batconf = event_data["config"]
                 self.time_sharing = event_data["allow_time_sharing"]
@@ -366,6 +371,7 @@ class Batsim(object):
                 self.scheduler.onSimulationBegins()
 
             elif event_type == "SIMULATION_ENDS":
+                self.running_simulation = False
                 print(
                     "[PYBATSIM]: All jobs have been submitted and completed!",
                     flush=True)
