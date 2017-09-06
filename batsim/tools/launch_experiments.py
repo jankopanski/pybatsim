@@ -30,6 +30,12 @@ def prepare_batsim_cl(options):
     if "config-file" in options["batsim"]:
         batsim_cl.append('--config-file=' + options["batsim"]["config-file"])
 
+    if "pfs-host" in options["batsim"]:
+        batsim_cl.append('--pfs-host=' + options["batsim"]["pfs-host"])
+
+    if "hpst-host" in options["batsim"]:
+        batsim_cl.append('--hpst-host=' + options["batsim"]["hpst-host"])
+
     batsim_cl.append('--verbosity')
     batsim_cl.append(options["batsim"]["verbosity"])
 
