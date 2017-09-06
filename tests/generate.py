@@ -1,4 +1,5 @@
 import os
+import os.path
 import json
 import copy
 
@@ -71,7 +72,7 @@ schedulers += [{
 workloads_to_use = ["../../workload_profiles/stupid.json"]
 
 options = [{
-    "batsim_bin": "docker run batsim:dev",
+    "batsim_bin": "tests/run_batsim.sh",
     "platform": "../../platforms/energy_platform_homogeneous_no_net.xml",
     "workload": w,
     "output_dir": "SELF",       # where all output files (stdins, stderrs, csvs...) will be outputed.
@@ -98,4 +99,6 @@ for opt in options:
         print("ALREADY HERE")
         pass
     # print json.dumps(opt, indent=4)
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
     open(new_dir+'/expe.json', 'w').write(json.dumps(opt, indent=4))

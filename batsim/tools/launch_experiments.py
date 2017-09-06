@@ -37,8 +37,7 @@ def prepare_batsim_cl(options):
     if "hpst-host" in options["batsim"]:
         batsim_cl.append('--hpst-host=' + options["batsim"]["hpst-host"])
 
-    batsim_cl.append('--verbosity')
-    batsim_cl.append(options["batsim"]["verbosity"])
+    batsim_cl.append('--verbosity=' + options["batsim"]["verbosity"])
 
     batsim_cl.append('--platform=' + options["platform"])
     batsim_cl.append('--workload=' + options["workload"])
