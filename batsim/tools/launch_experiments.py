@@ -10,6 +10,7 @@ import os
 import os.path
 import sys
 import json
+import time
 
 
 def prepare_batsim_cl(options):
@@ -132,14 +133,22 @@ def launch_expe(options, verbose=True):
     sched_exec = subprocess.Popen(
         sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file)
 
-    print("Wait for the scheduler")
+    while True:
+        if batsim_exec.poll() is not None:
+            break
+        elif sched_exec.poll() is not None:
+            break
+        time.sleep(1)
+
+    if sched_exec.poll() is not None and sched_exec.returncode != 0 and batsim_exec.poll() is None:
+            print("Terminating batsim")
+            batsim_exec.terminate()
+
+    if batsim_exec.poll() is not None and batsim_exec.returncode != 0 and sched_exec.poll() is None:
+            print("Terminating the scheduler")
+            sched_exec.terminate()
+
     sched_exec.wait()
-
-    if sched_exec.returncode >= 1 and batsim_exec.poll() is None:
-        print("Terminating batsim")
-        batsim_exec.terminate()
-
-    print("Wait for batsim")
     batsim_exec.wait()
 
     check_print(tail(batsim_stderr_file.name, 10))
