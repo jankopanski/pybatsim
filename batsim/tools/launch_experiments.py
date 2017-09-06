@@ -85,18 +85,22 @@ def tail(f, n):
     return subprocess.check_output(["tail", "-n", str(n), f]).decode("utf-8")
 
 
-def print_separator():
+def print_separator(header=None):
     try:
         _, columns = subprocess.check_output(["stty", "size"]).split()
         columns = int(columns)
     except Exception:
         columns = None
-    print("".join(["=" for i in range(0, columns or 30)]))
+    line = "".join(["=" for i in range(0, columns or 30)])
+    if header:
+        header = " " + header + " "
+        line = line[:len(line)//2] + header + line[len(header) + len(line)//2:]
+    print(line)
 
 
-def check_print(s):
+def check_print(header, s):
     if s:
-        print_separator()
+        print_separator(header)
         print(s)
 
 
@@ -133,28 +137,39 @@ def launch_expe(options, verbose=True):
     sched_exec = subprocess.Popen(
         sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file)
 
+    print("Simulation is in progress", end="")
+
     while True:
         if batsim_exec.poll() is not None:
             break
         elif sched_exec.poll() is not None:
             break
-        time.sleep(1)
+        time.sleep(0.5)
+        print(".", end="", flush=True)
+    print()
+
+    without_incidents=True
 
     if sched_exec.poll() is not None and sched_exec.returncode != 0 and batsim_exec.poll() is None:
-            print("Terminating batsim")
+            print("Scheduler has died => Terminating batsim")
+            without_incidents = False
             batsim_exec.terminate()
 
     if batsim_exec.poll() is not None and batsim_exec.returncode != 0 and sched_exec.poll() is None:
-            print("Terminating the scheduler")
+            print("Batsim has died => Terminating the scheduler")
+            without_incidents = False
             sched_exec.terminate()
 
     sched_exec.wait()
     batsim_exec.wait()
 
-    check_print(tail(batsim_stderr_file.name, 10))
-    check_print(tail(batsim_stdout_file.name, 10))
-    check_print(tail(sched_stderr_file.name, 10))
-    check_print(tail(sched_stdout_file.name, 10))
+    if without_incidents:
+        print("Simulation has ended")
+
+    check_print("Excerpt of log: Batsim - stdout", tail(batsim_stdout_file.name, 10))
+    check_print("Excerpt of log: Batsim - stderr", tail(batsim_stderr_file.name, 10))
+    check_print("Excerpt of log: Scheduler - stdout", tail(sched_stdout_file.name, 10))
+    check_print("Excerpt of log: Scheduler - stderr", tail(sched_stderr_file.name, 10))
 
     print_separator()
     print("Scheduler return code: " + str(sched_exec.returncode))
