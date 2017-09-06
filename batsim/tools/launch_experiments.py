@@ -129,7 +129,7 @@ def launch_expe(options, verbose=True):
     print("Wait for the scheduler")
     sched_exec.wait()
 
-    if sched_exec.returncode >= 2 and batsim_exec.poll() is None:
+    if sched_exec.returncode >= 1 and batsim_exec.poll() is None:
         print("Terminating batsim")
         batsim_exec.terminate()
 

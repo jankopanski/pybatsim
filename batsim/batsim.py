@@ -106,6 +106,8 @@ class Batsim(object):
         self.nb_jobs_failed = 0
         self.nb_jobs_timeout = 0
 
+        self.jobs_manually_changed = set()
+
         self.has_dynamic_job_submissions = False
 
         self.dynamic_id_counter = {}
@@ -219,6 +221,7 @@ class Batsim(object):
                     "kill_reason": kill_reason
             }
         })
+        self.jobs_manually_changed.add(job)
 
     def kill_jobs(self, jobs):
         """Kill the given jobs."""
