@@ -21,7 +21,7 @@ from datetime import timedelta
 import importlib.util
 import os.path
 
-from batsim.batsim import Batsim, BatsimScheduler
+from batsim.batsim import Batsim, BatsimScheduler, NetworkHandler
 from batsim.sched import as_scheduler
 from batsim.docopt import docopt
 from batsim.validatingmachine import ValidatingMachine
@@ -102,9 +102,8 @@ if __name__ == "__main__":
     scheduler = instanciate_scheduler(scheduler_filename, options=options)
 
     bs = Batsim(scheduler,
-                validatingmachine=vm,
-                socket_endpoint=socket_endpoint,
-                verbose=verbose)
+                NetworkHandler(socket_endpoint, verbose),
+                validatingmachine=vm)
 
     bs.start()
     time_ran = str(timedelta(seconds=time.time() - time_start))

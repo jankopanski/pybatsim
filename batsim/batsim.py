@@ -10,6 +10,53 @@ import redis
 import zmq
 
 
+class NetworkHandler:
+
+    def __init__(self, socket_endpoint='tcp://*:28000', verbose=0):
+        self.socket_endpoint = socket_endpoint
+        self.verbose = verbose
+        self.context = zmq.Context()
+        self.connection = None
+
+    def send(self, msg):
+        assert self.connection, "Connection not open"
+        if self.verbose > 0:
+            print("[PYBATSIM]: SEND_MSG\n {}".format(msg),
+                    flush=True)
+        self.connection.send_string(json.dumps(msg))
+
+    def recv(self):
+        assert self.connection, "Connection not open"
+        msg = json.loads(self.connection.recv().decode('utf-8'))
+
+        if self.verbose > 0:
+            print('[PYBATSIM]: RECEIVED_MSG\n {}'.format(
+                json.dumps(msg, indent=2)), flush=True)
+
+        return msg
+
+    def open(self):
+        assert not self.connection, "Connection already open"
+        self.connection = self.context.socket(zmq.REP)
+
+        if self.verbose > 0:
+            print("[PYBATSIM]: binding to {addr}"
+                    .format(addr=self.socket_endpoint), flush=True)
+        self.connection.bind(self.socket_endpoint)
+
+    def close(self):
+        if self.connection:
+            self.connection.close()
+            self.connection = None
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+
 class Batsim(object):
 
     DYNAMIC_JOB_PREFIX = "dynamic_job"
@@ -18,11 +65,12 @@ class Batsim(object):
     WORKLOAD_JOB_SEPARATOR_REPLACEMENT = "%"
 
     def __init__(self, scheduler,
+                 network_handler=None,
                  validatingmachine=None,
-                 socket_endpoint='tcp://*:28000', verbose=0,
                  handle_dynamic_notify=True):
-        self.socket_endpoint = socket_endpoint
-        self.verbose = verbose
+        if network_handler is None:
+            network_handler = NetworkHandler()
+        self.network = network_handler
         self.handle_dynamic_notify = handle_dynamic_notify
 
         self.jobs = dict()
@@ -33,14 +81,6 @@ class Batsim(object):
             self.scheduler = scheduler
         else:
             self.scheduler = validatingmachine(scheduler)
-
-        # open connection
-        self._context = zmq.Context()
-        self._connection = self._context.socket(zmq.REP)
-        if self.verbose > 0:
-            print("[PYBATSIM]: binding to {addr}"
-                    .format(addr=self.socket_endpoint), flush=True)
-        self._connection.bind(self.socket_endpoint)
 
         # initialize some public attributes
         self.nb_jobs_received = 0
@@ -55,6 +95,8 @@ class Batsim(object):
         self.has_dynamic_job_submissions = False
 
         self.dynamic_id_counter = {}
+
+        self.network.open()
 
         self.scheduler.bs = self
         # import pdb; pdb.set_trace()
@@ -271,11 +313,7 @@ class Batsim(object):
             cont = self.do_next_event()
 
     def _read_bat_msg(self):
-        msg = json.loads(self._connection.recv().decode('utf-8'))
-
-        if self.verbose > 0:
-            print('[PYBATSIM]: BATSIM ---> DECISION\n {}'.format(
-                json.dumps(msg, indent=2)), flush=True)
+        msg = self.network.recv()
 
         self._current_time = msg["now"]
 
@@ -391,13 +429,10 @@ class Batsim(object):
             "now": self._current_time,
             "events": self._events_to_send
         }
-        if self.verbose > 0:
-            print("[PYBATSIM]: BATSIM ---> DECISION\n {}".format(new_msg),
-                    flush=True)
-        self._connection.send_string(json.dumps(new_msg))
+        self.network.send(new_msg)
 
         if finished_received:
-            self._connection.close()
+            self.network.close()
 
         return not finished_received
 
