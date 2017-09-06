@@ -7,6 +7,7 @@
 
 import subprocess
 import os
+import os.path
 import sys
 import json
 
@@ -14,8 +15,11 @@ import json
 def prepare_batsim_cl(options):
     batsim_cl = [options["batsim_bin"]]
 
-    batsim_cl.append('--export')
-    batsim_cl.append(options["output_dir"] + "/" + options["batsim"]["export"])
+    batsim_cl.append(
+        '--export=' +
+        options["output_dir"] +
+        "/" +
+        options["batsim"]["export"])
 
     if options["batsim"]["energy-plugin"]:
         batsim_cl.append('--energy')
@@ -23,19 +27,20 @@ def prepare_batsim_cl(options):
     if options["batsim"]["disable-schedule-tracing"]:
         batsim_cl.append('--disable-schedule-tracing')
 
+    if "config-file" in options["batsim"]:
+        batsim_cl.append('--config-file=' + options["batsim"]["config-file"])
+
     batsim_cl.append('--verbosity')
     batsim_cl.append(options["batsim"]["verbosity"])
 
-    batsim_cl.append('--platform')
-    batsim_cl.append(options["platform"])
-    batsim_cl.append('--workload')
-    batsim_cl.append(options["workload"])
+    batsim_cl.append('--platform=' + options["platform"])
+    batsim_cl.append('--workload=' + options["workload"])
 
     return batsim_cl
 
 
 def prepare_pybatsim_cl(options):
-    interpreter = ["python"]
+    sched_cl = []
     if 'interpreter' in options["scheduler"]:
         if options["scheduler"]["interpreter"] == "coverage":
             interpreter = ["python", "-m", "coverage", "run", "-a"]
@@ -44,18 +49,23 @@ def prepare_pybatsim_cl(options):
         elif options["scheduler"]["interpreter"] == "profile":
             interpreter = ["python", "-m", "cProfile", "-o", "simul.cprof"]
         else:
-            assert False, "Unknwon interpreter"
-
-    sched_cl = interpreter
-    sched_cl.append("launcher.py")
+            assert False, "Unknown interpreter"
+        sched_cl += interpreter
+        sched_cl.append("launcher.py")
+    else:
+        sched_cl.append("pybatsim")
 
     sched_cl.append(options["scheduler"]["name"])
 
-    sched_cl.append(options["workload"])
+    try:
+        sched_options = options["scheduler"]["options"]
+    except KeyError:
+        sched_options = {}
+    sched_options["export_prefix"] = options["output_dir"] + "/" + options["batsim"]["export"]
 
     sched_cl.append("-o")
     # no need to sanitize the json : each args are given as args in popen
-    sched_cl.append(json.dumps(options["scheduler"]["options"]))
+    sched_cl.append(json.dumps(sched_options))
 
     if options["scheduler"]["verbosity"] > 0:
         sched_cl.append('-v')
@@ -64,10 +74,31 @@ def prepare_pybatsim_cl(options):
     return sched_cl
 
 
+def tail(f, n):
+    return subprocess.check_output(["tail", "-n", str(n), f]).decode("utf-8")
+
+
+def print_separator():
+    try:
+        _, columns = subprocess.check_output(["stty", "size"]).split()
+        columns = int(columns)
+    except Exception:
+        columns = None
+    print("".join(["=" for i in range(0, columns or 30)]))
+
+
+def check_print(s):
+    if s:
+        print_separator()
+        print(s)
+
+
 def launch_expe(options, verbose=True):
 
     if options["output_dir"] == "SELF":
         options["output_dir"] = os.path.dirname("./" + options["options_file"])
+    if not os.path.exists(options["output_dir"]):
+        os.makedirs(options["output_dir"])
 
     # use batsim in the PATH if it is not given in option
     if "batsim_bin" not in options:
@@ -86,20 +117,17 @@ def launch_expe(options, verbose=True):
         print(" ".join(batsim_cl + [">", str(batsim_stdout_file.name), "2>",
                                     str(batsim_stderr_file.name)]))
     batsim_exec = subprocess.Popen(
-        batsim_cl, stdout=batsim_stdout_file, stderr=batsim_stderr_file,
-        shell=True)
+        batsim_cl, stdout=batsim_stdout_file, stderr=batsim_stderr_file)
 
     print("Starting scheduler")
     if verbose:
         print(" ".join(sched_cl + [">", str(sched_stdout_file.name), "2>",
                                    str(sched_stderr_file.name)]))
     sched_exec = subprocess.Popen(
-        sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file,
-        shell=True)
+        sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file)
 
     print("Wait for the scheduler")
     sched_exec.wait()
-    print("Scheduler return code: " + str(sched_exec.returncode))
 
     if sched_exec.returncode >= 2 and batsim_exec.poll() is None:
         print("Terminating batsim")
@@ -107,6 +135,14 @@ def launch_expe(options, verbose=True):
 
     print("Wait for batsim")
     batsim_exec.wait()
+
+    check_print(tail(batsim_stderr_file.name, 10))
+    check_print(tail(batsim_stdout_file.name, 10))
+    check_print(tail(sched_stderr_file.name, 10))
+    check_print(tail(sched_stdout_file.name, 10))
+
+    print_separator()
+    print("Scheduler return code: " + str(sched_exec.returncode))
     print("Batsim return code: " + str(batsim_exec.returncode))
 
     return abs(batsim_exec.returncode) + abs(sched_exec.returncode)
