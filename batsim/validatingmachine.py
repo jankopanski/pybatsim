@@ -41,6 +41,9 @@ class ValidatingMachine(BatsimScheduler):
     def onNOP(self):
         self.scheduler.onNOP()
 
+    def onDeadlock(self):
+        self.scheduler.onDeadlock()
+
     def onJobSubmission(self, job):
         self.jobs_waiting.append(job)
         self.scheduler.onJobSubmission(job)

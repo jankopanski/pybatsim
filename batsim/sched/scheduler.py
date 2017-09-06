@@ -57,6 +57,12 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler.on_end()
         self._scheduler._on_post_end()
 
+    def onDeadlock(self):
+        self._scheduler.debug(
+            "batsim has reached a deadlock or is not responding",
+            type="deadlock")
+        self._scheduler.on_deadlock()
+
     def onNOP(self):
         self._scheduler._update_time()
         self._scheduler.debug(
@@ -499,6 +505,9 @@ class Scheduler(metaclass=ABCMeta):
     def on_nop(self):
         """Hook similar to the low-level API."""
         pass
+
+    def on_deadlock(self):
+        raise ValueError("Batsim has reached a deadlock")
 
     def on_jobs_killed(self, jobs):
         """Hook similar to the low-level API.

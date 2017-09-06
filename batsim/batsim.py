@@ -12,9 +12,10 @@ import zmq
 
 class NetworkHandler:
 
-    def __init__(self, socket_endpoint='tcp://*:28000', verbose=0):
+    def __init__(self, socket_endpoint='tcp://*:28000', verbose=0, timeout=1000):
         self.socket_endpoint = socket_endpoint
         self.verbose = verbose
+        self.timeout = timeout
         self.context = zmq.Context()
         self.connection = None
 
@@ -27,7 +28,11 @@ class NetworkHandler:
 
     def recv(self):
         assert self.connection, "Connection not open"
-        msg = json.loads(self.connection.recv().decode('utf-8'))
+        try:
+            msg = self.connection.recv()
+        except zmq.error.Again:
+            return None
+        msg = json.loads(msg.decode('utf-8'))
 
         if self.verbose > 0:
             print('[PYBATSIM]: RECEIVED_MSG\n {}'.format(
@@ -43,6 +48,7 @@ class NetworkHandler:
             print("[PYBATSIM]: binding to {addr}"
                     .format(addr=self.socket_endpoint), flush=True)
         self.connection.bind(self.socket_endpoint)
+        self.connection.RCVTIMEO = self.timeout
 
     def close(self):
         if self.connection:
@@ -313,7 +319,11 @@ class Batsim(object):
             cont = self.do_next_event()
 
     def _read_bat_msg(self):
-        msg = self.network.recv()
+        msg = None
+        while msg is None:
+            msg = self.network.recv()
+            if msg is None:
+                self.scheduler.onDeadlock()
 
         self._current_time = msg["now"]
 
@@ -532,6 +542,9 @@ class BatsimScheduler(object):
 
     def onSimulationEnds(self):
         pass
+
+    def onDeadlock(self):
+        raise ValueError("[PYBATSIM]: Batsim is not responding (maybe deadlocked)")
 
     def onNOP(self):
         raise NotImplementedError()

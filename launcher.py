@@ -11,6 +11,7 @@ Options:
     -p --protect                        Protect the scheduler using a validating machine.
     -s --socket-endpoint=<endpoint>     Batsim socket endpoint to use [default: tcp://*:28000]
     -o --options=<options_string>       A Json string to pass to the scheduler [default: {}]
+    -t --timeout=<timeout>              How long to wait for responses from Batsim [default: 1000]
 '''
 
 import json
@@ -90,6 +91,8 @@ if __name__ == "__main__":
     else:
         vm = None
 
+    timeout = int(arguments['--timeout'] or 1000)
+
     options = json.loads(arguments['--options'])
 
     scheduler_filename = arguments['<scheduler>']
@@ -102,7 +105,7 @@ if __name__ == "__main__":
     scheduler = instanciate_scheduler(scheduler_filename, options=options)
 
     bs = Batsim(scheduler,
-                NetworkHandler(socket_endpoint, verbose),
+                NetworkHandler(socket_endpoint, verbose, timeout),
                 validatingmachine=vm)
 
     bs.start()
