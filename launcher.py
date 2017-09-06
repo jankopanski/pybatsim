@@ -51,17 +51,21 @@ def instanciate_scheduler(name, options):
             print("No such scheduler (module file not found).", flush=True)
             sys.exit(1)
         if my_class not in package.__dict__[my_module].__dict__:
-            print("No such scheduler (class within the module file not found).", flush=True)
+            print(
+                "No such scheduler (class within the module file not found).",
+                flush=True)
             sys.exit(1)
         # load the class
-        scheduler_non_instancied = package.__dict__[my_module].__dict__[my_class]
+        scheduler_non_instancied = package.__dict__[
+            my_module].__dict__[my_class]
 
     # A full file path to the scheduler is expected
     else:
         module_name = os.path.basename(name).split(".")[0]
         my_class = module_to_class(module_name)
 
-        spec = importlib.util.spec_from_file_location("schedulers." + module_name, name)
+        spec = importlib.util.spec_from_file_location(
+            "schedulers." + module_name, name)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
 
@@ -112,12 +116,12 @@ if __name__ == "__main__":
     time_ran = str(timedelta(seconds=time.time() - time_start))
     print("Simulation ran for: " + time_ran, flush=True)
     print("Job received:", bs.nb_jobs_received,
-            ", scheduled:", bs.nb_jobs_scheduled,
-            ", rejected:", bs.nb_jobs_rejected,
-            ", killed:", bs.nb_jobs_killed,
-            ", submitted:", bs.nb_jobs_submitted,
-            ", timeout:", bs.nb_jobs_timeout,
-            ", success:", bs.nb_jobs_completed, flush=True)
+          ", scheduled:", bs.nb_jobs_scheduled,
+          ", rejected:", bs.nb_jobs_rejected,
+          ", killed:", bs.nb_jobs_killed,
+          ", submitted:", bs.nb_jobs_submitted,
+          ", timeout:", bs.nb_jobs_timeout,
+          ", success:", bs.nb_jobs_completed, flush=True)
 
     if bs.nb_jobs_received != bs.nb_jobs_scheduled:
         sys.exit(1)

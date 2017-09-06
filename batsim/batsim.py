@@ -12,7 +12,11 @@ import zmq
 
 class NetworkHandler:
 
-    def __init__(self, socket_endpoint='tcp://*:28000', verbose=0, timeout=1000):
+    def __init__(
+            self,
+            socket_endpoint='tcp://*:28000',
+            verbose=0,
+            timeout=1000):
         self.socket_endpoint = socket_endpoint
         self.verbose = verbose
         self.timeout = timeout
@@ -23,7 +27,7 @@ class NetworkHandler:
         assert self.connection, "Connection not open"
         if self.verbose > 0:
             print("[PYBATSIM]: SEND_MSG\n {}".format(msg),
-                    flush=True)
+                  flush=True)
         self.connection.send_string(json.dumps(msg))
 
     def recv(self):
@@ -46,7 +50,7 @@ class NetworkHandler:
 
         if self.verbose > 0:
             print("[PYBATSIM]: binding to {addr}"
-                    .format(addr=self.socket_endpoint), flush=True)
+                  .format(addr=self.socket_endpoint), flush=True)
         self.connection.bind(self.socket_endpoint)
         self.connection.RCVTIMEO = self.timeout
 
@@ -224,22 +228,25 @@ class Batsim(object):
         })
 
     def submit_job(self, res, walltime, profile, profile_name=None,
-            workload_name=None):
+                   workload_name=None):
         if workload_name is None:
-            workload_name=Batsim.DYNAMIC_JOB_PREFIX
+            workload_name = Batsim.DYNAMIC_JOB_PREFIX
 
-        workload_name = workload_name.replace(Batsim.WORKLOAD_JOB_SEPARATOR, Batsim.WORKLOAD_JOB_SEPARATOR_REPLACEMENT)
+        workload_name = workload_name.replace(
+            Batsim.WORKLOAD_JOB_SEPARATOR,
+            Batsim.WORKLOAD_JOB_SEPARATOR_REPLACEMENT)
 
         job_id = self.dynamic_id_counter.setdefault(workload_name, 0)
         self.dynamic_id_counter[workload_name] += 1
 
-        full_job_id = str(workload_name) + Batsim.WORKLOAD_JOB_SEPARATOR + str(job_id)
+        full_job_id = str(
+            workload_name) + Batsim.WORKLOAD_JOB_SEPARATOR + str(job_id)
 
         if profile_name is None:
             profile_name = (
-                    Batsim.DYNAMIC_PROFILE_PREFIX
-                    + Batsim.WORKLOAD_JOB_SEPARATOR
-                    + str(full_job_id))
+                Batsim.DYNAMIC_PROFILE_PREFIX +
+                Batsim.WORKLOAD_JOB_SEPARATOR +
+                str(full_job_id))
 
         msg = {
             "timestamp": self.time(),
@@ -253,7 +260,7 @@ class Batsim(object):
                         "walltime": walltime,
                         "subtime": self.time(),
                     },
-                    "profile": profile
+                "profile": profile
             }
         }
         self._events_to_send.append(msg)
@@ -359,8 +366,9 @@ class Batsim(object):
                 self.scheduler.onSimulationBegins()
 
             elif event_type == "SIMULATION_ENDS":
-                print("[PYBATSIM]: All jobs have been submitted and completed!",
-                        flush=True)
+                print(
+                    "[PYBATSIM]: All jobs have been submitted and completed!",
+                    flush=True)
                 finished_received = True
                 self.scheduler.onSimulationEnds()
             elif event_type == "JOB_SUBMITTED":
@@ -370,7 +378,8 @@ class Batsim(object):
                 self.scheduler.onJobSubmission(self.jobs[job_id])
                 self.nb_jobs_received += 1
             elif event_type == "JOB_KILLED":
-                self.scheduler.onJobsKilled([self.jobs[jid] for jid in event_data["job_ids"]])
+                self.scheduler.onJobsKilled(
+                    [self.jobs[jid] for jid in event_data["job_ids"]])
                 self.nb_jobs_killed += len(event_data["job_ids"])
             elif event_type == "JOB_COMPLETED":
                 job_id = event_data["job_id"]
@@ -420,11 +429,11 @@ class Batsim(object):
                 raise Exception("Unknow event type {}".format(event_type))
 
         if self.handle_dynamic_notify and not finished_received:
-            if ((self.nb_jobs_completed
-                        + self.nb_jobs_failed
-                        + self.nb_jobs_timeout
-                        + self.nb_jobs_killed) == self.nb_jobs_scheduled
-                    and not self.has_dynamic_job_submissions):
+            if ((self.nb_jobs_completed +
+                 self.nb_jobs_failed +
+                 self.nb_jobs_timeout +
+                 self.nb_jobs_killed) == self.nb_jobs_scheduled and
+                    not self.has_dynamic_job_submissions):
                 self.notify_submission_finished()
             else:
                 self.notify_submission_continue()
@@ -488,7 +497,15 @@ class Job(object):
         COMPLETED_KILLED = 5
         REJECTED = 6
 
-    def __init__(self, id, subtime, walltime, res, profile, json_dict, profile_dict):
+    def __init__(
+            self,
+            id,
+            subtime,
+            walltime,
+            res,
+            profile,
+            json_dict,
+            profile_dict):
         self.id = id
         self.submit_time = subtime
         self.requested_time = walltime
@@ -544,7 +561,8 @@ class BatsimScheduler(object):
         pass
 
     def onDeadlock(self):
-        raise ValueError("[PYBATSIM]: Batsim is not responding (maybe deadlocked)")
+        raise ValueError(
+            "[PYBATSIM]: Batsim is not responding (maybe deadlocked)")
 
     def onNOP(self):
         raise NotImplementedError()
