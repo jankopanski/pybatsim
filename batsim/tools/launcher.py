@@ -23,8 +23,9 @@ import os.path
 
 from batsim.batsim import Batsim, BatsimScheduler, NetworkHandler
 from batsim.sched import as_scheduler
-from batsim.docopt import docopt
 from batsim.validatingmachine import ValidatingMachine
+
+from docopt import docopt
 
 
 def module_to_class(module):

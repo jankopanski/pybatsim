@@ -11,7 +11,8 @@ requirements = [
     "pyzmq",
     "redis",
     "click",
-    "pandas"
+    "pandas",
+    "docopt==0.6.1"
 ]
 
 setup_requirements = [
