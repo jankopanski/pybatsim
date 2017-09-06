@@ -64,6 +64,10 @@ def instanciate_scheduler(name, options):
         module_name = os.path.basename(name).split(".")[0]
         my_class = module_to_class(module_name)
 
+        # Add path to allow relative imports in the scheduler implementation
+        sys.path.append(os.path.abspath(os.path.dirname(name)))
+
+        # Load python file as module schedulers.<file>
         spec = importlib.util.spec_from_file_location(
             "schedulers." + module_name, name)
         mod = importlib.util.module_from_spec(spec)
