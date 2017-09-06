@@ -32,7 +32,7 @@ class NetworkHandler:
 
     def recv(self, blocking=False):
         assert self.connection, "Connection not open"
-        if blocking or self.timeout is None or self.timeout <=0:
+        if blocking or self.timeout is None or self.timeout <= 0:
             self.connection.RCVTIMEO = -1
         else:
             self.connection.RCVTIMEO = self.timeout
