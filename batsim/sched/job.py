@@ -713,7 +713,7 @@ class DynamicJobRequest(Job):
         # allow complex Profile objects.
         profile = self._profile
         if not isinstance(profile, dict):
-            profile = profile(self._scheduler)
+            profile = profile()
 
         parent_job_id = None
         try:

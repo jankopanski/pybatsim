@@ -23,7 +23,7 @@ class Profile(metaclass=ABCMeta):
         self._name = name
 
     @abstractmethod
-    def to_dict(self, scheduler):
+    def to_dict(self):
         """Convert this profile to a dictionary."""
         pass
 
@@ -35,8 +35,8 @@ class Profile(metaclass=ABCMeta):
     def name(self):
         return self._name
 
-    def __call__(self, scheduler):
-        return self.to_dict(scheduler)
+    def __call__(self):
+        return self.to_dict()
 
     def copy(self):
         vals = {k: v for k, v in self.__dict__.items()
@@ -47,7 +47,7 @@ class Profile(metaclass=ABCMeta):
         return (
             "<Profile {}; name:{} data:{}>"
             .format(
-                self.type, self.name, self.to_dict(None)))
+                self.type, self.name, self.to_dict()))
 
 
 class Profiles(metaclass=ABCMeta):
@@ -86,7 +86,7 @@ class Profiles(metaclass=ABCMeta):
             super().__init__(**kwargs)
             self.data = data
 
-        def to_dict(self, scheduler):
+        def to_dict(self):
             return dict(self.data)
 
     class Delay(Profile):
@@ -102,7 +102,7 @@ class Profiles(metaclass=ABCMeta):
         def from_dict(cls, dct, name=None):
             return cls(delay=dct["delay"], name=name)
 
-        def to_dict(self, scheduler):
+        def to_dict(self):
             return {
                 "type": self.type,
                 "delay": self.delay
@@ -126,7 +126,7 @@ class Profiles(metaclass=ABCMeta):
                        com=dct["com"],
                        name=name)
 
-        def to_dict(self, scheduler):
+        def to_dict(self):
             return {
                 "type": self.type,
                 "nb_res": self.nbres,
@@ -150,7 +150,7 @@ class Profiles(metaclass=ABCMeta):
                        com=dct["com"],
                        name=name)
 
-        def to_dict(self, scheduler):
+        def to_dict(self):
             return {
                 "type": self.type,
                 "cpu": self.cpu,
@@ -171,7 +171,7 @@ class Profiles(metaclass=ABCMeta):
             return cls(trace_file=dct["trace_file"],
                        name=name)
 
-        def to_dict(self, scheduler):
+        def to_dict(self):
             return {
                 "type": self.type,
                 "trace": self.trace_file
@@ -193,7 +193,7 @@ class Profiles(metaclass=ABCMeta):
                        repeat=dct.get("nb", 1),
                        name=name)
 
-        def to_dict(self, scheduler):
+        def to_dict(self):
             return {
                 "type": self.type,
                 "nb": self.repeat,
@@ -229,7 +229,7 @@ class Profiles(metaclass=ABCMeta):
                        host=cls.Host[dct["host"]],
                        name=name)
 
-        def to_dict(self, scheduler):
+        def to_dict(self):
             return {
                 "type": self.type,
                 "size": self.size,
@@ -259,7 +259,7 @@ class Profiles(metaclass=ABCMeta):
                        direction=cls.Direction[dct["repeat"]],
                        name=name)
 
-        def to_dict(self, scheduler):
+        def to_dict(self):
             return {
                 "type": self.type,
                 "size": self.size,
@@ -282,7 +282,7 @@ class Profiles(metaclass=ABCMeta):
                        sleeptime=dct.get("sleeptime", None),
                        name=name)
 
-        def to_dict(self, scheduler):
+        def to_dict(self):
             if isinstance(self.msg, dict):
                 msg = self.msg
             else:
@@ -324,7 +324,7 @@ class Profiles(metaclass=ABCMeta):
                        polltime=dct.get("polltime", None),
                        name=name)
 
-        def to_dict(self, scheduler):
+        def to_dict(self):
             dct = {
                 "type": self.type,
                 "regex": self.regex,
