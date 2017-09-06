@@ -17,6 +17,10 @@ sample.expe.json    -> See launch_expe.json
 batsim/
     batsim.py       -> this class helps you communicate with the batsim server
 
+    sched/          -> High level scheduler API
+    
+    tools/          -> Tools to start the schedulers or for working with the generated data
+
 schedulers/         -> contains all the schedulers
                        Schedulers name should follow this convention:
                        fooBar.py contains the FooBar classname which has as an ancestor BatsimScheduler
