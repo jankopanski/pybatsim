@@ -130,6 +130,8 @@ def generate_sched(workloads_basedir, platforms_basedir, options):
         "output_dir": "SELF",
         # if set to "SELF" then output on the same dir as this option file.
         "batsim": {
+            "pfs-host": "lcst_host",
+            "hpst-host": "hpst_host",
             "config-file": "tests/config_noredis_dynamic.json",
             "export": "out",        # The export filename prefix used to generate simulation output
             "energy-plugin": False,  # Enables energy-aware experiments
