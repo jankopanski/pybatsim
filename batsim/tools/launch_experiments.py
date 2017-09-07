@@ -93,7 +93,8 @@ def print_separator(header=None):
     line = "".join(["=" for i in range(0, columns or 30)])
     if header:
         header = " " + header + " "
-        line = line[:len(line)//2] + header + line[len(header) + len(line)//2:]
+        line = line[:len(line) //
+                    2] + header + line[len(header) + len(line) // 2:]
     print(line)
 
 
@@ -147,17 +148,17 @@ def launch_expe(options, verbose=True):
         print(".", end="", flush=True)
     print()
 
-    without_incidents=True
+    without_incidents = True
 
     if sched_exec.poll() is not None and sched_exec.returncode != 0 and batsim_exec.poll() is None:
-            print("Scheduler has died => Terminating batsim")
-            without_incidents = False
-            batsim_exec.terminate()
+        print("Scheduler has died => Terminating batsim")
+        without_incidents = False
+        batsim_exec.terminate()
 
     if batsim_exec.poll() is not None and batsim_exec.returncode != 0 and sched_exec.poll() is None:
-            print("Batsim has died => Terminating the scheduler")
-            without_incidents = False
-            sched_exec.terminate()
+        print("Batsim has died => Terminating the scheduler")
+        without_incidents = False
+        sched_exec.terminate()
 
     sched_exec.wait()
     batsim_exec.wait()
@@ -165,10 +166,14 @@ def launch_expe(options, verbose=True):
     if without_incidents:
         print("Simulation has ended")
 
-    check_print("Excerpt of log: Batsim - stdout", tail(batsim_stdout_file.name, 10))
-    check_print("Excerpt of log: Batsim - stderr", tail(batsim_stderr_file.name, 10))
-    check_print("Excerpt of log: Scheduler - stdout", tail(sched_stdout_file.name, 10))
-    check_print("Excerpt of log: Scheduler - stderr", tail(sched_stderr_file.name, 10))
+    check_print("Excerpt of log: Batsim - stdout",
+                tail(batsim_stdout_file.name, 10))
+    check_print("Excerpt of log: Batsim - stderr",
+                tail(batsim_stderr_file.name, 10))
+    check_print("Excerpt of log: Scheduler - stdout",
+                tail(sched_stdout_file.name, 10))
+    check_print("Excerpt of log: Scheduler - stderr",
+                tail(sched_stderr_file.name, 10))
 
     print_separator()
     print("Scheduler return code: " + str(sched_exec.returncode))

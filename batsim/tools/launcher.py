@@ -128,7 +128,9 @@ def main():
           ", timeout:", bs.nb_jobs_timeout,
           ", success:", bs.nb_jobs_completed, flush=True)
 
-    if bs.nb_jobs_received != (bs.nb_jobs_scheduled + bs.nb_jobs_rejected + len(bs.jobs_manually_changed)):
+    if bs.nb_jobs_received != (
+            bs.nb_jobs_scheduled + bs.nb_jobs_rejected +
+            len(bs.jobs_manually_changed)):
         sys.exit(1)
     sys.exit(0)
 

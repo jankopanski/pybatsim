@@ -312,7 +312,8 @@ class Batsim(object):
             try:
                 profile_dict = event["data"]["profile"]
             except KeyError:
-                raise ValueError("Batsim was started with redis disabled but the profile was not sent to Pybatsim.")
+                raise ValueError(
+                    "Batsim was started with redis disabled but the profile was not sent to Pybatsim.")
             job = Job.from_json_dict(json_dict, profile_dict)
         return job
 
@@ -489,8 +490,8 @@ class DataStorage(object):
         job = Job.from_json_string(job_str)
 
         profile_key = 'profile_{workload_id}!{profile_id}'.format(
-                workload_id=job_id.split(Batsim.WORKLOAD_JOB_SEPARATOR)[0],
-                profile_id=job.profile)
+            workload_id=job_id.split(Batsim.WORKLOAD_JOB_SEPARATOR)[0],
+            profile_id=job.profile)
         profile_str = self.get(profile_key).decode('utf-8')
         job.profile_dict = json.loads(profile_str)
 
