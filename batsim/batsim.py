@@ -309,7 +309,10 @@ class Batsim(object):
             job = self.redis.get_job(event["data"]["job_id"])
         else:
             json_dict = event["data"]["job"]
-            profile_dict = event["data"]["profile"]
+            try:
+                profile_dict = event["data"]["profile"]
+            except KeyError:
+                raise ValueError("Batsim was started with redis disabled but the profile was not sent to Pybatsim.")
             job = Job.from_json_dict(json_dict, profile_dict)
         return job
 
@@ -481,10 +484,17 @@ class DataStorage(object):
         return value
 
     def get_job(self, job_id):
-        key = 'job_{job_id}'.format(job_id=job_id)
-        job_str = self.get(key).decode('utf-8')
+        job_key = 'job_{job_id}'.format(job_id=job_id)
+        job_str = self.get(job_key).decode('utf-8')
+        job = Job.from_json_string(job_str)
 
-        return Job.from_json_string(job_str)
+        profile_key = 'profile_{workload_id}!{profile_id}'.format(
+                workload_id=job_id.split(Batsim.WORKLOAD_JOB_SEPARATOR)[0],
+                profile_id=job.profile)
+        profile_str = self.get(profile_key).decode('utf-8')
+        job.profile_dict = json.loads(profile_str)
+
+        return job
 
     def set_job(self, job_id, subtime, walltime, res):
         real_key = '{iprefix}:{ukey}'.format(iprefix=self.prefix,
@@ -541,7 +551,7 @@ class Job(object):
         return Job.from_json_dict(json_dict)
 
     @staticmethod
-    def from_json_dict(json_dict, profile_dict):
+    def from_json_dict(json_dict, profile_dict=None):
         return Job(json_dict["id"],
                    json_dict["subtime"],
                    json_dict["walltime"],
