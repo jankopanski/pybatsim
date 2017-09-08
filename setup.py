@@ -57,14 +57,24 @@ class DocCommand(UserCommand):
 
     def run(self):
         self.run_external_command("make", "clean", cwd="doc")
-        self.run_external_command("sphinx-apidoc", "-o", "doc/apidoc", "batsim")
-        self.run_external_command("sphinx-apidoc", "-o", "doc/apidoc", "schedulers")
+        self.run_external_command(
+            "sphinx-apidoc", "-o", "doc/apidoc", "batsim")
+        self.run_external_command(
+            "sphinx-apidoc",
+            "-o",
+            "doc/apidoc",
+            "schedulers")
         self.run_external_command("make", "html", cwd="doc")
 
         import webbrowser
-        new = 2 # open in a new tab
+        new = 2  # open in a new tab
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        webbrowser.open("file:///" + os.path.join(dir_path, "doc/_build/html/index.html"), new=new)
+        webbrowser.open(
+            "file:///" +
+            os.path.join(
+                dir_path,
+                "doc/_build/html/index.html"),
+            new=new)
 
 
 class FormatCommand(UserCommand):
