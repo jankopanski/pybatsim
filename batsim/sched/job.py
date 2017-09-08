@@ -304,7 +304,7 @@ class Job:
         """Whether or not all dependencies of this job are fulfilled.
 
         :param jobs: a list of all jobs in the system which is needed to resolve
-        the actual jobs to which the dependencies are referring
+                     the actual jobs to which the dependencies are referring
         """
         for dep in self.resolved_dependencies:
             if not isinstance(dep, Job) or not dep.completed:
@@ -361,8 +361,8 @@ class Job:
         In this case the times of the allocation are not touched as long as the job
         fits in the walltime.
 
-        :param resource: either a single `Resource` a list in the form of a `Resources`
-        object or an `Allocation`
+        :param resource: either a single `Resource` a list in the form of a
+                         `Resources` object or an `Allocation`
         """
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         assert self._allocation is None, "Job has already an allocation"
@@ -568,11 +568,13 @@ class Job:
 
         :param requested_time: the number of requested time (walltime)
 
-        :param profile: The profile object (either a `Profile` object or a dictionary containing the
-        actual Batsim profile configuration).
+        :param profile: The profile object (either a `Profile` object or a
+                        dictionary containing the actual Batsim profile configuration).
 
-        :param workload_name: The name of the workload which should be chosen if the profiles should be cached,
-        since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
+        :param workload_name: The name of the workload which should be chosen if
+                              the profiles should be cached, since profiles are
+                              always related to their workload. If omitted a
+                              dynamically generated name for the workload will be used.
         """
         return DynamicJobRequest(*args, **kwargs)
 
@@ -587,11 +589,13 @@ class Job:
 
         :param requested_time: the number of requested time (walltime)
 
-        :param profile: The profile object (either a `Profile` object or a dictionary containing the
-        actual Batsim profile configuration).
+        :param profile: The profile object (either a `Profile` object or a
+                        dictionary containing the actual Batsim profile configuration).
 
-        :param workload_name: The name of the workload which should be chosen if the profiles should be cached,
-        since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
+        :param workload_name: The name of the workload which should be chosen if
+                              the profiles should be cached, since profiles are
+                              always related to their workload. If omitted a
+                              dynamically generated name for the workload will be used.
         """
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return DynamicJobRequest(*args, parent_job=self, **kwargs)
@@ -606,11 +610,13 @@ class DynamicJobRequest(Job):
 
     :param requested_time: the number of requested time (walltime)
 
-    :param profile: The profile object (either a `Profile` object or a dictionary containing the
-    actual Batsim profile configuration).
+    :param profile: The profile object (either a `Profile` object or a dictionary
+                    containing the actual Batsim profile configuration).
 
-    :param workload_name: The name of the workload which should be chosen if the profiles should be cached,
-    since profiles are always related to their workload. If omitted a dynamically generated name for the workload will be used.
+    :param workload_name: The name of the workload which should be chosen if the
+                          profiles should be cached, since profiles are always
+                          related to their workload. If omitted a dynamically
+                          generated name for the workload will be used.
 
     :param parent_job: the parental job object if this job should be a sub job
     """

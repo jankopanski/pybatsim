@@ -150,8 +150,8 @@ class Allocation:
 
         :param job: the job to be checked whether or not it fits
 
-        :param remaining_time: the time which still remains on this allocation. If not given the
-        actual remaining time is returned.
+        :param remaining_time: the time which still remains on this allocation.
+                               If not given the actual remaining time is returned.
         """
         if remaining_time is None:
             elapsed_time = job._scheduler.time - self.start_time
@@ -250,9 +250,8 @@ class Allocation:
     def free(self):
         """Either free a finished allocation or clear an allocation which was not started yet.
 
-        :param scheduler: The scheduler argument is required when a finished allocation
-        should be freed. It is not required to clear an allocation which was not started
-        yet.
+        :param scheduler: The scheduler argument is required when a finished allocation should be freed.
+                          It is not required to clear an allocation which was not started yet.
         """
         assert not self._previously_allocated, "Allocation is in invalid state"
         if not self._allocated:

@@ -121,6 +121,7 @@ class Resource:
         """Finds the first time after which the requested walltime is available for a job start.
 
         :param requested_walltime: the size of the requested time slot
+
         :param time: the starting time after which a time slot is needed
         """
         if time is None:
@@ -265,8 +266,7 @@ class Resources(ObserveList):
 
         :param requested_walltime: the walltime which should fit in the allocation
 
-        :param time: the earliest allowed start time of the allocation
-        time are allowed
+        :param time: the earliest allowed start time of the allocation time are allowed
 
         :param min_matches: discard resources if less than `min_matches` were found
 
@@ -301,8 +301,8 @@ class Resources(ObserveList):
 
         :param job: the job for which the start times and resources should be found
 
-        :param allow_future_allocations: whether or not allocations starting after the current simulation
-        time are allowed
+        :param allow_future_allocations: whether or not allocations starting after
+                                         the current simulation time are allowed
 
         :param args: forwarded to filter the resources
 
@@ -326,8 +326,8 @@ class Resources(ObserveList):
 
         :param job: the job for which the start times and resources should be found
 
-        :param allow_future_allocations: whether or not allocations starting after the current simulation
-        time are allowed
+        :param allow_future_allocations: whether or not allocations starting after
+                                         the current simulation time are allowed
 
         :param args: forwarded to filter the resources
 

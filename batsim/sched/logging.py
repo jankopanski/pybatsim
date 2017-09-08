@@ -43,7 +43,7 @@ class Logger:
     """Base logger class which handles various cases needed for the loggers.
 
     :param obj: either a string with the name of the logger or an object or a type
-    (in which case the logger will be based on the type).
+                (in which case the logger will be based on the type).
 
     :param logger_suffix: a suffix appended to the generated logger name
 
@@ -54,7 +54,6 @@ class Logger:
     :param to_file: the file to log to if set (will be overwritten each time)
 
     :param append_to_file: the file to log to if set (new lines will be appended)
-
     """
 
     def __init__(

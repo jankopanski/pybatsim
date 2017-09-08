@@ -567,7 +567,7 @@ def as_scheduler(*args, on_init=[], on_end=[], base_classes=[], **kwargs):
     """Decorator to convert a function to a scheduler class.
 
     The function should accept the scheduler as first argument and optionally
-    *args and **kwargs arguments which will be given from additional arguments
+    `*args` and `**kwargs` arguments which will be given from additional arguments
     to the call of the decorator.
 
     :param args: additional arguments passed to the scheduler function (in each iteration)

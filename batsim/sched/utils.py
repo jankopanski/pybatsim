@@ -156,8 +156,9 @@ def filter_list(
 
     :param data: the list to be filtered.
 
-    :param filter: a list of generators through which the entries will be piped. The generators
-    should iterate through the data (first argument) and should `yield` the searched elements.
+    :param filter: a list of generators through which the entries will be piped.
+                   The generators should iterate through the data (first argument)
+                   and should `yield` the searched elements.
 
     :param cond: a function evaluating the entries and returns True or False whether or not the entry should be returned.
 

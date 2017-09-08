@@ -12,7 +12,7 @@ def filler_sched(scheduler, abort_on_first_nonfitting=False, jobs=None):
     never fit into the machine.
 
     :param abort_on_first_nonfitting: whether or not the filling should be aborted on the first
-    job which does not fit (default: `False`)
+                                      job which does not fit (default: `False`)
     """
 
     abort_on_first_nonfitting = (
