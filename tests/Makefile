@@ -20,7 +20,7 @@ testIntervals: generate
 	cd ..; python -m coverage run -a schedulers/intervalContainer.py
 
 %/out_jobs.csv:
-	cd ..; python launch_expe.py tests/$*/expe.json
+	cd ..; python launch_expe.py --verbose tests/$*/expe.json
 
 gantts: $(GANTTS_OUT)
 

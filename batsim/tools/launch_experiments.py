@@ -123,21 +123,32 @@ def launch_expe(options, verbose=True):
     sched_stdout_file = open(options["output_dir"] + "/sched.stdout", "w")
     sched_stderr_file = open(options["output_dir"] + "/sched.stderr", "w")
 
-    print("Starting batsim")
+    print("Starting batsim", end="")
     if verbose:
-        print(" ".join(batsim_cl + [">", str(batsim_stdout_file.name), "2>",
-                                    str(batsim_stderr_file.name)]))
+        print(
+            ":", " ".join(
+                batsim_cl +
+                [">", str(batsim_stdout_file.name),
+                 "2>", str(batsim_stderr_file.name)]))
+    else:
+        print()
+
     batsim_exec = subprocess.Popen(
         batsim_cl, stdout=batsim_stdout_file, stderr=batsim_stderr_file)
 
-    print("Starting scheduler")
+    print("Starting scheduler", end="")
     if verbose:
-        print(" ".join(sched_cl + [">", str(sched_stdout_file.name), "2>",
-                                   str(sched_stderr_file.name)]))
+        print(":", " ".join(sched_cl + [">", str(sched_stdout_file.name), "2>",
+                                        str(sched_stderr_file.name)]))
+    else:
+        print()
+
     sched_exec = subprocess.Popen(
         sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file)
 
     print("Simulation is in progress", end="")
+    if not verbose:
+        print()
 
     while True:
         if batsim_exec.poll() is not None:
@@ -145,8 +156,10 @@ def launch_expe(options, verbose=True):
         elif sched_exec.poll() is not None:
             break
         time.sleep(0.5)
-        print(".", end="", flush=True)
-    print()
+        if verbose:
+            print(".", end="", flush=True)
+    if verbose:
+        print()
 
     without_incidents = True
 
@@ -166,35 +179,47 @@ def launch_expe(options, verbose=True):
     if without_incidents:
         print("Simulation has ended")
 
-    check_print("Excerpt of log: Batsim - stdout",
-                tail(batsim_stdout_file.name, 10))
-    check_print("Excerpt of log: Batsim - stderr",
-                tail(batsim_stderr_file.name, 10))
-    check_print("Excerpt of log: Scheduler - stdout",
-                tail(sched_stdout_file.name, 10))
-    check_print("Excerpt of log: Scheduler - stderr",
-                tail(sched_stderr_file.name, 10))
-
-    print_separator()
+    if verbose:
+        check_print("Excerpt of log: Batsim - stdout",
+                    tail(batsim_stdout_file.name, 10))
+        check_print("Excerpt of log: Batsim - stderr",
+                    tail(batsim_stderr_file.name, 10))
+        check_print("Excerpt of log: Scheduler - stdout",
+                    tail(sched_stdout_file.name, 10))
+        check_print("Excerpt of log: Scheduler - stderr",
+                    tail(sched_stderr_file.name, 10))
+        print_separator()
     print("Scheduler return code: " + str(sched_exec.returncode))
     print("Batsim return code: " + str(batsim_exec.returncode))
 
     return abs(batsim_exec.returncode) + abs(sched_exec.returncode)
 
 
-def main():
-    if len(sys.argv) != 2:
-        print("usage: launch_expe.py path/to/file.json")
-        exit()
+def usage():
+    print("usage: [--verbose] launch_expe.py path/to/file.json")
+    return 1
 
-    options_file = sys.argv[1]
+
+def main():
+    verbose = False
+    options_file = None
+
+    for arg in sys.argv[1:]:
+        if arg == "--verbose":
+            verbose = True
+        elif not arg.startswith("-"):
+            if options_file is not None:
+                return usage()
+            options_file = arg
+        else:
+            return usage()
 
     options = json.loads(open(options_file).read())
 
     options["options_file"] = options_file
 
-    exit(launch_expe(options, verbose=True))
+    return launch_expe(options, verbose=verbose)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

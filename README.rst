@@ -47,7 +47,7 @@ Run an experiment
   
 To run a complete experiment the experiment launcher can be used::
 
-  pybatsim-experiment sample.expe.json
+  pybatsim-experiment --verbose sample.expe.json
   
 Please note that Batsim has to be installed and the environment has to be set-up for this command to succeed.
 
