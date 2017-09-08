@@ -13,6 +13,21 @@ The library consists of two layers:
    to provide a simpler API for accessing data from Batsim and filtering for
    jobs and resources (example scheduler: `schedulers/delayProfilesAsTasks.py`).
 
+Commands
+--------
+
+The following commands are provided:
+
+*pybatsim*
+    To launch schedulers
+
+*pybatsim-experiment*
+    To launch experiments
+
+*pybatsim-postprocess-jobs*
+    To manipulate the `out_jobs.csv` file based on data only available in the
+    scheduler but not in Batsim.
+
 Examples
 --------
 
