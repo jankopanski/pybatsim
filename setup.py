@@ -50,6 +50,23 @@ class TestCommand(UserCommand):
         self.run_external_command("make", cwd="tests")
 
 
+class DocCommand(UserCommand):
+
+    description = 'Generate documentation'
+    user_options = []
+
+    def run(self):
+        self.run_external_command("make", "clean", cwd="doc")
+        self.run_external_command("sphinx-apidoc", "-o", "doc/apidoc", "batsim")
+        self.run_external_command("sphinx-apidoc", "-o", "doc/apidoc", "schedulers")
+        self.run_external_command("make", "html", cwd="doc")
+
+        import webbrowser
+        new = 2 # open in a new tab
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        webbrowser.open("file:///" + os.path.join(dir_path, "doc/_build/html/index.html"), new=new)
+
+
 class FormatCommand(UserCommand):
 
     description = 'Format the source code'
@@ -105,6 +122,7 @@ setup(
     },
     cmdclass={
         'test': TestCommand,
-        'format': FormatCommand
+        'format': FormatCommand,
+        'doc': DocCommand,
     },
 )
