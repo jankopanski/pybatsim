@@ -7,6 +7,11 @@ GANTTS_OUT := $(patsubst %,%/gantt.png,$(EXPE_FOLDERS))
 all: simuls
 
 simuls: testIntervals $(SIMULS_OUT) coverage_html
+	@if [ "$(SIMULS_OUT)" == "" ]; then \
+		echo; \
+		echo "All experiments were generated."; \
+		echo " -> You may have to run the command again to run the experiments."; \
+	fi
 
 coverage_html: ../.coverage
 	cd ..; coverage html -d tests/coverage_html
