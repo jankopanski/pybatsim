@@ -312,8 +312,7 @@ class Batsim(object):
             try:
                 profile_dict = event["data"]["profile"]
             except KeyError:
-                raise ValueError(
-                    "Batsim was started with redis disabled but the profile was not sent to Pybatsim.")
+                profile_dict = {}
             job = Job.from_json_dict(json_dict, profile_dict)
         return job
 
