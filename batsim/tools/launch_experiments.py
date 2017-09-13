@@ -13,6 +13,42 @@ import json
 import time
 
 
+def is_executable(file):
+    return os.access(file, os.X_OK)
+
+
+def run_workload_script(options):
+    script = options["workload_script"]["path"]
+    interpreter = options["workload_script"].get("interpreter", None)
+    args = [str(s) for s in options["workload_script"].get("args", [])]
+
+    def do_run_script(cmds):
+        out_workload_file_path = os.path.join(
+            options["output_dir"], "workload.json")
+        with open(out_workload_file_path, "w") as f:
+            script_exec = subprocess.Popen(cmds, stdout=f)
+            ret = script_exec.wait()
+            if ret != 0:
+                raise ValueError(
+                    "Workload script {} failed with return code {}".format(
+                        script, ret))
+        return out_workload_file_path
+
+    if not os.path.exists(script):
+        raise ValueError("Workload script {} does not exist".format(script))
+
+    if interpreter:
+        return do_run_script([interpreter, script] + args)
+    else:
+        if is_executable(script):
+            return do_run_script(["./" + script] + args)
+        elif script.endswith(".py"):
+            return do_run_script(["python", script] + args)
+        else:
+            raise ValueError(
+                "Workload script {} is not executable but also does not seem to be a python script.".format(script))
+
+
 def prepare_batsim_cl(options):
     batsim_cl = [options["batsim_bin"]]
 
@@ -40,7 +76,18 @@ def prepare_batsim_cl(options):
     batsim_cl.append('--verbosity=' + options["batsim"]["verbosity"])
 
     batsim_cl.append('--platform=' + options["platform"])
-    batsim_cl.append('--workload=' + options["workload"])
+
+    workload = None
+    if "workload_script" in options:
+        workload = run_workload_script(options)
+    else:
+        try:
+            workload = options["workload"]
+        except KeyError:
+            pass
+
+    if workload:
+        batsim_cl.append('--workload=' + workload)
 
     return batsim_cl
 
