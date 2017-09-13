@@ -72,8 +72,6 @@ class NetworkHandler:
 
 class Batsim(object):
 
-    DYNAMIC_JOB_PREFIX = "dynamic_job"
-    DYNAMIC_PROFILE_PREFIX = "dynamic_profile"
     WORKLOAD_JOB_SEPARATOR = "!"
     WORKLOAD_JOB_SEPARATOR_REPLACEMENT = "%"
 
@@ -111,8 +109,6 @@ class Batsim(object):
         self.jobs_manually_changed = set()
 
         self.has_dynamic_job_submissions = False
-
-        self.dynamic_id_counter = {}
 
         self.network.open()
 
@@ -237,42 +233,42 @@ class Batsim(object):
             }
         })
 
-    def submit_job(self, res, walltime, profile, profile_name=None,
-                   workload_name=None):
-        if workload_name is None:
-            workload_name = Batsim.DYNAMIC_JOB_PREFIX
 
-        workload_name = workload_name.replace(
-            Batsim.WORKLOAD_JOB_SEPARATOR,
-            Batsim.WORKLOAD_JOB_SEPARATOR_REPLACEMENT)
+    def submit_job(
+            self,
+            id,
+            res,
+            walltime,
+            profile_name,
+            workload_name,
+            subtime=None,
+            profile=None):
+        assert Batsim.WORKLOAD_JOB_SEPARATOR not in workload_name
+        assert isinstance(id, int)
+        assert isinstance(workload_name, str)
 
-        job_id = self.dynamic_id_counter.setdefault(workload_name, 0)
-        self.dynamic_id_counter[workload_name] += 1
+        full_job_id = workload_name + Batsim.WORKLOAD_JOB_SEPARATOR + str(id)
 
-        full_job_id = str(
-            workload_name) + Batsim.WORKLOAD_JOB_SEPARATOR + str(job_id)
-
-        if profile_name is None:
-            profile_name = (
-                Batsim.DYNAMIC_PROFILE_PREFIX +
-                Batsim.WORKLOAD_JOB_SEPARATOR +
-                str(full_job_id))
+        if subtime is None:
+            subtime = self.time()
 
         msg = {
             "timestamp": self.time(),
             "type": "SUBMIT_JOB",
             "data": {
-                    "job_id": full_job_id,
-                    "job": {
-                        "profile": profile_name,
-                        "id": job_id,
-                        "res": res,
-                        "walltime": walltime,
-                        "subtime": self.time(),
-                    },
-                "profile": profile
+                "job_id": full_job_id,
+                "job": {
+                    "profile": profile_name,
+                    "id": id,
+                    "res": res,
+                    "walltime": walltime,
+                    "subtime": subtime,
+                },
             }
         }
+        if profile:
+            msg["data"]["profile"] = profile
+
         self._events_to_send.append(msg)
         self.nb_jobs_submitted += 1
         self.has_dynamic_job_submissions = True
