@@ -29,24 +29,21 @@ class BaseBatsimScheduler(BatsimScheduler):
     """
 
     def __init__(self, scheduler, options):
+        super().__init__(options)
+
         self._scheduler = scheduler
-        self._options = options
 
         self._jobmap = {}
-
-    def onAfterBatsimInit(self):
-        self._scheduler.debug(
-            "decision process is executing after batsim init", type="on_init")
-        self._scheduler._batsim = self.bs
-        self._scheduler._update_time()
-        self._scheduler._on_pre_init()
-        self._scheduler.on_init()
-        self._scheduler._on_post_init()
 
     def onSimulationBegins(self):
         self._scheduler.info(
             "Simulation begins",
             type="simulation_begins_received")
+        self._scheduler._batsim = self.bs
+        self._scheduler._update_time()
+        self._scheduler._on_pre_init()
+        self._scheduler.on_init()
+        self._scheduler._on_post_init()
 
     def onSimulationEnds(self):
         self._scheduler._update_time()

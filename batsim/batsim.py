@@ -106,6 +106,8 @@ class Batsim(object):
         self.nb_jobs_failed = 0
         self.nb_jobs_timeout = 0
 
+        self.initialized = False
+
         self.jobs_manually_changed = set()
 
         self.has_dynamic_job_submissions = False
@@ -120,6 +122,7 @@ class Batsim(object):
         self._read_bat_msg()
 
         self.scheduler.onAfterBatsimInit()
+        self.initialized = True
 
     def time(self):
         return self._current_time
@@ -445,7 +448,7 @@ class Batsim(object):
                  self.nb_jobs_failed +
                  self.nb_jobs_timeout +
                  self.nb_jobs_killed) == self.nb_jobs_scheduled and
-                    not self.has_dynamic_job_submissions):
+                    not self.has_dynamic_job_submissions) and self.initialized:
                 self.notify_submission_finished()
             else:
                 self.notify_submission_continue()

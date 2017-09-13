@@ -18,6 +18,9 @@ class ValidatingMachine(BatsimScheduler):
         self.scheduler = scheduler
 
     def onAfterBatsimInit(self):
+        self.scheduler.onAfterBatsimInit()
+
+    def onSimulationBegins(self):
         self.nb_res = self.bs.nb_res
         self.availableResources = SortedSet(range(self.nb_res))
         self.jobs_waiting = []
@@ -30,9 +33,6 @@ class ValidatingMachine(BatsimScheduler):
         self.bs.start_jobs = self.start_jobs
 
         self.scheduler.bs = self.bs
-        self.scheduler.onAfterBatsimInit()
-
-    def onSimulationBegins(self):
         self.scheduler.onSimulationBegins()
 
     def onSimulationEnds(self):
