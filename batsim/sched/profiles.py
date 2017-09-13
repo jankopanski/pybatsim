@@ -457,3 +457,80 @@ class Profiles(metaclass=ABCMeta):
                 self.on_failure = map.get(self.on_failure, self.on_failure)
             if self.on_timeout is not None:
                 self.on_timeout = map.get(self.on_timeout, self.on_timeout)
+
+        @classmethod
+        def if_recv(
+                cls,
+                regex,
+                on_success=None,
+                on_failure=None,
+                on_timeout=None,
+                polltime=None,
+                **kwargs):
+            """Returns a `Profiles.Receive` instance generated from the profile
+            generator functions.
+
+            :param regex: the regex used in the receive
+
+            :param on_success: the function which will be converted to a profile
+                               for the on_success handler
+
+            :param on_failure: the function which will be converted to a profile
+                               for the on_failure handler
+
+            :param on_timeout: the function which will be converted to a profile
+                               for the on_timeout handler
+
+            :param kwargs: additional arguments forwarded to the `Receive` profile.
+            """
+            on_success_profile = Profiles.profile_from_generator(
+                on_success) if on_success else None
+            on_failure_profile = Profiles.profile_from_generator(
+                on_failure) if on_failure else None
+            on_timeout_profile = Profiles.profile_from_generator(
+                on_timeout) if on_timeout else None
+            return cls(regex,
+                       on_success_profile,
+                       on_failure_profile,
+                       on_timeout_profile,
+                       polltime,
+                       **kwargs)
+
+    @classmethod
+    def profile_from_generator(cls, func, *args, **kwargs):
+        """Constructs a profile based on executing a generator function.
+
+        The generator should yield `Profile` objects. If more than one profile is
+        yielded a `Profiles.Sequence` profile is constructed, otherwise the profile
+        is directly used. The generator may also yield lists of profiles.
+
+        :param func: the generation which should yield profiles
+
+        :param args: arguments forwarded to the call of `func`
+
+        :param kwargs: arguments forwarded to the call of `func`
+
+        """
+        profiles = []
+        func_iter = iter(func(*args, **kwargs))
+        to_process = []
+        while True:
+            if not to_process:
+                try:
+                    to_process.append(next(func_iter))
+                except StopIteration:
+                    break
+            p = to_process.pop(0)
+            if isinstance(p, list):
+                profiles += p
+            elif isinstance(p, Profile):
+                profiles.append(p)
+            else:
+                raise ValueError("Unknown profile element: {}".format(p))
+
+        if len(profiles) > 1:
+            return Profiles.Sequence(profiles)
+        elif len(profiles) == 1:
+            return profiles[0]
+        else:
+            raise ValueError("Profile sequence contains no elements")
