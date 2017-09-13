@@ -131,6 +131,12 @@ def tail(f, n):
     return subprocess.check_output(["tail", "-n", str(n), f]).decode("utf-8")
 
 
+def truncate_string(s, len_s=45):
+    if len(s) > len_s:
+        return "..." + s[len(s) - len_s:]
+    return s
+
+
 def print_separator(header=None):
     try:
         _, columns = subprocess.check_output(["stty", "size"]).split()
@@ -170,32 +176,26 @@ def launch_expe(options, verbose=True):
     sched_stdout_file = open(options["output_dir"] + "/sched.stdout", "w")
     sched_stderr_file = open(options["output_dir"] + "/sched.stderr", "w")
 
-    print("Starting batsim", end="")
     if verbose:
-        print(
-            ":", " ".join(
-                batsim_cl +
-                [">", str(batsim_stdout_file.name),
-                 "2>", str(batsim_stderr_file.name)]))
-    else:
-        print()
+        print("Starting batsim:", end="")
+        print(" ".join(
+            batsim_cl +
+            [">", str(batsim_stdout_file.name),
+             "2>", str(batsim_stderr_file.name)]))
 
     batsim_exec = subprocess.Popen(
         batsim_cl, stdout=batsim_stdout_file, stderr=batsim_stderr_file)
 
-    print("Starting scheduler", end="")
     if verbose:
-        print(":", " ".join(sched_cl + [">", str(sched_stdout_file.name), "2>",
-                                        str(sched_stderr_file.name)]))
-    else:
-        print()
+        print("Starting scheduler:", end="")
+        print(" ".join(sched_cl + [">", str(sched_stdout_file.name), "2>",
+                                   str(sched_stderr_file.name)]))
 
     sched_exec = subprocess.Popen(
         sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file)
 
-    print("Simulation is in progress", end="")
-    if not verbose:
-        print()
+    if verbose:
+        print("Simulation is in progress", end="")
 
     while True:
         if batsim_exec.poll() is not None:
@@ -208,38 +208,56 @@ def launch_expe(options, verbose=True):
     if verbose:
         print()
 
-    without_incidents = True
-
     if sched_exec.poll() is not None and sched_exec.returncode != 0 and batsim_exec.poll() is None:
         print("Scheduler has died => Terminating batsim")
-        without_incidents = False
         batsim_exec.terminate()
 
     if batsim_exec.poll() is not None and batsim_exec.returncode != 0 and sched_exec.poll() is None:
         print("Batsim has died => Terminating the scheduler")
-        without_incidents = False
         sched_exec.terminate()
 
     sched_exec.wait()
     batsim_exec.wait()
 
-    if without_incidents:
+    ret_code = abs(batsim_exec.returncode) + abs(sched_exec.returncode)
+
+    if verbose or ret_code != 0:
         print("Simulation has ended")
 
-    if verbose:
-        check_print("Excerpt of log: Batsim - stdout",
-                    tail(batsim_stdout_file.name, 10))
-        check_print("Excerpt of log: Batsim - stderr",
-                    tail(batsim_stderr_file.name, 10))
-        check_print("Excerpt of log: Scheduler - stdout",
-                    tail(sched_stdout_file.name, 10))
-        check_print("Excerpt of log: Scheduler - stderr",
-                    tail(sched_stderr_file.name, 10))
+        check_print(
+            "Excerpt of log: " +
+            truncate_string(
+                batsim_stdout_file.name),
+            tail(
+                batsim_stdout_file.name,
+                10))
+        check_print(
+            "Excerpt of log: " +
+            truncate_string(
+                batsim_stderr_file.name),
+            tail(
+                batsim_stderr_file.name,
+                10))
+        check_print(
+            "Excerpt of log: " +
+            truncate_string(
+                sched_stdout_file.name),
+            tail(
+                sched_stdout_file.name,
+                10))
+        check_print(
+            "Excerpt of log: " +
+            truncate_string(
+                sched_stderr_file.name),
+            tail(
+                sched_stderr_file.name,
+                10))
         print_separator()
-    print("Scheduler return code: " + str(sched_exec.returncode))
-    print("Batsim return code: " + str(batsim_exec.returncode))
 
-    return abs(batsim_exec.returncode) + abs(sched_exec.returncode)
+        print("Scheduler return code: " + str(sched_exec.returncode))
+        print("Batsim return code: " + str(batsim_exec.returncode))
+
+    return ret_code
 
 
 def usage():
@@ -264,6 +282,8 @@ def main():
     options = json.loads(open(options_file).read())
 
     options["options_file"] = options_file
+
+    print("Running experiment: {}".format(options_file))
 
     return launch_expe(options, verbose=verbose)
 
