@@ -86,7 +86,7 @@ def generate_energy(workloads_basedir, platforms_basedir, options):
     } for s in schedulers for w in workloads_to_use]
 
 
-def generate_sched(workloads_basedir, platforms_basedir, options):
+def generate_sched_static(workloads_basedir, platforms_basedir, options):
     schedulers = []
 
     schedulers += [
@@ -144,10 +144,107 @@ def generate_sched(workloads_basedir, platforms_basedir, options):
     } for s in schedulers for w in workloads_to_use]
 
 
+def generate_sched_script(workloads_basedir, platforms_basedir, options):
+    schedulers = []
+
+    schedulers += [
+        {
+            "name_expe": "sched_fillerSched",
+            "name": "fillerSched2",
+            "verbosity": 0,
+            "protection": True,
+            "interpreter": "coverage",
+            "options": {
+            }
+        },
+        {
+            "name_expe": "sched_backfilling",
+            "name": "easyBackfill2",
+            "verbosity": 0,
+            "protection": True,
+            "interpreter": "coverage",
+            "options": {
+            }
+        },
+    ]
+
+    options += [{
+        "batsim_bin": "tests/run_batsim.sh",
+        "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
+        "workload_script": {
+            "path": "tests/workloads/generated_workload.py",
+        },
+        # where all output files (stdins, stderrs, csvs...) will be outputed.
+        "output_dir": "SELF",
+        # if set to "SELF" then output on the same dir as this option file.
+        "batsim": {
+            "pfs-host": "lcst_host",
+            "hpst-host": "hpst_host",
+            "config-file": "tests/config_noredis_dynamic.json",
+            "export": "out",        # The export filename prefix used to generate simulation output
+            "energy-plugin": False,  # Enables energy-aware experiments
+            "disable-schedule-tracing": True,  # remove paje output
+            "verbosity": "information"  # Sets the Batsim verbosity level. Available values
+                                        # are : quiet, network-only,
+                                        # information (default), debug.
+        },
+        "scheduler": copy.deepcopy(s)
+    } for s in schedulers]
+
+
+def generate_sched_dynamic(workloads_basedir, platforms_basedir, options):
+    schedulers = []
+
+    schedulers += [
+        {
+            "name_expe": "sched_dynamic",
+            "name": "tests/schedulers/dynamicTestScheduler.py",
+            "verbosity": 0,
+            "protection": True,
+            "interpreter": "coverage",
+            "options": {
+            }
+        },
+    ]
+
+    options += [{
+        "batsim_bin": "tests/run_batsim.sh",
+        "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
+        # where all output files (stdins, stderrs, csvs...) will be outputed.
+        "output_dir": "SELF",
+        # if set to "SELF" then output on the same dir as this option file.
+        "batsim": {
+            "pfs-host": "lcst_host",
+            "hpst-host": "hpst_host",
+            "config-file": "tests/config_noredis_dynamic.json",
+            "export": "out",        # The export filename prefix used to generate simulation output
+            "energy-plugin": False,  # Enables energy-aware experiments
+            "disable-schedule-tracing": True,  # remove paje output
+            "verbosity": "information"  # Sets the Batsim verbosity level. Available values
+                                        # are : quiet, network-only,
+                                        # information (default), debug.
+        },
+        "scheduler": copy.deepcopy(s)
+    } for s in schedulers]
+
+
+def generate_sched(workloads_basedir, platforms_basedir, options):
+    generate_sched_static(workloads_basedir, platforms_basedir, options)
+    generate_sched_script(workloads_basedir, platforms_basedir, options)
+    generate_sched_dynamic(workloads_basedir, platforms_basedir, options)
+
+
 def do_generate(options):
     for opt in options:
+        try:
+            workload_name = opt["workload"]
+        except KeyError:
+            try:
+                workload_name = opt["workload_script"]["path"]
+            except KeyError:
+                workload_name = ""
         opt["scheduler"]["name_expe"] += "_" + os.path.splitext(
-            os.path.basename(opt["workload"]))[0]
+            os.path.basename(workload_name))[0]
 
         new_dir = "tests/" + opt["scheduler"]["name_expe"]
         try:

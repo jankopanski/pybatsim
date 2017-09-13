@@ -245,6 +245,11 @@ class Scheduler(metaclass=ABCMeta):
         return ListView(self._events)
 
     @property
+    def dynamic_workload(self):
+        """The workload of dynamic job submissions of this scheduler."""
+        return self._dynamic_workload
+
+    @property
     def hpst(self):
         """The hpst (high-performance storage tier) host managed by Batsim."""
         return self._hpst

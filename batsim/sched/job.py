@@ -11,7 +11,8 @@ from batsim.batsim import Job as BatsimJob, Batsim
 from .utils import ObserveList, filter_list, ListView
 from .alloc import Allocation
 from .messages import MessageBuffer
-from .profiles import Profiles
+from .profiles import Profiles, Profile
+from .workloads import WorkloadDescription
 
 
 class Job:
@@ -52,8 +53,6 @@ class Job:
         self._rejected = False
         self._rejected_reason = None
 
-        self._sub_jobs = []
-
         self._own_dependencies = []
 
         self._allocation = None
@@ -64,6 +63,9 @@ class Job:
         self._profile = None
 
         self._comment = None
+
+        self._workload_description = None
+        self._subjobs_workload = None
 
     def __setattr__(self, field, value):
         object.__setattr__(self, field, value)
@@ -94,6 +96,14 @@ class Job:
         """The buffer of incoming messages"""
         return self._messages
 
+    @property
+    def sub_jobs_workload(self):
+        """The workload containing sub jobs."""
+        if self._subjobs_workload is None:
+            self._subjobs_workload = SubjobWorkload(self, name=self.id.replace(
+                Batsim.WORKLOAD_JOB_SEPARATOR, Batsim.WORKLOAD_JOB_SEPARATOR_REPLACEMENT))
+        return self._subjobs_workload
+
     def send(self, message):
         """Send a message to a running job (assuming that this job will try to receive
         a message at any time in the future of its execution).
@@ -118,7 +128,7 @@ class Job:
     def comment(self):
         """The comment will be written to the log file on job completion.
         This field can be used to write additional data to the out_sched_jobs file."""
-        return self._comment
+        return self._comment or self.get_job_data("comment")
 
     @comment.setter
     def comment(self, value):
@@ -163,7 +173,8 @@ class Job:
         Sub jobs cannot be added manually and instead have to be submitted as dynamic sub
         jobs which are then added automatically.
         """
-        return Jobs(self._sub_jobs)
+        return Jobs(
+            [j.job for j in self.sub_jobs_workload if j.job is not None])
 
     @property
     def running(self):
@@ -192,15 +203,6 @@ class Job:
     def submitted(self):
         """Whether or not this job was submitted to Batsim."""
         return self._submitted
-
-    @property
-    def is_dynamic_submission_request(self):
-        """Whether or not this job is a request sent for dynamic submission.
-
-        To check whether this job was originally dynamically submitted use the property:
-        `is_dynamic_job` instead.
-        """
-        return False
 
     @property
     def rejected_reason(self):
@@ -297,7 +299,7 @@ class Job:
     @property
     def is_dynamic_job(self):
         """Whether or not this job is a dynamic job."""
-        return self.id.startswith(Batsim.DYNAMIC_JOB_PREFIX + ":")
+        return self._workload_description is not None
 
     @property
     def dependencies_fulfilled(self):
@@ -412,18 +414,6 @@ class Job:
         self._scheduler.info("Remove completed job and free resources: {job}",
                              job=self, type="job_completed")
         self.allocation.free()
-        self._jobs_list.update_element(self)
-
-    def move_properties_from(self, otherjob):
-        """Move properties from one job to another.
-
-        This is used internally to convert dynamic jobs to submitted jobs."""
-        parent_job = otherjob.parent_job
-        if parent_job:
-            i = parent_job._sub_jobs.index(otherjob)
-            parent_job._sub_jobs[i] = self
-            self._parent_job = parent_job
-        self._own_dependencies = list(otherjob._own_dependencies)
         self._jobs_list.update_element(self)
 
     def reject(self, reason=""):
@@ -560,193 +550,20 @@ class Job:
                 self.return_code,
                 self.comment))
 
-    @classmethod
-    def create_dynamic_job(cls, *args, **kwargs):
-        """Create a dynamic job.
-
-        :param requested_resources: the number of requested resources.
-
-        :param requested_time: the number of requested time (walltime)
-
-        :param profile: The profile object (either a `Profile` object or a
-                        dictionary containing the actual Batsim profile configuration).
-
-        :param workload_name: The name of the workload which should be chosen if
-                              the profiles should be cached, since profiles are
-                              always related to their workload. If omitted a
-                              dynamically generated name for the workload will be used.
-        """
-        return DynamicJobRequest(*args, **kwargs)
-
-    def create_sub_job(self, *args, **kwargs):
-        """Create a dynamic job as a sub job.
-
-        A sub job has no other meaning besides annotating that this new dynamic job is somehow related
-        to its parent job. A use case could be to generate various dynamic jobs to prepare the running of a jub
-        and create these dynamic jobs as sub jobs to make it easier keeping track of the related dynamic jobs.
-
-        :param requested_resources: the number of requested resources.
-
-        :param requested_time: the number of requested time (walltime)
-
-        :param profile: The profile object (either a `Profile` object or a
-                        dictionary containing the actual Batsim profile configuration).
-
-        :param workload_name: The name of the workload which should be chosen if
-                              the profiles should be cached, since profiles are
-                              always related to their workload. If omitted a
-                              dynamically generated name for the workload will be used.
-        """
-        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
-        return DynamicJobRequest(*args, parent_job=self, **kwargs)
+    def submit_sub_job(self, *args, **kwargs):
+        job = self.sub_jobs_workload.new_job(*args, **kwargs)
+        self.sub_jobs_workload.prepare()
+        job.submit(self._scheduler)
 
 
-class DynamicJobRequest(Job):
-    """A DynamicJobRequest may be used to construct dynamic jobs afterwards submitted to the scheduler.
-    It has no related batsim_job since it is not known by Batsim yet. Instead it should be submitted
-    and will be bounced back to the scheduler as a job known by Batsim and can be executed in this state.
+class SubjobWorkload(WorkloadDescription):
 
-    :param requested_resources: the number of requested resources.
+    def __init__(self, parent_job, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._parent_job = parent_job
 
-    :param requested_time: the number of requested time (walltime)
-
-    :param profile: The profile object (either a `Profile` object or a dictionary
-                    containing the actual Batsim profile configuration).
-
-    :param workload_name: The name of the workload which should be chosen if the
-                          profiles should be cached, since profiles are always
-                          related to their workload. If omitted a dynamically
-                          generated name for the workload will be used.
-
-    :param parent_job: the parental job object if this job should be a sub job
-    """
-
-    def __init__(
-            self,
-            requested_resources,
-            requested_time,
-            profile,
-            workload_name=None,
-            parent_job=None):
-        super().__init__(parent_job=parent_job)
-        self._job_id = None
-        self._requested_resources = requested_resources
-        self._requested_time = requested_time
-        self._profile = profile
-        self._workload_name = workload_name
-
-        self._submitted = False
-
-        if parent_job is not None:
-            parent_job._jobs_list.update_element(self)
-
-    @property
-    def id(self):
-        return self._job_id
-
-    @property
-    def start_time(self):
-        return None
-
-    @property
-    def submit_time(self):
-        return None
-
-    @property
-    def requested_time(self):
-        return self._requested_time
-
-    @property
-    def requested_resources(self):
-        return self._requested_resources
-
-    @property
-    def profile(self):
-        return self._profile
-
-    @property
-    def workload_name(self):
-        return self._workload_name
-
-    @property
-    def finish_time(self):
-        return None
-
-    @property
-    def state(self):
-        return BatsimJob.State.UNKNOWN
-
-    @property
-    def kill_reason(self):
-        return None
-
-    @property
-    def return_code(self):
-        return None
-
-    @property
-    def runnable(self):
-        return False
-
-    @property
-    def running(self):
-        return False
-
-    @property
-    def completed(self):
-        return False
-
-    @property
-    def open(self):
-        return not self.submitted
-
-    @property
-    def is_dynamic_submission_request(self):
-        return True
-
-    @property
-    def is_dynamic_job(self):
-        return True
-
-    def submit(self, scheduler):
-        """Marks a dynamic job for submission in the `scheduler`."""
-        assert not self._submitted, "Dynamic job was already submitted"
-        scheduler.jobs.add(self)
-        self._jobs_list = scheduler.jobs
-        self._scheduler = scheduler
-
-        # The profile object will be executed if it is no dictionary already to
-        # allow complex Profile objects.
-        profile = self._profile
-        if not isinstance(profile, dict):
-            profile = profile()
-
-        parent_job_id = None
-        try:
-            parent_job_id = self.parent_job.id
-        except AttributeError:
-            pass
-
-        self._scheduler.info(
-            "Submit dynamic job ({job})",
-            job=self,
-            subjob_of=parent_job_id,
-            subjob_of_obj=self.parent_job,
-            is_subjob=(parent_job_id is not None),
-            type="dynamic_job_submit")
-        self._job_id = self._scheduler._batsim.submit_job(
-            self._requested_resources,
-            self._requested_time,
-            profile,
-            self._profile.name,
-            Batsim.DYNAMIC_JOB_PREFIX + ":" + (self._workload_name or ""))
-
-        if self.parent_job:
-            self.parent_job._sub_jobs.append(self)
-            self.parent_job._jobs_list.update_element(self)
-
-        self._submitted = True
-        self._jobs_list.update_element(self)
+    def update_job(self, jobdesc, job):
+        job._parent_job = self._parent_job
 
 
 class Jobs(ObserveList):
@@ -809,11 +626,6 @@ class Jobs(ObserveList):
         """Returns all jobs which are static jobs."""
         return self.filter(static_job=True)
 
-    @property
-    def dynamic_submission_request(self):
-        """Returns all jobs which are requests for dynamic submissions."""
-        return self.filter(dynamic_submission_request=True)
-
     def __getitem__(self, items):
         if isinstance(items, slice):
             return self.create(self._data[items])
@@ -848,7 +660,6 @@ class Jobs(ObserveList):
             submitted=False,
             dynamic_job=False,
             static_job=False,
-            dynamic_submission_request=False,
             **kwargs):
         """Filter the jobs lists to search for jobs.
 
@@ -871,8 +682,6 @@ class Jobs(ObserveList):
         :param dynamic_job: whether the job is a dynamic job.
 
         :param static_job: whether the job is a static job.
-
-        :param dynamic_submission_request: whether the job is a request for dynamic submission.
         """
 
         # Yield all jobs if not filtered
@@ -884,8 +693,7 @@ class Jobs(ObserveList):
                 killed,
                 submitted,
                 dynamic_job,
-                static_job,
-                dynamic_submission_request]:
+                static_job]:
             runnable = True
             running = True
             open = True
@@ -896,15 +704,10 @@ class Jobs(ObserveList):
             submitted = True
             dynamic_job = True
             static_job = True
-            dynamic_submission_request = True
 
         # Filter jobs
         def filter_jobs(jobs):
             for j in jobs:
-                if dynamic_submission_request:
-                    if j.is_dynamic_submission_request:
-                        yield j
-                        continue
                 if dynamic_job:
                     if j.is_dynamic_job:
                         yield j

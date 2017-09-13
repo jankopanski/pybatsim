@@ -43,9 +43,9 @@ class DelayProfilesAsTasks(Scheduler):
 
                 # Create all sub jobs and submit them to Batsim
                 for task in tasks:
-                    job.create_sub_job(job.requested_resources,
+                    job.submit_sub_job(job.requested_resources,
                                        walltimes_each,
-                                       Profiles.Delay(task[1])).submit(self)
+                                       Profiles.Delay(task[1]))
             # This scheduler only handles delay jobs
             else:
                 self.fatal(
