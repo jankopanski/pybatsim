@@ -14,17 +14,24 @@
 """
 from abc import ABCMeta, abstractmethod
 from enum import Enum
+import json
 
 
 class Profile(metaclass=ABCMeta):
     """A profile can be converted to a dictionary for being sent to Batsim."""
 
-    def __init__(self, name=None):
+    def __init__(self, name=None, ret=0):
         self._name = name
+        self._ret = ret
 
     @abstractmethod
-    def to_dict(self):
-        """Convert this profile to a dictionary."""
+    def to_dict(self, embed_references=False):
+        """Convert this profile to a dictionary.
+
+        :param embed_references: whether or not references to other profiles should
+                                 be embedded (only works if references are given as
+                                 `Profile` objects).
+        """
         pass
 
     @property
@@ -34,6 +41,18 @@ class Profile(metaclass=ABCMeta):
     @property
     def name(self):
         return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
+
+    @property
+    def ret(self):
+        return self._ret
+
+    @ret.setter
+    def ret(self, value):
+        self._ret = value
 
     def __call__(self):
         return self.to_dict()
@@ -47,7 +66,56 @@ class Profile(metaclass=ABCMeta):
         return (
             "<Profile {}; name:{} data:{}>"
             .format(
-                self.type, self.name, self.to_dict()))
+                self.type, self.name, self.to_dict(embed_references=True)))
+
+    def __eq__(self, other):
+        if isinstance(other, Profile):
+            return json.dumps(
+                self.to_dict(
+                    embed_references=True),
+                sort_keys=True) \
+                == json.dumps(
+                other.to_dict(
+                    embed_references=True),
+                sort_keys=True)
+        else:
+            return False
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash(
+            json.dumps(
+                self.to_dict(
+                    embed_references=True),
+                sort_keys=True))
+
+    def get_additional_profiles(self):
+        """Return the additional profile objects which are referenced in this profile."""
+        return []
+
+    def replace_additional_profiles(self, map):
+        """Replace additional profile objects with the profiles from the map if the map contains the same profile already."""
+        pass
+
+    def _convert_profile_reference(self, profile, embed=True):
+        """Returns the reference to the given profile (usually the name).
+
+        :param profile: the profile to be referenced
+
+        :param embed: whether the profile should be directly included (no reference)
+
+        """
+        if isinstance(profile, Profile):
+            if embed:
+                return profile.to_dict(embed_references=embed)
+            elif profile.name is None:
+                raise ValueError(
+                    "Profile reference has no name: {}".format(profile))
+            return profile.name
+        else:
+            return profile
 
 
 class Profiles(metaclass=ABCMeta):
@@ -86,7 +154,7 @@ class Profiles(metaclass=ABCMeta):
             super().__init__(**kwargs)
             self.data = data
 
-        def to_dict(self):
+        def to_dict(self, embed_references=False):
             return dict(self.data)
 
     class Delay(Profile):
@@ -100,12 +168,15 @@ class Profiles(metaclass=ABCMeta):
 
         @classmethod
         def from_dict(cls, dct, name=None):
-            return cls(delay=dct["delay"], name=name)
+            return cls(delay=dct["delay"],
+                       ret=dct.get("ret", 0),
+                       name=name)
 
-        def to_dict(self):
+        def to_dict(self, embed_references=False):
             return {
                 "type": self.type,
-                "delay": self.delay
+                "delay": self.delay,
+                "ret": self.ret,
             }
 
     class Parallel(Profile):
@@ -124,14 +195,16 @@ class Profiles(metaclass=ABCMeta):
             return cls(nbres=dct["nb_res"],
                        cpu=dct["cpu"],
                        com=dct["com"],
+                       ret=dct.get("ret", 0),
                        name=name)
 
-        def to_dict(self):
+        def to_dict(self, embed_references=False):
             return {
                 "type": self.type,
                 "nb_res": self.nbres,
                 "cpu": self.cpu,
-                "com": self.com
+                "com": self.com,
+                "ret": self.ret,
             }
 
     class ParallelHomogeneous(Profile):
@@ -148,13 +221,15 @@ class Profiles(metaclass=ABCMeta):
         def from_dict(cls, dct, name=None):
             return cls(cpu=dct["cpu"],
                        com=dct["com"],
+                       ret=dct.get("ret", 0),
                        name=name)
 
-        def to_dict(self):
+        def to_dict(self, embed_references=False):
             return {
                 "type": self.type,
                 "cpu": self.cpu,
-                "com": self.com
+                "com": self.com,
+                "ret": self.ret,
             }
 
     class Smpi(Profile):
@@ -169,12 +244,14 @@ class Profiles(metaclass=ABCMeta):
         @classmethod
         def from_dict(cls, dct, name=None):
             return cls(trace_file=dct["trace_file"],
+                       ret=dct.get("ret", 0),
                        name=name)
 
-        def to_dict(self):
+        def to_dict(self, embed_references=False):
             return {
                 "type": self.type,
-                "trace": self.trace_file
+                "trace": self.trace_file,
+                "ret": self.ret,
             }
 
     class Sequence(Profile):
@@ -191,14 +268,25 @@ class Profiles(metaclass=ABCMeta):
         def from_dict(cls, dct, name=None):
             return cls(profiles=dct["seq"],
                        repeat=dct.get("nb", 1),
+                       ret=dct.get("ret", 0),
                        name=name)
 
-        def to_dict(self):
+        def to_dict(self, embed_references=False):
             return {
                 "type": self.type,
                 "nb": self.repeat,
-                "seq": self.profiles
-            }
+                "ret": self.ret,
+                "seq": [
+                    self._convert_profile_reference(
+                        profile,
+                        embed_references) for profile in self.profiles]}
+
+        def get_additional_profiles(self):
+            return self.profiles
+
+        def replace_additional_profiles(self, map):
+            self.profiles = [map.get(profile, profile)
+                             for profile in self.profiles]
 
     class ParallelPFS(Profile):
         """Implementation of the MsgParallelHomogeneousPFSMultipleTiers profile."""
@@ -227,14 +315,16 @@ class Profiles(metaclass=ABCMeta):
             return cls(size=dct["size"],
                        direction=cls.Direction[dct["direction"]],
                        host=cls.Host[dct["host"]],
+                       ret=dct.get("ret", 0),
                        name=name)
 
-        def to_dict(self):
+        def to_dict(self, embed_references=False):
             return {
                 "type": self.type,
                 "size": self.size,
                 "direction": self.direction.name,
-                "host": self.host.name
+                "host": self.host.name,
+                "ret": self.ret,
             }
 
     class DataStaging(Profile):
@@ -257,13 +347,15 @@ class Profiles(metaclass=ABCMeta):
         def from_dict(cls, dct, name=None):
             return cls(size=dct["size"],
                        direction=cls.Direction[dct["repeat"]],
+                       ret=dct.get("ret", 0),
                        name=name)
 
-        def to_dict(self):
+        def to_dict(self, embed_references=False):
             return {
                 "type": self.type,
                 "size": self.size,
-                "direction": self.direction.name
+                "direction": self.direction.name,
+                "ret": self.ret,
             }
 
     class Send(Profile):
@@ -272,6 +364,8 @@ class Profiles(metaclass=ABCMeta):
         type = "send"
 
         def __init__(self, msg, sleeptime=None, **kwargs):
+            assert isinstance(
+                msg, dict), "Batsim expects a json object as a message"
             super().__init__(**kwargs)
             self.msg = msg
             self.sleeptime = sleeptime
@@ -280,9 +374,10 @@ class Profiles(metaclass=ABCMeta):
         def from_dict(cls, dct, name=None):
             return cls(msg=dct["msg"],
                        sleeptime=dct.get("sleeptime", None),
+                       ret=dct.get("ret", 0),
                        name=name)
 
-        def to_dict(self):
+        def to_dict(self, embed_references=False):
             if isinstance(self.msg, dict):
                 msg = self.msg
             else:
@@ -290,6 +385,7 @@ class Profiles(metaclass=ABCMeta):
             dct = {
                 "type": self.type,
                 "msg": msg,
+                "ret": self.ret,
             }
             if self.sleeptime is not None:
                 dct["sleeptime"] = self.sleeptime
@@ -302,7 +398,7 @@ class Profiles(metaclass=ABCMeta):
 
         def __init__(
                 self,
-                regex,
+                regex=".*",
                 on_success=None,
                 on_failure=None,
                 on_timeout=None,
@@ -318,23 +414,46 @@ class Profiles(metaclass=ABCMeta):
         @classmethod
         def from_dict(cls, dct, name=None):
             return cls(regex=dct["regex"],
-                       on_success=dct.get("on_success", None),
-                       on_failure=dct.get("on_failure", None),
-                       on_timeout=dct.get("on_timeout", None),
+                       on_success=dct.get("success", None),
+                       on_failure=dct.get("failure", None),
+                       on_timeout=dct.get("timeout", None),
                        polltime=dct.get("polltime", None),
+                       ret=dct.get("ret", 0),
                        name=name)
 
-        def to_dict(self):
+        def to_dict(self, embed_references=False):
             dct = {
                 "type": self.type,
                 "regex": self.regex,
+                "ret": self.ret,
             }
             if self.on_success is not None:
-                dct["on_success"] = self.on_success
+                dct["success"] = self._convert_profile_reference(
+                    self.on_success, embed_references)
             if self.on_failure is not None:
-                dct["on_failure"] = self.on_failure
+                dct["failure"] = self._convert_profile_reference(
+                    self.on_failure, embed_references)
             if self.on_timeout is not None:
-                dct["on_timeout"] = self.on_timeout
+                dct["timeout"] = self._convert_profile_reference(
+                    self.on_timeout, embed_references)
             if self.polltime is not None:
                 dct["polltime"] = self.polltime
             return dct
+
+        def get_additional_profiles(self):
+            profiles = []
+            if self.on_success is not None:
+                profiles.append(self.on_success)
+            if self.on_failure is not None:
+                profiles.append(self.on_failure)
+            if self.on_timeout is not None:
+                profiles.append(self.on_timeout)
+            return profiles
+
+        def replace_additional_profiles(self, map):
+            if self.on_success is not None:
+                self.on_success = map.get(self.on_success, self.on_success)
+            if self.on_failure is not None:
+                self.on_failure = map.get(self.on_failure, self.on_failure)
+            if self.on_timeout is not None:
+                self.on_timeout = map.get(self.on_timeout, self.on_timeout)
