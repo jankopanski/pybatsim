@@ -18,6 +18,7 @@ from .utils import DictWrapper
 from .messages import Message
 from .utils import ListView
 from .logging import LoggingEvent, Logger, EventLogger
+from .workloads import WorkloadDescription
 
 
 class BaseBatsimScheduler(BatsimScheduler):
@@ -104,15 +105,24 @@ class BaseBatsimScheduler(BatsimScheduler):
 
         self._scheduler.jobs.add(newjob)
 
+        job_id_split = job.id.split(Batsim.WORKLOAD_JOB_SEPARATOR)
+        workload_name = job_id_split[0]
+        job_id = int(job_id_split[1])
+
+        workload = None
+        try:
+            # Will succeed if job is dynamic job
+            workload = self._scheduler._workload_map[workload_name]
+        except KeyError:
+            pass
+        if workload:
+            job_description = workload[job_id]
+            job_description.job = newjob
+            newjob._workload_description = workload
+
         self._scheduler.info("Received job submission from Batsim ({job})",
                              job=newjob, type="job_submission_received")
 
-        if newjob.is_dynamic_job:
-            for job2 in self._scheduler.jobs.dynamic_submission_request:
-                if job.id == job2.id:
-                    newjob.move_properties_from(job2)
-                    self._scheduler.jobs.remove(job2)
-                    break
         self._scheduler.on_job_submission(newjob)
         self._scheduler._do_schedule()
 
@@ -223,6 +233,9 @@ class Scheduler(metaclass=ABCMeta):
 
         self._jobs = Jobs()
         self._resources = Resources()
+
+        self._workload_map = {}
+        self._dynamic_workload = WorkloadDescription(name="DYNAMIC_WORKLOAD")
 
         self.debug("Scheduler initialised", type="scheduler_initialised")
 
@@ -558,6 +571,11 @@ class Scheduler(metaclass=ABCMeta):
         :param event: the triggered event (class: `LoggingEvent`)
         """
         pass
+
+    def submit_dynamic_job(self, *args, **kwargs):
+        job = self._dynamic_workload.new_job(*args, **kwargs)
+        self._dynamic_workload.prepare()
+        job.submit(self)
 
 
 def as_scheduler(*args, on_init=[], on_end=[], base_classes=[], **kwargs):
