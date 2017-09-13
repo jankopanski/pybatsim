@@ -233,6 +233,18 @@ class Batsim(object):
             }
         })
 
+    def submit_profiles(self, workload_name, profiles):
+        for profile_name, profile in profiles.items():
+            msg = {
+                "timestamp": self.time(),
+                "type": "SUBMIT_PROFILE",
+                "data": {
+                    "workload_name": workload_name,
+                    "profile_name": profile_name,
+                    "profile": profile,
+                }
+            }
+            self._events_to_send.append(msg)
 
     def submit_job(
             self,
@@ -242,7 +254,8 @@ class Batsim(object):
             profile_name,
             workload_name,
             subtime=None,
-            profile=None):
+            profile=None,
+            additional_profiles={}):
         assert Batsim.WORKLOAD_JOB_SEPARATOR not in workload_name
         assert isinstance(id, int)
         assert isinstance(workload_name, str)
@@ -272,6 +285,9 @@ class Batsim(object):
         self._events_to_send.append(msg)
         self.nb_jobs_submitted += 1
         self.has_dynamic_job_submissions = True
+
+        if additional_profiles:
+            self.submit_profiles(workload_name, additional_profiles)
 
         return full_job_id
 
