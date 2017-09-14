@@ -226,7 +226,9 @@ class JobDescription:
             self.profile.name,
             self.workload.name,
             self.subtime,
-            self.profile.to_dict(),
+            self.profile.to_dict())
+        scheduler._batsim.submit_profiles(
+            self.workload.name,
             additional_profiles)
         self._submitted = True
 

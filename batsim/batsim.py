@@ -254,8 +254,7 @@ class Batsim(object):
             profile_name,
             workload_name,
             subtime=None,
-            profile=None,
-            additional_profiles={}):
+            profile=None):
         assert Batsim.WORKLOAD_JOB_SEPARATOR not in workload_name
         assert isinstance(id, int)
         assert isinstance(workload_name, str)
@@ -285,9 +284,6 @@ class Batsim(object):
         self._events_to_send.append(msg)
         self.nb_jobs_submitted += 1
         self.has_dynamic_job_submissions = True
-
-        if additional_profiles:
-            self.submit_profiles(workload_name, additional_profiles)
 
         return full_job_id
 
