@@ -177,7 +177,7 @@ def launch_expe(options, verbose=True):
     sched_stderr_file = open(options["output_dir"] + "/sched.stderr", "w")
 
     if verbose:
-        print("Starting batsim:", end="")
+        print("Starting batsim: ", end="")
         print(" ".join(
             batsim_cl +
             [">", str(batsim_stdout_file.name),
@@ -187,7 +187,7 @@ def launch_expe(options, verbose=True):
         batsim_cl, stdout=batsim_stdout_file, stderr=batsim_stderr_file)
 
     if verbose:
-        print("Starting scheduler:", end="")
+        print("Starting scheduler: ", end="")
         print(" ".join(sched_cl + [">", str(sched_stdout_file.name), "2>",
                                    str(sched_stderr_file.name)]))
 
