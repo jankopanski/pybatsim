@@ -118,6 +118,7 @@ setup(
     zip_safe=False,
     description="Python scheduler for Batsim",
     keywords='Scheduler',
+    license='LGPLv3',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Programming Language :: Python :: 3',
