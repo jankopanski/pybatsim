@@ -8,7 +8,12 @@ import json
 import copy
 
 
-def generate_energy(workloads_basedir, platforms_basedir, options):
+def generate_energy(
+        workloads_basedir,
+        platforms_basedir,
+        batsim_bin,
+        batsim_args,
+        options):
     schedulers = []
 
     budgets = [0, 2, 0.5]
@@ -26,7 +31,7 @@ def generate_energy(workloads_basedir, platforms_basedir, options):
     schedulers += [{
         "name_expe": "easyEnergyBudget_" + str(b) + "_" + name_allow[allow] + "_" + name_shut[shut],
         "name":"easyEnergyBudget",
-        "verbosity":10,
+        "verbose":True,
         "protection":True,
         "interpreter": "coverage",
         "options": {
@@ -51,7 +56,7 @@ def generate_energy(workloads_basedir, platforms_basedir, options):
     schedulers += [
         {"name_expe": "easyEnergyBudget_" + str(b) + "on1000_" +
          name_allow[allow] + "_" + name_shut[shut],
-         "name": "easyEnergyBudget", "verbosity": 10, "protection": True,
+         "name": "easyEnergyBudget", "verbose": True, "protection": True,
          "interpreter": "coverage",
          "options":
          {"budget_total": b, "budget_start": 10, "budget_end": 1010,
@@ -68,15 +73,20 @@ def generate_energy(workloads_basedir, platforms_basedir, options):
     workloads_to_use = [os.path.join(workloads_basedir, "stupid.json")]
 
     options += [{
-        "batsim_bin": "tests/run_batsim.sh",
-        "platform": os.path.join(platforms_basedir, "energy_platform_homogeneous_no_net.xml"),
-        "workload": w,
         # where all output files (stdins, stderrs, csvs...) will be outputed.
-        "output_dir": "SELF",
+        "output-dir": "SELF",
         # if set to "SELF" then output on the same dir as this option file.
+
+        "export": "out",        # The export filename prefix used to generate simulation output
+
         "batsim": {
-            "export": "out",        # The export filename prefix used to generate simulation output
-            "energy-plugin": True,  # Enables energy-aware experiments
+            "executable": {
+                "path": batsim_bin,
+                "args": batsim_args,
+            },
+            "platform": os.path.join(platforms_basedir, "energy_platform_homogeneous_no_net.xml"),
+            "workload": w,
+            "energy": True,  # Enables energy-aware experiments
             "disable-schedule-tracing": True,  # remove paje output
             "verbosity": "information"  # Sets the Batsim verbosity level. Available values
                                         # are : quiet, network-only,
@@ -86,14 +96,19 @@ def generate_energy(workloads_basedir, platforms_basedir, options):
     } for s in schedulers for w in workloads_to_use]
 
 
-def generate_sched_static(workloads_basedir, platforms_basedir, options):
+def generate_sched_static(
+        workloads_basedir,
+        platforms_basedir,
+        batsim_bin,
+        batsim_args,
+        options):
     schedulers = []
 
     schedulers += [
         {
             "name_expe": "sched_delayProfilesAsTasks",
             "name": "schedDelayProfilesAsTasks",
-            "verbosity": 0,
+            "verbose": False,
             "protection": True,
             "interpreter": "coverage",
             "options": {
@@ -102,7 +117,7 @@ def generate_sched_static(workloads_basedir, platforms_basedir, options):
         {
             "name_expe": "sched_fillerSched",
             "name": "schedFiller",
-            "verbosity": 0,
+            "verbose": False,
             "protection": True,
             "interpreter": "coverage",
             "options": {
@@ -111,7 +126,7 @@ def generate_sched_static(workloads_basedir, platforms_basedir, options):
         {
             "name_expe": "sched_backfilling",
             "name": "schedEasySjfBackfill",
-            "verbosity": 0,
+            "verbose": False,
             "protection": True,
             "interpreter": "coverage",
             "options": {
@@ -123,18 +138,35 @@ def generate_sched_static(workloads_basedir, platforms_basedir, options):
         os.path.join(workloads_basedir, "simple_delay_workload.json")]
 
     options += [{
-        "batsim_bin": "tests/run_batsim.sh",
-        "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
-        "workload": w,
         # where all output files (stdins, stderrs, csvs...) will be outputed.
-        "output_dir": "SELF",
+        "output-dir": "SELF",
         # if set to "SELF" then output on the same dir as this option file.
+
+        "export": "out",        # The export filename prefix used to generate simulation output
+
         "batsim": {
-            "pfs-host": "lcst_host",
-            "hpst-host": "hpst_host",
-            "config-file": "tests/config_noredis_dynamic.json",
-            "export": "out",        # The export filename prefix used to generate simulation output
-            "energy-plugin": False,  # Enables energy-aware experiments
+            "executable": {
+                "path": batsim_bin,
+                "args": batsim_args,
+            },
+            "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
+            "workload": w,
+            "config": {
+                "redis": {
+                    "enabled": False,
+                    "hostname": "127.0.0.1",
+                    "port": 6379,
+                    "prefix": "default"
+                },
+                "job_submission": {
+                    "forward_profiles": True,
+                    "from_scheduler": {
+                        "enabled": True,
+                        "acknowledge": True
+                    }
+                }
+            },
+            "energy": False,  # Enables energy-aware experiments
             "disable-schedule-tracing": True,  # remove paje output
             "verbosity": "information"  # Sets the Batsim verbosity level. Available values
                                         # are : quiet, network-only,
@@ -144,14 +176,19 @@ def generate_sched_static(workloads_basedir, platforms_basedir, options):
     } for s in schedulers for w in workloads_to_use]
 
 
-def generate_sched_script(workloads_basedir, platforms_basedir, options):
+def generate_sched_script(
+        workloads_basedir,
+        platforms_basedir,
+        batsim_bin,
+        batsim_args,
+        options):
     schedulers = []
 
     schedulers += [
         {
             "name_expe": "sched_fillerSched",
             "name": "schedFiller",
-            "verbosity": 0,
+            "verbose": False,
             "protection": True,
             "interpreter": "coverage",
             "options": {
@@ -160,7 +197,7 @@ def generate_sched_script(workloads_basedir, platforms_basedir, options):
         {
             "name_expe": "sched_backfilling",
             "name": "schedEasySjfBackfill",
-            "verbosity": 0,
+            "verbose": False,
             "protection": True,
             "interpreter": "coverage",
             "options": {
@@ -173,20 +210,37 @@ def generate_sched_script(workloads_basedir, platforms_basedir, options):
         for w in ["generated_workload.py", "generated_workload2.py"]]
 
     options += [{
-        "batsim_bin": "tests/run_batsim.sh",
-        "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
-        "workload_script": {
-            "path": w,
-        },
         # where all output files (stdins, stderrs, csvs...) will be outputed.
-        "output_dir": "SELF",
+        "output-dir": "SELF",
         # if set to "SELF" then output on the same dir as this option file.
+
+        "export": "out",        # The export filename prefix used to generate simulation output
+
         "batsim": {
-            "pfs-host": "lcst_host",
-            "hpst-host": "hpst_host",
-            "config-file": "tests/config_noredis_dynamic.json",
-            "export": "out",        # The export filename prefix used to generate simulation output
-            "energy-plugin": False,  # Enables energy-aware experiments
+            "executable": {
+                "path": batsim_bin,
+                "args": batsim_args,
+            },
+            "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
+            "workload-script": {
+                "path": w,
+            },
+            "config": {
+                "redis": {
+                    "enabled": False,
+                    "hostname": "127.0.0.1",
+                    "port": 6379,
+                    "prefix": "default"
+                },
+                "job_submission": {
+                    "forward_profiles": True,
+                    "from_scheduler": {
+                        "enabled": True,
+                        "acknowledge": True
+                    }
+                }
+            },
+            "energy": False,  # Enables energy-aware experiments
             "disable-schedule-tracing": True,  # remove paje output
             "verbosity": "information"  # Sets the Batsim verbosity level. Available values
                                         # are : quiet, network-only,
@@ -196,14 +250,19 @@ def generate_sched_script(workloads_basedir, platforms_basedir, options):
     } for s in schedulers for w in workloads_to_use]
 
 
-def generate_sched_dynamic(workloads_basedir, platforms_basedir, options):
+def generate_sched_dynamic(
+        workloads_basedir,
+        platforms_basedir,
+        batsim_bin,
+        batsim_args,
+        options):
     schedulers = []
 
     schedulers += [
         {
             "name_expe": "sched_dynamic",
             "name": "tests/schedulers/dynamicTestScheduler.py",
-            "verbosity": 0,
+            "verbose": False,
             "protection": True,
             "interpreter": "coverage",
             "options": {
@@ -212,17 +271,34 @@ def generate_sched_dynamic(workloads_basedir, platforms_basedir, options):
     ]
 
     options += [{
-        "batsim_bin": "tests/run_batsim.sh",
-        "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
         # where all output files (stdins, stderrs, csvs...) will be outputed.
-        "output_dir": "SELF",
+        "output-dir": "SELF",
         # if set to "SELF" then output on the same dir as this option file.
+
+        "export": "out",        # The export filename prefix used to generate simulation output
+
         "batsim": {
-            "pfs-host": "lcst_host",
-            "hpst-host": "hpst_host",
-            "config-file": "tests/config_noredis_dynamic.json",
-            "export": "out",        # The export filename prefix used to generate simulation output
-            "energy-plugin": False,  # Enables energy-aware experiments
+            "executable": {
+                "path": batsim_bin,
+                "args": batsim_args,
+            },
+            "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
+            "config": {
+                "redis": {
+                    "enabled": False,
+                    "hostname": "127.0.0.1",
+                    "port": 6379,
+                    "prefix": "default"
+                },
+                "job_submission": {
+                    "forward_profiles": True,
+                    "from_scheduler": {
+                        "enabled": True,
+                        "acknowledge": True
+                    }
+                }
+            },
+            "energy": False,  # Enables energy-aware experiments
             "disable-schedule-tracing": True,  # remove paje output
             "verbosity": "information"  # Sets the Batsim verbosity level. Available values
                                         # are : quiet, network-only,
@@ -232,19 +308,39 @@ def generate_sched_dynamic(workloads_basedir, platforms_basedir, options):
     } for s in schedulers]
 
 
-def generate_sched(workloads_basedir, platforms_basedir, options):
-    generate_sched_static(workloads_basedir, platforms_basedir, options)
-    generate_sched_script(workloads_basedir, platforms_basedir, options)
-    generate_sched_dynamic(workloads_basedir, platforms_basedir, options)
+def generate_sched(
+        workloads_basedir,
+        platforms_basedir,
+        batsim_bin,
+        batsim_args,
+        options):
+    generate_sched_static(
+        workloads_basedir,
+        platforms_basedir,
+        batsim_bin,
+        batsim_args,
+        options)
+    generate_sched_script(
+        workloads_basedir,
+        platforms_basedir,
+        batsim_bin,
+        batsim_args,
+        options)
+    generate_sched_dynamic(
+        workloads_basedir,
+        platforms_basedir,
+        batsim_bin,
+        batsim_args,
+        options)
 
 
 def do_generate(options):
     for opt in options:
         try:
-            workload_name = opt["workload"]
+            workload_name = opt["batsim"]["workload"]
         except KeyError:
             try:
-                workload_name = opt["workload_script"]["path"]
+                workload_name = opt["batsim"]["workload-script"]["path"]
             except KeyError:
                 workload_name = ""
         opt["scheduler"]["name_expe"] += "_" + os.path.splitext(
@@ -267,19 +363,20 @@ def main(args):
     sched = False
     workloads_basedir = "../../workload_profiles"
     platforms_basedir = "../../platforms"
+    batsim_bin = None
+    batsim_args = []
 
     for arg in args:
         if arg == "--energy":
             energy = True
         elif arg == "--sched":
             sched = True
-        elif arg == "--all":
-            energy = True
-            sched = True
-        elif arg.startswith("--workloads_basedir="):
+        elif arg.startswith("--workloads-basedir="):
             workloads_basedir = arg.split("=")[1]
-        elif arg.startswith("--platforms_basedir="):
+        elif arg.startswith("--platforms-basedir="):
             platforms_basedir = arg.split("=")[1]
+        elif arg.startswith("--batsim-bin="):
+            batsim_bin = arg.split("=")[1]
         else:
             print("Unknown argument: {}".format(arg))
             return 1
@@ -288,11 +385,25 @@ def main(args):
         energy = True
         sched = True
 
+    if not batsim_bin:
+        batsim_bin = "docker"
+        batsim_args = ["run", "batsim:dev"]
+
     if energy:
-        generate_energy(workloads_basedir, platforms_basedir, options)
+        generate_energy(
+            workloads_basedir,
+            platforms_basedir,
+            batsim_bin,
+            batsim_args,
+            options)
 
     if sched:
-        generate_sched(workloads_basedir, platforms_basedir, options)
+        generate_sched(
+            workloads_basedir,
+            platforms_basedir,
+            batsim_bin,
+            batsim_args,
+            options)
 
     do_generate(options)
 

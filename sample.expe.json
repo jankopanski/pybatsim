@@ -1,34 +1,51 @@
 {
-    "batsim_bin": "batsim",
-    "_comment": "Should be set to the batsim executable, e.g. to a script which executes: 'docker run batsim \"$@\"'",
-
-    "platform":"../../platforms/energy_platform_homogeneous_no_net_512.xml",
-    "workload":"../../workload_profiles/test_bf.json",
-    "_comment": "Should be set to the Platform and workload files",
-    
-    "output_dir":"SELF",
+    "output-dir":"SELF",
     "_comment": "where all output files (stdins, stderrs, csvs...) will be output. If set to 'SELF' then output on the same dir as this option file.",
+
+    "export":"out",
+    "_comment": "The export filename prefix used to generate simulation output",
     
     "batsim": {
-    
-        "export":"out",
-        "_comment": "The export filename prefix used to generate simulation output",
-        
-        "energy-plugin": false,
-        "_comment": "Enables energy-aware experiments",
+        "executable": {
+            "path": "docker",
+            "args": ["run", "batsim"],
+            "_comment": "Should be set to the batsim executable"
+        },
+
+        "platform":"../../platforms/energy_platform_homogeneous_no_net_512.xml",
+        "workload":"../../workload_profiles/test_bf.json",
+        "_comment": "Should be set to the Platform and workload files",
+
+        "energy": false,
+        "_comment": "Disables energy-aware experiments",
         
         "disable-schedule-tracing": true,
         "_comment": "remove paje output",
         
         "verbosity": "information",
-        "_comment": "Sets the Batsim verbosity level. Available values are : quiet, network-only, information (default), debug."
-        
-        },
+        "_comment": "Sets the Batsim verbosity level. Available values are : quiet, network-only, information (default), debug.",
+
+        "config": {
+            "redis": {
+                "enabled": false,
+                "hostname": "127.0.0.1",
+                "port": 6379,
+                "prefix": "default"
+            },
+            "job_submission": {
+                "forward_profiles": true,
+                "from_scheduler": {
+                    "enabled": false,
+                    "acknowledge": true
+                }
+            }
+        }
+    },
     "scheduler":{
         "name":"fillerSched",
         "_comment": "The name of a standard scheduler or the path to a python module containing a scheduler",
 
-        "verbosity":10,
-        "protection":true
+        "verbose": true,
+        "protection": true
     }
 }

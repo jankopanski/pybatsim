@@ -11,120 +11,46 @@ import os.path
 import sys
 import json
 import time
+import signal
 
 
 def is_executable(file):
     return os.access(file, os.X_OK)
 
 
-def run_workload_script(options):
-    script = options["workload_script"]["path"]
-    interpreter = options["workload_script"].get("interpreter", None)
-    args = [str(s) for s in options["workload_script"].get("args", [])]
+def get_value(options, keys, fallback_keys=None, default=None):
+    original_options = options
 
-    def do_run_script(cmds):
-        out_workload_file_path = os.path.join(
-            options["output_dir"], "workload.json")
-        with open(out_workload_file_path, "w") as f:
-            script_exec = subprocess.Popen(cmds, stdout=f)
-            ret = script_exec.wait()
-            if ret != 0:
-                raise ValueError(
-                    "Workload script {} failed with return code {}".format(
-                        script, ret))
-        return out_workload_file_path
-
-    if not os.path.exists(script):
-        raise ValueError("Workload script {} does not exist".format(script))
-
-    if interpreter:
-        return do_run_script([interpreter, script] + args)
-    else:
-        if is_executable(script):
-            return do_run_script(["./" + script] + args)
-        elif script.endswith(".py"):
-            return do_run_script(["python", script] + args)
-        else:
-            raise ValueError(
-                "Workload script {} is not executable but also does not seem to be a python script.".format(script))
-
-
-def prepare_batsim_cl(options):
-    batsim_cl = [options["batsim_bin"]]
-
-    batsim_cl.append(
-        '--export=' +
-        options["output_dir"] +
-        "/" +
-        options["batsim"]["export"])
-
-    if options["batsim"]["energy-plugin"]:
-        batsim_cl.append('--energy')
-
-    if options["batsim"]["disable-schedule-tracing"]:
-        batsim_cl.append('--disable-schedule-tracing')
-
-    if "config-file" in options["batsim"]:
-        batsim_cl.append('--config-file=' + options["batsim"]["config-file"])
-
-    if "pfs-host" in options["batsim"]:
-        batsim_cl.append('--pfs-host=' + options["batsim"]["pfs-host"])
-
-    if "hpst-host" in options["batsim"]:
-        batsim_cl.append('--hpst-host=' + options["batsim"]["hpst-host"])
-
-    batsim_cl.append('--verbosity=' + options["batsim"]["verbosity"])
-
-    batsim_cl.append('--platform=' + options["platform"])
-
-    workload = None
-    if "workload_script" in options:
-        workload = run_workload_script(options)
-    else:
-        try:
-            workload = options["workload"]
-        except KeyError:
-            pass
-
-    if workload:
-        batsim_cl.append('--workload=' + workload)
-
-    return batsim_cl
-
-
-def prepare_pybatsim_cl(options):
-    sched_cl = []
-    if 'interpreter' in options["scheduler"]:
-        if options["scheduler"]["interpreter"] == "coverage":
-            interpreter = ["python", "-m", "coverage", "run", "-a"]
-        elif options["scheduler"]["interpreter"] == "pypy":
-            interpreter = ["pypy", "-OOO"]
-        elif options["scheduler"]["interpreter"] == "profile":
-            interpreter = ["python", "-m", "cProfile", "-o", "simul.cprof"]
-        else:
-            assert False, "Unknown interpreter"
-        sched_cl += interpreter
-        sched_cl.append("launcher.py")
-    else:
-        sched_cl.append("pybatsim")
-
-    sched_cl.append(options["scheduler"]["name"])
+    if not isinstance(keys, list):
+        keys = [keys]
 
     try:
-        sched_options = options["scheduler"]["options"]
+        for k in keys:
+            options = options[k]
     except KeyError:
-        sched_options = {}
-    sched_options["export_prefix"] = options["output_dir"] + "/" + options["batsim"]["export"]
+        if fallback_keys:
+            return get_value(original_options, fallback_keys, default=default)
+        elif default is not None:
+            return default
+        else:
+            print(
+                "Option is missing in experiment settings ({})".format(
+                    ".".join(keys)),
+                file=sys.stderr)
+            sys.exit(1)
+    return options
 
-    sched_cl.append("-o")
-    # no need to sanitize the json : each args are given as args in popen
-    sched_cl.append(json.dumps(sched_options))
 
-    if options["scheduler"]["verbosity"] > 0:
-        sched_cl.append('-v')
-    if options["scheduler"]["protection"]:
-        sched_cl.append('-p')
-    return sched_cl
+def delete_key(options, keys):
+    if not isinstance(keys, list):
+        keys = [keys]
+
+    try:
+        for k in keys[:-1]:
+            options = options[k]
+        del options[keys[-1]]
+    except KeyError:
+        pass
 
 
 def tail(f, n):
@@ -157,123 +83,260 @@ def check_print(header, s):
         print(s)
 
 
-def launch_expe(options, verbose=True):
+def run_workload_script(options):
+    script = options["batsim"]["workload-script"]["path"]
+    interpreter = options["batsim"]["workload-script"].get("interpreter", None)
+    args = [str(s) for s in options["batsim"]
+            ["workload-script"].get("args", [])]
 
-    if options["output_dir"] == "SELF":
-        options["output_dir"] = os.path.dirname("./" + options["options_file"])
-    if not os.path.exists(options["output_dir"]):
-        os.makedirs(options["output_dir"])
+    def do_run_script(cmds):
+        out_workload_file_path = os.path.join(
+            options["output-dir"], "workload.json")
+        with open(out_workload_file_path, "w") as f:
+            script_exec = subprocess.Popen(cmds, stdout=f)
+            ret = script_exec.wait()
+            if ret != 0:
+                raise ValueError(
+                    "Workload script {} failed with return code {}".format(
+                        script, ret))
+        return out_workload_file_path
 
-    # use batsim in the PATH if it is not given in option
-    if "batsim_bin" not in options:
-        options["batsim_bin"] = "batsim"
+    if not os.path.exists(script):
+        raise ValueError("Workload script {} does not exist".format(script))
 
-    batsim_cl = prepare_batsim_cl(options)
-    batsim_stdout_file = open(options["output_dir"] + "/batsim.stdout", "w")
-    batsim_stderr_file = open(options["output_dir"] + "/batsim.stderr", "w")
+    if interpreter:
+        return do_run_script([interpreter, script] + args)
+    else:
+        if is_executable(script):
+            return do_run_script(["./" + script] + args)
+        elif script.endswith(".py"):
+            return do_run_script(["python", script] + args)
+        else:
+            raise ValueError(
+                "Workload script {} is not executable but also does not seem to be a python script.".format(script))
 
-    sched_cl = prepare_pybatsim_cl(options)
-    sched_stdout_file = open(options["output_dir"] + "/sched.stdout", "w")
-    sched_stderr_file = open(options["output_dir"] + "/sched.stderr", "w")
 
-    if verbose:
-        print("Starting batsim: ", end="")
-        print(" ".join(
-            batsim_cl +
-            [">", str(batsim_stdout_file.name),
-             "2>", str(batsim_stderr_file.name)]))
+def generate_config(options):
+    out_config_file_path = os.path.join(
+        options["output-dir"], "config.json")
+    with open(out_config_file_path, "w") as f:
+        f.write(json.dumps(options["batsim"]["config"], indent=4))
+    return out_config_file_path
 
-    try:
-        batsim_exec = subprocess.Popen(
-            batsim_cl, stdout=batsim_stdout_file, stderr=batsim_stderr_file)
-    except PermissionError:
-        print("Failed to run batsim: {}".format(" ".join(batsim_cl)), file=sys.stderr)
+
+def prepare_batsim_cl(options):
+    if "batsim" not in options:
+        print("batsim section is missing in experiment settings", file=sys.stderr)
         sys.exit(1)
 
-    if verbose:
-        print("Starting scheduler: ", end="")
-        print(" ".join(sched_cl + [">", str(sched_stdout_file.name), "2>",
-                                   str(sched_stderr_file.name)]))
+    batsim_cl = [
+        get_value(
+            options, [
+                "batsim", "executable", "path"], [
+                "batsim", "bin"], default="batsim")]
+    batsim_cl += get_value(options, ["batsim",
+                                     "executable", "args"], default=[])
+
+    delete_key(options, ["batsim", "executable"])
+    delete_key(options, ["batsim", "bin"])
+
+    batsim_cl.append(
+        '--export=' +
+        os.path.join(
+            options["output-dir"],
+            options.get("export", "out")))
+
+    if "workload-script" in options["batsim"]:
+        options["batsim"]["workload"] = run_workload_script(options)
+        delete_key(options, ["batsim", "workload-script"])
+
+    if "config" in options["batsim"]:
+        options["batsim"]["config-file"] = generate_config(options)
+        delete_key(options, ["batsim", "config"])
+
+    for key, val in options.get("batsim", {}).items():
+        if not key.startswith("_"):
+            if isinstance(val, bool):
+                if not val:
+                    continue
+                val = ""
+            else:
+                val = "=" + str(val)
+            batsim_cl.append("--" + key + val)
+
+    return batsim_cl
+
+
+def prepare_scheduler_cl(options):
+    if "scheduler" not in options:
+        print(
+            "scheduler section is missing in experiment settings",
+            file=sys.stderr)
+        sys.exit(1)
+
+    sched_cl = []
+    if 'interpreter' in options["scheduler"]:
+        if options["scheduler"]["interpreter"] == "coverage":
+            interpreter = ["python", "-m", "coverage", "run", "-a"]
+        elif options["scheduler"]["interpreter"] == "pypy":
+            interpreter = ["pypy", "-OOO"]
+        elif options["scheduler"]["interpreter"] == "profile":
+            interpreter = ["python", "-m", "cProfile", "-o", "simul.cprof"]
+        else:
+            assert False, "Unknown interpreter"
+        sched_cl += interpreter
+        sched_cl.append("launcher.py")
+    else:
+        sched_cl.append("pybatsim")
+
+    sched_cl.append(options["scheduler"]["name"])
 
     try:
-        sched_exec = subprocess.Popen(
-            sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file)
-    except PermissionError:
-        print("Failed to run the scheduler: {}".format(" ".join(sched_cl)), file=sys.stderr)
-        print("Terminating batsim", file=sys.stderr)
-        batsim_exec.terminate()
-        batsim_exec.wait()
-        sys.exit(2)
+        sched_options = options["scheduler"]["options"]
+    except KeyError:
+        sched_options = {}
+    sched_options["export-prefix"] = os.path.join(
+        options["output-dir"], options.get("export", "out"))
 
-    try:
+    sched_cl.append("-o")
+    sched_cl.append(json.dumps(sched_options))
+
+    if options["scheduler"].get("verbose", False):
+        sched_cl.append('-v')
+
+    if options["scheduler"].get("protection", False):
+        sched_cl.append('-p')
+
+    if "socket-endpoint" in options["scheduler"]:
+        sched_cl.append('-s')
+        sched_cl.append(options["scheduler"]["socket-endpoint"])
+
+    if "timeout" in options["scheduler"]:
+        sched_cl.append('-t')
+        sched_cl.append(options["scheduler"]["timeout"])
+
+    return sched_cl
+
+
+def launch_expe(options, verbose=True):
+    if options.get("output-dir", "SELF") == "SELF":
+        options["output-dir"] = os.path.dirname("./" + options["options-file"])
+    if not os.path.exists(options["output-dir"]):
+        os.makedirs(options["output-dir"])
+
+    batsim_cl = prepare_batsim_cl(options)
+    sched_cl = prepare_scheduler_cl(options)
+
+    with open(os.path.join(options["output-dir"], "batsim.stdout"), "w") as batsim_stdout_file, \
+            open(os.path.join(options["output-dir"], "batsim.stderr"), "w") as batsim_stderr_file, \
+            open(os.path.join(options["output-dir"], "sched.stdout"), "w") as sched_stdout_file, \
+            open(os.path.join(options["output-dir"], "sched.stderr"), "w") as sched_stderr_file:
         if verbose:
-            print("Simulation is in progress.", end="", flush=True)
+            print("Starting batsim: ", end="")
+            print(" ".join(
+                batsim_cl +
+                [">", str(batsim_stdout_file.name),
+                 "2>", str(batsim_stderr_file.name)]))
 
-        while True:
-            if batsim_exec.poll() is not None:
-                if verbose:
-                    print()
-                break
-            elif sched_exec.poll() is not None:
-                if verbose:
-                    print()
-                break
-            time.sleep(0.5)
+        try:
+            batsim_exec = subprocess.Popen(
+                batsim_cl, stdout=batsim_stdout_file,
+                stderr=batsim_stderr_file, preexec_fn=os.setsid)
+        except PermissionError:
+            print(
+                "Failed to run batsim: {}".format(
+                    " ".join(batsim_cl)),
+                file=sys.stderr)
+            sys.exit(1)
+
+        if verbose:
+            print("Starting scheduler: ", end="")
+            print(" ".join(sched_cl + [">", str(sched_stdout_file.name), "2>",
+                                       str(sched_stderr_file.name)]))
+
+        try:
+            sched_exec = subprocess.Popen(
+                sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file,
+                preexec_fn=os.setsid)
+        except PermissionError:
+            print(
+                "Failed to run the scheduler: {}".format(
+                    " ".join(sched_cl)),
+                file=sys.stderr)
+            print("Terminating batsim", file=sys.stderr)
+            os.killpg(os.getpgid(batsim_exec.pid), signal.SIGTERM)
+            batsim_exec.wait()
+            sys.exit(2)
+
+        try:
             if verbose:
-                print(".", end="", flush=True)
-    except KeyboardInterrupt:
-        print("\nSimulation was aborted => Terminating batsim and the scheduler")
-        batsim_exec.terminate()
-        sched_exec.terminate()
+                print("Simulation is in progress.", end="", flush=True)
 
-    if sched_exec.poll() is not None and sched_exec.returncode != 0 and batsim_exec.poll() is None:
-        print("Scheduler has died => Terminating batsim")
-        batsim_exec.terminate()
+            while True:
+                if batsim_exec.poll() is not None:
+                    if verbose:
+                        print()
+                    break
+                elif sched_exec.poll() is not None:
+                    if verbose:
+                        print()
+                    break
+                time.sleep(0.5)
+                if verbose:
+                    print(".", end="", flush=True)
+        except KeyboardInterrupt:
+            print("\nSimulation was aborted => Terminating batsim and the scheduler")
+            os.killpg(os.getpgid(batsim_exec.pid), signal.SIGTERM)
+            os.killpg(os.getpgid(sched_exec.pid), signal.SIGTERM)
 
-    if batsim_exec.poll() is not None and batsim_exec.returncode != 0 and sched_exec.poll() is None:
-        print("Batsim has died => Terminating the scheduler")
-        sched_exec.terminate()
+        if sched_exec.poll() is not None and sched_exec.returncode != 0 and batsim_exec.poll() is None:
+            print("Scheduler has died => Terminating batsim")
+            os.killpg(os.getpgid(batsim_exec.pid), signal.SIGTERM)
 
-    sched_exec.wait()
-    batsim_exec.wait()
+        if batsim_exec.poll() is not None and batsim_exec.returncode != 0 and sched_exec.poll() is None:
+            print("Batsim has died => Terminating the scheduler")
+            os.killpg(os.getpgid(sched_exec.pid), signal.SIGTERM)
 
-    ret_code = abs(batsim_exec.returncode) + abs(sched_exec.returncode)
+        sched_exec.wait()
+        batsim_exec.wait()
 
-    if verbose or ret_code != 0:
-        print("Simulation has ended")
+        ret_code = abs(batsim_exec.returncode) + abs(sched_exec.returncode)
 
-        check_print(
-            "Excerpt of log: " +
-            truncate_string(
-                batsim_stdout_file.name),
-            tail(
-                batsim_stdout_file.name,
-                10))
-        check_print(
-            "Excerpt of log: " +
-            truncate_string(
-                batsim_stderr_file.name),
-            tail(
-                batsim_stderr_file.name,
-                10))
-        check_print(
-            "Excerpt of log: " +
-            truncate_string(
-                sched_stdout_file.name),
-            tail(
-                sched_stdout_file.name,
-                10))
-        check_print(
-            "Excerpt of log: " +
-            truncate_string(
-                sched_stderr_file.name),
-            tail(
-                sched_stderr_file.name,
-                10))
-        print_separator()
+        if verbose or ret_code != 0:
+            print("Simulation has ended")
 
-        print("Scheduler return code: " + str(sched_exec.returncode))
-        print("Batsim return code: " + str(batsim_exec.returncode))
+            check_print(
+                "Excerpt of log: " +
+                truncate_string(
+                    batsim_stdout_file.name),
+                tail(
+                    batsim_stdout_file.name,
+                    10))
+            check_print(
+                "Excerpt of log: " +
+                truncate_string(
+                    batsim_stderr_file.name),
+                tail(
+                    batsim_stderr_file.name,
+                    10))
+            check_print(
+                "Excerpt of log: " +
+                truncate_string(
+                    sched_stdout_file.name),
+                tail(
+                    sched_stdout_file.name,
+                    10))
+            check_print(
+                "Excerpt of log: " +
+                truncate_string(
+                    sched_stderr_file.name),
+                tail(
+                    sched_stderr_file.name,
+                    10))
+            print_separator()
+
+            print("Scheduler return code: " + str(sched_exec.returncode))
+            print("Batsim return code: " + str(batsim_exec.returncode))
 
     return ret_code
 
@@ -299,7 +362,7 @@ def main():
 
     options = json.loads(open(options_file).read())
 
-    options["options_file"] = options_file
+    options["options-file"] = options_file
 
     print("Running experiment: {}".format(options_file))
 

@@ -207,7 +207,7 @@ class Scheduler(metaclass=ABCMeta):
     def __init__(self, options={}):
         self._options = options
         debug = self.options.get("debug", False)
-        export_prefix = self.options.get("export_prefix", "out")
+        export_prefix = self.options.get("export-prefix", "out")
 
         # Create the logger
         self._logger = Logger(self, debug=debug)
