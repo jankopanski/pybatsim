@@ -161,7 +161,7 @@ def filter_func_consecutive_resources(
 
 
 def best_find_one_of(*fs):
-    """`find_best_func` function to combine multiple `find_best_func`s so that
+    """`find_best_func` function to combine multiple `find_best_func` so that
     the set is considered as better if only one function matches.
 
     :param fs: list of `find_best_func` functions
@@ -251,16 +251,16 @@ def generate_resources_filter(filter_funcs=[], find_best_funcs=[]):
     :param filter_funcs: filter methods which will be called on each resource whether
                          or not it should be added in the current iteration.
                          Signature: current_time, requested_walltime, min_entries,
-                                    max_entries, considered_resources, remaining_resources,
-                                    current_resource
+                         max_entries, considered_resources, remaining_resources,
+                         current_resource
 
     :param find_best_funcs: filter methods which will be used to compare found resource
                             sets and find the best resource set amongst them.
                             Signature: current_time, requested_walltime, min_entries,
-                                       max_entries, best_considered_resources,
-                                       best_remaining_resources,
-                                       current_considered_resources,
-                                       current_remaining_resources
+                            max_entries, best_considered_resources,
+                            best_remaining_resources,
+                            current_considered_resources,
+                            current_remaining_resources
     """
     def do_filter(
             resources,

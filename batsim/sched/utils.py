@@ -160,7 +160,7 @@ def build_filter(
                    The filter functions are called with the following arguments:
                    data (the iterable), max_entries (see parameter max_entries),
                    min_entries (see parameter min_entries), min_or_max (see parameter min_or_max),
-                   **kwargs (see parameter kwargs).
+                   kwargs (see parameter kwargs).
 
     :param cond: a function evaluating the entries and returns True or False whether or not the entry should be returned.
 
