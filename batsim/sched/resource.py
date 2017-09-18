@@ -117,6 +117,33 @@ class Resource:
         """Returns a list containing only the resource (for compatibility with the `Resources` class)."""
         return [self]
 
+    def time_free(self, time=None):
+        """Get time how long this resource is still free until the next reservation starts, `0` if the resource is allocated, and
+        `Inf` if this resource has no allocations.
+
+        :param time: the first time step to consider (default: the current time in the simulation)
+        """
+        result = None
+
+        if time is None:
+            time = self._scheduler.time
+
+        for alloc in self._allocations:
+            # Allocation is currently active
+            if alloc.start_time <= time and alloc.end_time >= time:
+                return 0
+            # Allocation starts after current time
+            elif alloc.start_time > time:
+                if result is None:
+                    result = alloc.start_time
+                else:
+                    result = min(result, alloc.start_time)
+
+        if result is None:
+            result = float("Inf")
+
+        return result
+
     def find_first_time_to_fit_walltime(self, requested_walltime, time=None):
         """Finds the first time after which the requested walltime is available for a job start.
 
@@ -132,8 +159,8 @@ class Resource:
             # Search the earliest time when a slot for an allocation is
             # available
             for alloc in self._allocations:
-                if alloc.start_time < time and alloc.end_time >= time:
-                    time = alloc.end_time + 1
+                if alloc.start_time <= time and alloc.end_time >= time:
+                    time = alloc.end_time + 0.000001
                     time_updated = True
             # Check whether or not the full requested walltime fits into the
             # slot, otherwise move the slot at the end of the found conflicting
@@ -141,8 +168,8 @@ class Resource:
             estimated_end_time = time + requested_walltime
             for alloc in self._allocations:
                 if alloc.start_time > time and alloc.start_time < (
-                        estimated_end_time + 1):
-                    time = alloc.end_time + 1
+                        estimated_end_time + 0.000001):
+                    time = alloc.end_time + 0.000001
                     estimated_end_time = time + requested_walltime
                     time_updated = True
         return time
@@ -260,8 +287,10 @@ class Resources(ObserveList):
             self,
             requested_walltime,
             time,
-            min_matches,
-            max_matches):
+            min_matches=None,
+            max_matches=None,
+            time_sharing=False,
+            filter=None):
         """Find sufficient resources and the earlierst start time to fit a walltime and resource requirements.
 
         :param requested_walltime: the walltime which should fit in the allocation
@@ -271,32 +300,69 @@ class Resources(ObserveList):
         :param min_matches: discard resources if less than `min_matches` were found
 
         :param max_matches: discard more resources than `max_matches`
+
+        :param filter: the filter to be applied when a set of resources was found
         """
-        time_updated = True
-        while time_updated:
-            time_updated = False
+        if time_sharing:
+            raise ValueError(
+                "Finding allocations when time sharing is enabled is currently not implemented")
+
+        # There are not enough resources available
+        if min_matches is not None and len(self) < min_matches:
+            return time, self.create()
+
+        while True:
+            sufficient_resources_found = False
             found_resources = []
-            for i, r in enumerate(self._data):
+            earliest_time_available = None
+            time_changed = False
+            for r in self._data:
                 new_time = r.find_first_time_to_fit_walltime(
                     requested_walltime, time)
-                if new_time != time:
-                    if max_matches is None or len(
-                            found_resources) < max_matches:
-                        time = new_time
-                        time_updated = True
-                        break
-                    elif len(found_resources) >= max_matches:
-                        break
-                else:
+
+                if new_time == time:
                     found_resources.append(r)
-                    if len(found_resources) >= max_matches:
+                    if min_matches is None or len(
+                            found_resources) >= min_matches:
+                        sufficient_resources_found = True
+                else:
+                    if earliest_time_available is None:
+                        earliest_time_available = new_time
+                    else:
+                        earliest_time_available = min(
+                            earliest_time_available, new_time)
+            if sufficient_resources_found:
+                if filter:
+                    found_resources = build_filter(
+                        filter, min_entries=min_matches,
+                        max_entries=max_matches, walltime=requested_walltime,
+                        current_time=time)(found_resources)
+
+                    if found_resources and (
+                            min_matches is None or len(found_resources) >= min_matches):
                         break
-        if len(found_resources) < min_matches:
-            found_resources = []
+                    else:
+                        time = earliest_time_available
+                else:
+                    break
+            elif earliest_time_available:
+                time = earliest_time_available
+
+        found_length = len(found_resources)
+
+        if max_matches is not None:
+            found_resources = found_resources[:max_matches]
+            found_length = len(found_resources)
+            assert found_length <= max_matches
+
+        if min_matches is not None:
+            assert found_length >= min_matches
+
         return time, self.create(found_resources)
 
     def find_with_earliest_start_time(
-            self, job, *args, allow_future_allocations=False, **kwargs):
+            self, job, allow_future_allocations=False,
+            filter=None):
         """Find sufficient resources and the earlierst start time for a given job.
 
         :param job: the job for which the start times and resources should be found
@@ -304,17 +370,12 @@ class Resources(ObserveList):
         :param allow_future_allocations: whether or not allocations starting after
                                          the current simulation time are allowed
 
-        :param args: forwarded to filter the resources
-
-        :param kwargs: forwarded to filter the resources
+        :param filter: the filter to be applied when a set of resources was found
         """
-        has_time_sharing = job._scheduler.has_time_sharing
-        resources = self.filter(
-            *args, free=True, allocated=has_time_sharing,
-            computing=has_time_sharing, **kwargs)
-
-        start_time, found_resources = resources.find_first_time_and_resources_to_fit_walltime(
-            job.requested_time, job._scheduler.time, job.requested_resources, job.requested_resources)
+        start_time, found_resources = self.find_first_time_and_resources_to_fit_walltime(
+            job.requested_time, max(job._scheduler.time, job.submit_time), job.requested_resources, job.requested_resources,
+            job._scheduler.has_time_sharing,
+            filter)
 
         if not allow_future_allocations and start_time != job._scheduler.time:
             found_resources = self.create()
@@ -324,14 +385,8 @@ class Resources(ObserveList):
     def find_sufficient_resources_for_job(self, *args, **kwargs):
         """Find sufficient resources for a given job.
 
-        :param job: the job for which the start times and resources should be found
+        For supported arguments see `find_with_earliest_start_time`.
 
-        :param allow_future_allocations: whether or not allocations starting after
-                                         the current simulation time are allowed
-
-        :param args: forwarded to filter the resources
-
-        :param kwargs: forwarded to filter the resources
         """
         return self.find_with_earliest_start_time(
             *args, **kwargs)[1]

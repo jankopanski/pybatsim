@@ -11,60 +11,138 @@ from .filling import filler_sched
 from . import utils
 
 
-def backfilling_jobs_sjf(scheduler, reservation_depth, jobs=None):
-    """Backfill jobs using the shortest-job-first strategy (relying on the user guesses for the
-    requested time).
-    """
-    if jobs is None:
-        jobs = scheduler.jobs
+def do_backfilling(
+        scheduler,
+        reservation_depth,
+        jobs,
+        resources,
+        resources_filter=None,
+        check_func=None,
+        handle_scheduled_func=None,
+        backfilling_sort=None):
+    """Helper to implement the backfilling step of backfilling algorithms.
 
+    :param scheduler: the scheduler
+
+    :param reservation_depth: how many jobs should be reserved at the beginning of the queue
+
+    :param jobs: the list of all jobs considering in the priority scheduling and in the
+                 backfilling
+
+    :param resources: the resources to use for the scheduling
+
+    :param resources_filter: the filter to use for the resource filtering
+                             (can be used to implement topology aware scheduling)
+
+    :param check_func: a function to check whether or not a job should be backfilled.
+                       The signature is: job, res, temporary_allocations; whereas
+                       the job is the job to be backfilled, res are the resources
+                       found for the backfilling job, and temporary_allocations are
+                       the allocations of the jobs with allocations in the future
+                       (reserved jobs).
+
+    :param handle_scheduled_func: a function which will be given the latest scheduled job
+                                  as a parameter
+
+    :param backfilling_sort: after the priority jobs were reserved, this function will
+                             be used to call jobs.sorted(f) with it to sort the remaining
+                             jobs.
+    """
     runnable_jobs = jobs.runnable
 
     reserved_jobs = runnable_jobs[:reservation_depth]
     remaining_jobs = runnable_jobs[reservation_depth:]
 
-    # Sort remaining jobs with the shortest jobs first
-    for job in remaining_jobs.sorted(lambda j: j.requested_time):
-        # Search resources for job which do not delay priority jobs
-        res = utils.find_resources_without_delaying_priority_jobs(
-            scheduler, reserved_jobs, scheduler.resources, job)
-        if res:
-            scheduler.info(
-                "Scheduled job in backfilling ({job}) instead of priority jobs ({priority_jobs})",
-                type="backfilling_schedule_job",
-                job=job,
-                priority_jobs=reserved_jobs)
-            job.schedule(res)
+    if backfilling_sort:
+        remaining_jobs = remaining_jobs.sorted(backfilling_sort)
+
+    utils.schedule_jobs_without_delaying_priorities(
+        scheduler,
+        reserved_jobs,
+        resources,
+        remaining_jobs,
+        resources_filter=resources_filter,
+        check_func=check_func,
+        handle_scheduled_func=handle_scheduled_func)
 
 
 def backfilling_sched(
         scheduler,
-        strategy=None,
-        reservation_depth=None,
-        jobs=None):
-    """Backfilling algorithm using the filler scheduler to run the first jobs and
-    using a backfilling strategy to backfill low-priority jobs afterwards.
+        reservation_depth=1,
+        jobs=None,
+        resources=None,
+        resources_filter=None,
+        filler_check_func=None,
+        backfilling_check_func=None,
+        handle_scheduled_func=None,
+        backfilling_sort=None,
+        priority_sort=None):
+    """Backfilling algorithm using the filler scheduler to run the first jobs and backfill the remaining jobs.
 
-    :param strategy: the strategy (`str`) or fallback to the shortest-job-first strategy
+    :param scheduler: the scheduler
 
-    :param reservation_depth: the number of priority jobs to be reserved during the backfilling
+    :param reservation_depth: how many jobs should be reserved at the beginning of the queue
+
+    :param jobs: the list of all jobs considering in the priority scheduling and in the
+                 backfilling
+
+    :param resources: the resources to use for the scheduling
+
+    :param resources_filter: the filter to use for the resource filtering
+                             (can be used to implement topology aware scheduling)
+
+    :param filler_check_func: a function which can check whether or not jobs in the filler_sched
+                              part are allowed to be scheduled.
+                              Signature: job, res, list_of_already_scheduled_jobs
+
+    :param backfilling_check_func: a function to check whether or not a job should be backfilled.
+                                   The signature is: job, res, temporary_allocations; whereas
+                                   the job is the job to be backfilled, res are the resources
+                                   found for the backfilling job, and temporary_allocations are
+                                   the allocations of the jobs with allocations in the future
+                                   (reserved jobs).
+
+    :param handle_scheduled_func: a function which will be given the latest scheduled job
+                                  as a parameter
+
+    :param backfilling_sort: after the priority jobs were reserved, this function will
+                             be used to call jobs.sorted(f) with it to sort the remaining
+                             jobs.
+
+    :param priority_sort:    this function will be used to call jobs.sorted(f) to sort
+                             the initial list of priority jobs.
     """
-    strategy = strategy or scheduler.options.get("backfilling_strategy", "sjf")
-    reservation_depth = reservation_depth or scheduler.options.get(
-        "backfilling_reservation_depth",
-        1)
 
     if jobs is None:
         jobs = scheduler.jobs
 
+    if priority_sort:
+        jobs = jobs.sorted(priority_sort)
+
+    if resources is None:
+        resources = scheduler.resources
+
     # Start earlier submitted jobs first until a job doesn't fit.
-    filler_sched(scheduler, abort_on_first_nonfitting=True, jobs=jobs)
+    filler_sched(scheduler, abort_on_first_nonfitting=True, jobs=jobs,
+                 resources=resources, resources_filter=resources_filter,
+                 check_func=filler_check_func,
+                 handle_scheduled_func=handle_scheduled_func)
 
     # Do backfilling if there are still runnable jobs and free resources.
-    if scheduler.resources.free and len(
+    if resources.free and len(
             jobs.runnable) > reservation_depth:
-        if strategy == "sjf":
-            backfilling_jobs_sjf(scheduler, reservation_depth, jobs=jobs)
-        else:
-            raise NotImplementedError(
-                "Unimplemented backfilling strategy: {}".format(strategy))
+        do_backfilling(scheduler, reservation_depth, jobs=jobs,
+                       resources=resources, resources_filter=resources_filter,
+                       check_func=backfilling_check_func,
+                       handle_scheduled_func=handle_scheduled_func,
+                       backfilling_sort=backfilling_sort)
+
+
+def sjf_backfilling_sched(*args, **kwargs):
+    """Shortest-job-first backfilling algorithm sorting the jobs to be backfilled after
+    their requested walltime.
+    """
+    return backfilling_sched(
+        *args,
+        backfilling_sort=lambda j: j.requested_time,
+        **kwargs)
