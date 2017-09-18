@@ -183,16 +183,27 @@ def launch_expe(options, verbose=True):
             [">", str(batsim_stdout_file.name),
              "2>", str(batsim_stderr_file.name)]))
 
-    batsim_exec = subprocess.Popen(
-        batsim_cl, stdout=batsim_stdout_file, stderr=batsim_stderr_file)
+    try:
+        batsim_exec = subprocess.Popen(
+            batsim_cl, stdout=batsim_stdout_file, stderr=batsim_stderr_file)
+    except PermissionError:
+        print("Failed to run batsim: {}".format(" ".join(batsim_cl)), file=sys.stderr)
+        sys.exit(1)
 
     if verbose:
         print("Starting scheduler: ", end="")
         print(" ".join(sched_cl + [">", str(sched_stdout_file.name), "2>",
                                    str(sched_stderr_file.name)]))
 
-    sched_exec = subprocess.Popen(
-        sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file)
+    try:
+        sched_exec = subprocess.Popen(
+            sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file)
+    except PermissionError:
+        print("Failed to run the scheduler: {}".format(" ".join(sched_cl)), file=sys.stderr)
+        print("Terminating batsim", file=sys.stderr)
+        batsim_exec.terminate()
+        batsim_exec.wait()
+        sys.exit(2)
 
     try:
         if verbose:
