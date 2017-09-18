@@ -194,19 +194,26 @@ def launch_expe(options, verbose=True):
     sched_exec = subprocess.Popen(
         sched_cl, stdout=sched_stdout_file, stderr=sched_stderr_file)
 
-    if verbose:
-        print("Simulation is in progress", end="")
-
-    while True:
-        if batsim_exec.poll() is not None:
-            break
-        elif sched_exec.poll() is not None:
-            break
-        time.sleep(0.5)
+    try:
         if verbose:
-            print(".", end="", flush=True)
-    if verbose:
-        print()
+            print("Simulation is in progress.", end="", flush=True)
+
+        while True:
+            if batsim_exec.poll() is not None:
+                if verbose:
+                    print()
+                break
+            elif sched_exec.poll() is not None:
+                if verbose:
+                    print()
+                break
+            time.sleep(0.5)
+            if verbose:
+                print(".", end="", flush=True)
+    except KeyboardInterrupt:
+        print("\nSimulation was aborted => Terminating batsim and the scheduler")
+        batsim_exec.terminate()
+        sched_exec.terminate()
 
     if sched_exec.poll() is not None and sched_exec.returncode != 0 and batsim_exec.poll() is None:
         print("Scheduler has died => Terminating batsim")
