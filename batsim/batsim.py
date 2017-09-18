@@ -367,6 +367,7 @@ class Batsim(object):
             event_type = event["type"]
             event_data = event.get("data", {})
             if event_type == "SIMULATION_BEGINS":
+                assert not self.running_simulation, "A simulation is already running (is more than one instance of Batsim active?!)"
                 self.running_simulation = True
                 self.nb_res = event_data["nb_resources"]
                 batconf = event_data["config"]
@@ -388,6 +389,7 @@ class Batsim(object):
                 self.scheduler.onSimulationBegins()
 
             elif event_type == "SIMULATION_ENDS":
+                assert self.running_simulation, "No simulation is currently running"
                 self.running_simulation = False
                 print(
                     "[PYBATSIM]: All jobs have been submitted and completed!",
