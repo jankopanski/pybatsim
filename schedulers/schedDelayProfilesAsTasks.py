@@ -1,6 +1,6 @@
 """
-    delayProfilesAsTasks
-    ~~~~~~~~~~~~~~~~~~~~
+    schedDelayProfilesAsTasks
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
 
     This is a small scheduler to test the dynamic API of Batsim.
     Delay jobs are split into small tasks and submitted individually to Batsim.
@@ -17,7 +17,7 @@ from batsim.sched import Allocation
 from batsim.sched import Profiles
 
 
-class DelayProfilesAsTasks(Scheduler):
+class SchedDelayProfilesAsTasks(Scheduler):
 
     def on_job_submission(self, job):
         # Do this only on static job submissions

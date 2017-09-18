@@ -92,7 +92,7 @@ def generate_sched_static(workloads_basedir, platforms_basedir, options):
     schedulers += [
         {
             "name_expe": "sched_delayProfilesAsTasks",
-            "name": "delayProfilesAsTasks",
+            "name": "schedDelayProfilesAsTasks",
             "verbosity": 0,
             "protection": True,
             "interpreter": "coverage",
@@ -101,7 +101,7 @@ def generate_sched_static(workloads_basedir, platforms_basedir, options):
         },
         {
             "name_expe": "sched_fillerSched",
-            "name": "fillerSched2",
+            "name": "schedFiller",
             "verbosity": 0,
             "protection": True,
             "interpreter": "coverage",
@@ -110,7 +110,7 @@ def generate_sched_static(workloads_basedir, platforms_basedir, options):
         },
         {
             "name_expe": "sched_backfilling",
-            "name": "easyBackfill2",
+            "name": "schedEasySjfBackfill",
             "verbosity": 0,
             "protection": True,
             "interpreter": "coverage",
@@ -150,7 +150,7 @@ def generate_sched_script(workloads_basedir, platforms_basedir, options):
     schedulers += [
         {
             "name_expe": "sched_fillerSched",
-            "name": "fillerSched2",
+            "name": "schedFiller",
             "verbosity": 0,
             "protection": True,
             "interpreter": "coverage",
@@ -159,7 +159,7 @@ def generate_sched_script(workloads_basedir, platforms_basedir, options):
         },
         {
             "name_expe": "sched_backfilling",
-            "name": "easyBackfill2",
+            "name": "schedEasySjfBackfill",
             "verbosity": 0,
             "protection": True,
             "interpreter": "coverage",
