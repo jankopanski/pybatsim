@@ -123,7 +123,7 @@ class Resource:
 
         :param time: the first time step to consider (default: the current time in the simulation)
         """
-        result = None
+        result = float("Inf")
 
         if time is None:
             time = self._scheduler.time
@@ -131,16 +131,11 @@ class Resource:
         for alloc in self._allocations:
             # Allocation is currently active
             if alloc.start_time <= time and alloc.end_time >= time:
-                return 0
+                result = 0
+                break
             # Allocation starts after current time
             elif alloc.start_time > time:
-                if result is None:
-                    result = alloc.start_time
-                else:
-                    result = min(result, alloc.start_time)
-
-        if result is None:
-            result = float("Inf")
+                result = min(result, alloc.start_time)
 
         return result
 
