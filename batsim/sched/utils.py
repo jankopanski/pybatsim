@@ -144,41 +144,47 @@ class ObserveList:
                 reverse=reverse))
 
 
-def filter_list(
-        data,
+def build_filter(
         filter=[],
         cond=None,
-        max=None,
-        min=None,
-        num=None,
-        min_or_max=False):
-    """Filters a list.
-
-    :param data: the list to be filtered.
+        max_entries=None,
+        min_entries=None,
+        num_entries=None,
+        min_or_max=False,
+        **kwargs):
+    """Construct a function to filter a list.
 
     :param filter: a list of generators through which the entries will be piped.
                    The generators should iterate through the data (first argument)
                    and should `yield` the searched elements.
+                   The filter functions are called with the following arguments:
+                   data (the iterable), max_entries (see parameter max_entries),
+                   min_entries (see parameter min_entries), min_or_max (see parameter min_or_max),
+                   **kwargs (see parameter kwargs).
 
     :param cond: a function evaluating the entries and returns True or False whether or not the entry should be returned.
 
-    :param max: the maximum number of returned entries.
+    :param max_entries: the maximum number of returned entries.
 
-    :param min: the minimum number of returned entries (if less entries are available no entries will be returned at all).
+    :param min_entries: the minimum number of returned entries (if less entries are available no entries will be returned at all).
 
-    :param num: the exact number of returned entries (overwrites `min` and `max`).
+    :param num_entries: the exact number of returned entries (overwrites `min` and `max`).
 
     :param min_or_max: either return the minimum or maximum number but nothing between.
 
+    :param kwargs: Additional arguments forwarded to all filter functions.
+
     """
+    if not isinstance(filter, list):
+        filter = [filter]
 
     # If a concrete number of entries is requested do not yield less or
     # more
-    if num:
-        min = num
-        max = num
+    if num_entries:
+        min_entries = num_entries
+        max_entries = num_entries
 
-    def filter_condition(res):
+    def filter_condition(res, **kwargs):
         if cond:
             for r in res:
                 if cond(r):
@@ -188,36 +194,56 @@ def filter_list(
 
     def do_filter(res):
         for gen in reversed(filter):
-            res = gen(res)
+            res = gen(
+                res,
+                max_entries=max_entries,
+                min_entries=min_entries,
+                min_or_max=min_or_max,
+                **kwargs)
         yield from filter_condition(res)
 
-    result = []
-    num_elems = 0
-    iterator = do_filter(data)
-    while True:
-        # Do not yield more entries than requested
-        if max and num_elems >= max:
-            break
-
-        try:
-            elem = next(iterator)
-        except StopIteration:
-            break
-        num_elems += 1
-        result.append(elem)
-
-    # Do not yield less entries than requested (better nothing than less)
-    if min and len(result) < min:
+    def filter_func(data):
         result = []
         num_elems = 0
+        iterator = do_filter(data)
+        while True:
+            # Do not yield more entries than requested
+            if max_entries and num_elems >= max_entries:
+                break
 
-    # Return only min elements if flag is set and num_elems is between min and
-    # max
-    if min_or_max and min and max and num_elems < max and num_elems > min:
-        result = result[:min]
+            try:
+                elem = next(iterator)
+            except StopIteration:
+                break
+            num_elems += 1
+            result.append(elem)
 
-    # Construct a new list which can be filtered again
-    return result
+        # Do not yield less entries than requested (better nothing than less)
+        if min_entries and len(result) < min_entries:
+            result = []
+            num_elems = 0
+
+        # Return only min elements if flag is set and num_elems is between min and
+        # max
+        if min_or_max and min_entries and max_entries and num_elems < max_entries and num_elems > min_entries:
+            result = result[:min_entries]
+
+        # Construct a new list which can be filtered again
+        return result
+    return filter_func
+
+
+def filter_list(data, *args, **kwargs):
+    """Filters a list.
+
+    :param data: the list to be filtered.
+
+    :param args: Arguments forwarded to the filter generator.
+
+    :param kwargs: Arguments forwarded to the filter generator.
+
+    """
+    return build_filter(*args, **kwargs)(data)
 
 
 class DictWrapper:

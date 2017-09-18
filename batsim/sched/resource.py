@@ -7,7 +7,7 @@
 """
 from enum import Enum
 
-from .utils import ObserveList, filter_list, ListView
+from .utils import ObserveList, filter_list, ListView, build_filter
 
 
 class Resource:
@@ -361,7 +361,7 @@ class Resources(ObserveList):
         filter_objects = []
 
         # Filter after the resource type
-        def filter_free_or_allocated_resources(res):
+        def filter_free_or_allocated_resources(res, **kwargs):
             for r in res:
                 if allocated:
                     if r.is_allocated:

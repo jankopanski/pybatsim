@@ -716,7 +716,7 @@ class Jobs(ObserveList):
             static_job = True
 
         # Filter jobs
-        def filter_jobs(jobs):
+        def filter_jobs(jobs, **kwargs):
             for j in jobs:
                 if dynamic_job:
                     if j.is_dynamic_job:
