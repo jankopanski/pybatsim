@@ -168,11 +168,15 @@ def generate_sched_script(workloads_basedir, platforms_basedir, options):
         },
     ]
 
+    workloads_to_use = [
+        os.path.join("tests/workloads", w)
+        for w in ["generated_workload.py", "generated_workload2.py"]]
+
     options += [{
         "batsim_bin": "tests/run_batsim.sh",
         "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
         "workload_script": {
-            "path": "tests/workloads/generated_workload.py",
+            "path": w,
         },
         # where all output files (stdins, stderrs, csvs...) will be outputed.
         "output_dir": "SELF",
@@ -189,7 +193,7 @@ def generate_sched_script(workloads_basedir, platforms_basedir, options):
                                         # information (default), debug.
         },
         "scheduler": copy.deepcopy(s)
-    } for s in schedulers]
+    } for s in schedulers for w in workloads_to_use]
 
 
 def generate_sched_dynamic(workloads_basedir, platforms_basedir, options):
