@@ -136,13 +136,3 @@ def backfilling_sched(
                        check_func=backfilling_check_func,
                        handle_scheduled_func=handle_scheduled_func,
                        backfilling_sort=backfilling_sort)
-
-
-def sjf_backfilling_sched(*args, **kwargs):
-    """Shortest-job-first backfilling algorithm sorting the jobs to be backfilled after
-    their requested walltime.
-    """
-    return backfilling_sched(
-        *args,
-        backfilling_sort=lambda j: j.requested_time,
-        **kwargs)
