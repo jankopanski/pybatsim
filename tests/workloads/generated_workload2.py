@@ -24,7 +24,7 @@ def delay_workload(w):
     ]
 
     jobs = job_classes[:]
-    while len(jobs) < 25:
+    while len(jobs) < 30:
         jobs.append(
             r.choices(
                 job_classes, [r + 0.25 for r in range(0, len(job_classes))])

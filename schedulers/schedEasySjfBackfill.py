@@ -7,7 +7,7 @@
 """
 
 from batsim.sched.algorithms.backfilling import backfilling_sched
-from batsim.sched.algorithms.utils import default_resources_filter
+from batsim.sched.algorithms.utils import consecutive_resources_filter
 
 
 def SchedEasySjfBackfill(scheduler):
@@ -25,5 +25,5 @@ def SchedEasySjfBackfill(scheduler):
 
     backfilling_sched(
         scheduler,
-        resources_filter=default_resources_filter,
+        resources_filter=consecutive_resources_filter,
         **kwargs)
