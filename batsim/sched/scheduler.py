@@ -35,6 +35,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler = scheduler
 
         self._jobmap = {}
+        self._next_job_number = 0
 
     def onSimulationBegins(self):
         self._scheduler.info(
@@ -98,10 +99,12 @@ class BaseBatsimScheduler(BatsimScheduler):
             job=job,
             type="job_submission_received2")
         newjob = Job(
+            number=self._next_job_number,
             batsim_job=job,
             scheduler=self._scheduler,
             jobs_list=self._scheduler.jobs)
         self._jobmap[job.id] = newjob
+        self._next_job_number += 1
 
         self._scheduler.jobs.add(newjob)
 
@@ -120,8 +123,12 @@ class BaseBatsimScheduler(BatsimScheduler):
             job_description.job = newjob
             newjob._workload_description = workload
 
-        self._scheduler.info("Received job submission from Batsim ({job})",
-                             job=newjob, type="job_submission_received")
+        self._scheduler.info(
+            "Received job submission from Batsim (job={job}, open_jobs_in_queue={open_jobs_in_queue})",
+            job=newjob,
+            open_jobs_in_queue=len(
+                self._scheduler.jobs.open),
+            type="job_submission_received")
 
         self._scheduler.on_job_submission(newjob)
         self._scheduler._do_schedule()

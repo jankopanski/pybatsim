@@ -19,6 +19,8 @@ class Job:
     """A job is a wrapper around a batsim job to extend the basic API of Pybatsim with more
     object oriented approaches on the implementation of the scheduler.
 
+    :param number: the number of this job in the queue.
+
     :param batsim_job: the batsim job object from the underlying Pybatsim scheduler.
 
     :param scheduler: the associated scheduler managing this job.
@@ -32,6 +34,7 @@ class Job:
 
     def __init__(
             self,
+            number=None,
             batsim_job=None,
             scheduler=None,
             jobs_list=None,
@@ -64,6 +67,8 @@ class Job:
 
         self._comment = None
 
+        self._number = number
+
         self._workload_description = None
         self._subjobs_workload = None
 
@@ -90,6 +95,11 @@ class Job:
                 return self._batsim_job.__dict__[key]
             except KeyError:
                 return default
+
+    @property
+    def number(self):
+        """The number of this job (place in the queue)."""
+        return self._number
 
     @property
     def messages(self):
@@ -540,9 +550,9 @@ class Job:
 
     def __str__(self):
         return (
-            "<Job {}; sub:{} reqtime:{} res:{} prof:{} start:{} fin:{} stat:{} killreason:{} ret:{} comment:{}>"
+            "<Job {}; queue:{} sub:{} reqtime:{} res:{} prof:{} start:{} fin:{} stat:{} killreason:{} ret:{} comment:{}>"
             .format(
-                self.id, self.submit_time, self.requested_time,
+                self.id, self.number, self.submit_time, self.requested_time,
                 self.requested_resources, self.profile,
                 self.start_time,
                 self.finish_time, self.state,
