@@ -422,17 +422,25 @@ def launch_expe(options, verbose=True):
 
 
 def usage():
-    print("usage: [--verbose] launch_expe.py path/to/file.json")
+    print(
+        "usage: [--quiet|--debug|--help] {} path/to/file.json".format(
+            os.path.basename(
+                sys.argv[0])))
     return 1
 
 
 def main():
-    verbose = False
+    verbose = True
+    debug = False
     options_file = None
 
     for arg in sys.argv[1:]:
-        if arg == "--verbose":
-            verbose = True
+        if arg == "--quiet":
+            verbose = False
+        elif arg == "--debug":
+            debug = True
+        elif arg == "--help":
+            return usage()
         elif not arg.startswith("-"):
             if options_file is not None:
                 return usage()
@@ -440,18 +448,22 @@ def main():
         else:
             return usage()
 
+    if options_file is None:
+        return usage()
+
     try:
         with open(options_file) as f:
             options = json.loads(f.read())
-    except json.decoder.JSONDecodeError:
-        if verbose:
+    except Exception:
+        if debug:
             raise
         print("Error in json file: {}".format(options_file), file=sys.stderr)
         sys.exit(1)
 
     options["options-file"] = options_file
 
-    print("Running experiment: {}".format(options_file))
+    if verbose:
+        print("Running experiment: {}".format(options_file))
 
     return launch_expe(options, verbose=verbose)
 
