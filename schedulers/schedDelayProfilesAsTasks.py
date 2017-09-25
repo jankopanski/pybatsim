@@ -91,7 +91,7 @@ class SchedDelayProfilesAsTasks(Scheduler):
                 res = alloc.resources.copy()
                 starttime = alloc.start_time
                 walltime = alloc.walltime
-                alloc.free()
+                alloc.remove_all_resources()
 
                 # Schedule the sub job. Afterwards create a new reservation for
                 # the remaining part of the parent job's walltime.

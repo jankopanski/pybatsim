@@ -120,7 +120,7 @@ def backfilling_sched(
         jobs = jobs.sorted(priority_sort)
 
     if resources is None:
-        resources = scheduler.resources
+        resources = scheduler.resources.compute
 
     # Start earlier submitted jobs first until a job doesn't fit.
     filler_sched(scheduler, abort_on_first_nonfitting=True, jobs=jobs,

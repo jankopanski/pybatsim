@@ -45,7 +45,8 @@ def find_resources_without_delaying_priority_jobs(
             filter=resources_filter)
         assert res, "No future allocations were found in backfilling for priority job"
 
-        a = Allocation(start_time, j.requested_time, res)
+        a = Allocation(start_time, resources=res, job=j)
+        a.allocate_all(scheduler)
         temporary_allocations.append(a)
 
     # Search for allocations for the given job (not in the future)
@@ -145,7 +146,7 @@ def helper_cmp_numbers(n1, n2):
 
 def filter_func_consecutive_resources(
         current_time,
-        walltime,
+        job,
         min_entries,
         max_entries,
         current_result,
@@ -176,7 +177,7 @@ def best_find_one_of(*fs):
 
 def best_find_more_resources(
         current_time,
-        walltime,
+        job,
         min_entries,
         max_entries,
         best_result,
@@ -191,7 +192,7 @@ def best_find_more_resources(
 
 def best_find_more_remaining_resources(
         current_time,
-        walltime,
+        job,
         min_entries,
         max_entries,
         best_result,
@@ -206,7 +207,7 @@ def best_find_more_remaining_resources(
 
 def best_find_longest_remaining_time(
         current_time,
-        walltime,
+        job,
         min_entries,
         max_entries,
         best_result,
@@ -228,7 +229,7 @@ def best_find_longest_remaining_time(
 
 def best_find_shortest_current_time(
         current_time,
-        walltime,
+        job,
         min_entries,
         max_entries,
         best_result,
@@ -250,13 +251,13 @@ def generate_resources_filter(filter_funcs=[], find_best_funcs=[]):
 
     :param filter_funcs: filter methods which will be called on each resource whether
                          or not it should be added in the current iteration.
-                         Signature: current_time, requested_walltime, min_entries,
+                         Signature: current_time, job, min_entries,
                          max_entries, considered_resources, remaining_resources,
                          current_resource
 
     :param find_best_funcs: filter methods which will be used to compare found resource
                             sets and find the best resource set amongst them.
-                            Signature: current_time, requested_walltime, min_entries,
+                            Signature: current_time, job, min_entries,
                             max_entries, best_considered_resources,
                             best_remaining_resources,
                             current_considered_resources,
@@ -264,7 +265,7 @@ def generate_resources_filter(filter_funcs=[], find_best_funcs=[]):
     """
     def do_filter(
             resources,
-            walltime,
+            job,
             current_time,
             max_entries=None,
             min_entries=None,
@@ -280,7 +281,7 @@ def generate_resources_filter(filter_funcs=[], find_best_funcs=[]):
                 for f in filter_funcs:
                     if not f(
                             current_time,
-                            walltime,
+                            job,
                             min_entries,
                             max_entries,
                             result,
@@ -298,12 +299,14 @@ def generate_resources_filter(filter_funcs=[], find_best_funcs=[]):
                 if not best_result:
                     best_result = result
                     best_remaining = remaining
+                    if not find_best_funcs:
+                        break
                 else:
-                    is_best = True
+                    is_best = False
                     for f in find_best_funcs:
                         fres = f(
                             current_time,
-                            walltime,
+                            job,
                             min_entries,
                             max_entries,
                             best_result,
@@ -311,9 +314,9 @@ def generate_resources_filter(filter_funcs=[], find_best_funcs=[]):
                             result,
                             remaining)
                         if fres < 0:
-                            is_best = False
                             break
                         elif fres > 0:
+                            is_best = True
                             break
                     if is_best:
                         best_result = result

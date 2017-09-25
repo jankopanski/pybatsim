@@ -41,7 +41,7 @@ def filler_sched(scheduler, abort_on_first_nonfitting=False, jobs=None,
         jobs = scheduler.jobs
 
     if resources is None:
-        resources = scheduler.resources
+        resources = scheduler.resources.compute
 
     already_scheduled = []
 

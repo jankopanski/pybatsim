@@ -13,9 +13,15 @@ from .profiles import *
 from .alloc import *
 
 __all__ = [
-    "Scheduler", "as_scheduler",
-    "Job", "Jobs",
-    "Resource", "Resources",
-    "Profiles", "Profile",
+    "Scheduler",
+    "as_scheduler",
+    "Job",
+    "Jobs",
+    "ComputeResource",
+    "Resource",
+    "Resources",
+    "ResourceRequirement",
+    "Profiles",
+    "Profile",
     "Allocation",
 ]
