@@ -96,6 +96,53 @@ def generate_energy(
     } for s in schedulers for w in workloads_to_use]
 
 
+def generate_basic(
+        workloads_basedir,
+        platforms_basedir,
+        batsim_bin,
+        batsim_args,
+        options):
+    schedulers = []
+
+    schedulers += [
+        {
+            "name_expe": "basic_filler_sched",
+            "name": "fillerSched",
+            "verbose": False,
+            "protection": True,
+            "interpreter": "coverage",
+            "options": {
+            }
+        },
+    ]
+
+    workloads_to_use = [
+        os.path.join(workloads_basedir, "test_bf.json")]
+
+    options += [{
+        # where all output files (stdins, stderrs, csvs...) will be outputed.
+        "output-dir": "SELF",
+        # if set to "SELF" then output on the same dir as this option file.
+
+        "export": "out",        # The export filename prefix used to generate simulation output
+
+        "batsim": {
+            "executable": {
+                "path": batsim_bin,
+                "args": batsim_args,
+            },
+            "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
+            "workload": w,
+            "energy": False,  # Enables energy-aware experiments
+            "disable-schedule-tracing": True,  # remove paje output
+            "verbosity": "information"  # Sets the Batsim verbosity level. Available values
+                                        # are : quiet, network-only,
+                                        # information (default), debug.
+        },
+        "scheduler": copy.deepcopy(s)
+    } for s in schedulers for w in workloads_to_use]
+
+
 def generate_sched_static(
         workloads_basedir,
         platforms_basedir,
@@ -359,15 +406,19 @@ def do_generate(options):
 def main(args):
     options = []
 
+    basic = False
     energy = False
     sched = False
+
     workloads_basedir = "../../workload_profiles"
     platforms_basedir = "../../platforms"
     batsim_bin = None
     batsim_args = []
 
     for arg in args:
-        if arg == "--energy":
+        if arg == "--basic":
+            basic = True
+        elif arg == "--energy":
             energy = True
         elif arg == "--sched":
             sched = True
@@ -381,13 +432,22 @@ def main(args):
             print("Unknown argument: {}".format(arg))
             return 1
 
-    if not energy and not sched:
+    if not energy and not sched and not basic:
+        basic = True
         energy = True
         sched = True
 
     if not batsim_bin:
         batsim_bin = "docker"
         batsim_args = ["run", "batsim:dev"]
+
+    if basic:
+        generate_basic(
+            workloads_basedir,
+            platforms_basedir,
+            batsim_bin,
+            batsim_args,
+            options)
 
     if energy:
         generate_energy(
