@@ -253,11 +253,21 @@ class Job:
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.id
 
+    @id.setter
+    def id(self, value):
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        self._batsim_job.id = value
+
     @property
     def submit_time(self):
         """The time of submission of this job as known by Batsim."""
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.submit_time
+
+    @submit_time.setter
+    def submit_time(self, value):
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        self._batsim_job.submit_time = value
 
     @property
     def requested_time(self):
@@ -265,11 +275,21 @@ class Job:
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.requested_time
 
+    @requested_time.setter
+    def requested_time(self, value):
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        self._batsim_job.requested_time = value
+
     @property
     def requested_resources(self):
         """The requested resources of this job as known by Batsim."""
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.requested_resources
+
+    @requested_resources.setter
+    def requested_resources(self, value):
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        self._batsim_job.requested_resources = value
 
     @property
     def profile(self):
@@ -286,6 +306,11 @@ class Job:
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.finish_time
 
+    @finish_time.setter
+    def finish_time(self, value):
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        self._batsim_job.finish_time = value
+
     @property
     def state(self):
         """The state of this job as known by Batsim."""
@@ -300,11 +325,21 @@ class Job:
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.kill_reason
 
+    @kill_reason.setter
+    def kill_reason(self, value):
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        self._batsim_job.kill_reason = value
+
     @property
     def return_code(self):
         """The return code of this job as known by Batsim."""
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         return self._batsim_job.return_code
+
+    @return_code.setter
+    def return_code(self, value):
+        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
+        self._batsim_job.return_code = value
 
     @property
     def is_dynamic_job(self):
