@@ -10,6 +10,7 @@
 from abc import ABCMeta, abstractmethod
 
 from batsim.batsim import BatsimScheduler, Batsim
+from batsim.network import NetworkHandler
 
 from .resource import Resources, ComputeResource
 from .job import Job, Jobs
