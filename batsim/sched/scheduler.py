@@ -220,6 +220,7 @@ class Scheduler(metaclass=ABCMeta):
         # Create the logger
         self._logger = Logger(self, debug=debug)
 
+        self._last_published_event = None
         self._event_logger = None
         if write_events:
             self._event_logger = EventLogger(
@@ -381,7 +382,17 @@ class Scheduler(metaclass=ABCMeta):
         event_str = event.to_message()
 
         try:
-            self._batsim.publish_event(event_str)
+            do_publish = True
+
+            if self._last_published_event is not None:
+                if (self._last_published_event.time >= event.time and
+                    self._last_published_event.open_jobs == event.open_jobs and
+                        self._last_published_event.processed_jobs == event.processed_jobs):
+                    do_publish = False
+
+            if do_publish:
+                self._batsim.publish_event(event_str)
+                self._last_published_event = event
         except AttributeError:
             # Batsim is not initialised
             pass
