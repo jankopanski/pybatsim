@@ -332,7 +332,7 @@ def launch_expe(options, verbose=True):
         event_socket_connect = options.get(
             "event-socket-connect", "tcp://localhost:28001")
         network_client = NetworkHandler(
-            socket_endpoint=event_socket_connect, timeout=250)
+            socket_endpoint=event_socket_connect, timeout=10)
         network_client.subscribe()
 
         try:
