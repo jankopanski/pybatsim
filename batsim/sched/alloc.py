@@ -35,6 +35,11 @@ class Allocation:
         assert start_time > 0, "Invalid start time for the allocation was given"
         self._start_time = start_time
         self._end_time = None
+
+        if job is not None:
+            if walltime is None:
+                walltime = job.requested_time
+
         self._walltime = walltime
 
         if isinstance(resources, Resource):
@@ -44,8 +49,6 @@ class Allocation:
                 self.add_resource(r)
 
         if job is not None:
-            if walltime is None:
-                self._walltime = job.requested_time
             self._reserve_job_on_allocation(job)
 
     @property
@@ -76,14 +79,19 @@ class Allocation:
     @start_time.setter
     def start_time(self, new_time):
         assert not self.allocated and not self.previously_allocated, "Allocation is in invalid state"
-        assert self._end_time is None or new_time < self.end_time, "An allocation can not start after its end time"
+        assert self._end_time is None or new_time < self.estimated_end_time, "An allocation can not start after its end time"
         self._start_time = new_time
 
     @property
-    def end_time(self):
-        """The end time of this allocation (either explicit or based on the walltime)."""
+    def estimated_end_time(self):
+        """The estimated end time of this allocation (either explicit or based on the walltime)."""
         return self._end_time or (
-            self.start_time + (self.walltime or sys.maxsize))
+            self.start_time + (self.walltime or float("Inf")))
+
+    @property
+    def end_time(self):
+        """The real end time of this allocation."""
+        return self._end_time
 
     @property
     def walltime(self):
@@ -183,10 +191,10 @@ class Allocation:
         :param other_allocation: the allocation to be checked for overlaps
         """
         s1 = self.start_time
-        e1 = self.end_time
+        e1 = self.estimated_end_time
 
         s2 = other_allocation.start_time
-        e2 = other_allocation.end_time
+        e2 = other_allocation.estimated_end_time
 
         if s1 < s2:
             if e1 >= s2:
@@ -244,9 +252,6 @@ class Allocation:
         assert not self._previously_allocated and not self._allocated, "Allocation is in invalid state"
         assert self._job is not None, "No job set in allocation"
 
-        time = scheduler.time
-        assert self.start_time <= time and self.end_time > time, "The allocation lies not in the current simulation time frame"
-
         for r in ([range1] + list(more_ranges)):
             for i in r:
                 res = self._resources[i]
@@ -258,8 +263,24 @@ class Allocation:
                         type="resource_ranges_invalid")
                 self._allocated_resources.add(res)
                 res._do_allocate_allocation(self)
+
+        for r in self.special_resources:
+            r._do_allocate_allocation(self)
+
         self._allocated = True
         self._scheduler = scheduler
+
+        self._scheduler.debug(
+            "Allocated allocation {allocation}",
+            allocation=self,
+            type="allocated_allocation")
+
+    def allocate_all(self, scheduler):
+        """Allocate all resources which were added to this allocation object.
+
+        :param scheduler: the scheduler to which the allocation is related to
+        """
+        return self.allocate(scheduler, range(0, len(self._resources)))
 
     def free(self):
         """Either free a finished allocation or clear an allocation which was not started yet.
@@ -267,7 +288,14 @@ class Allocation:
         :param scheduler: The scheduler argument is required when a finished allocation should be freed.
                           It is not required to clear an allocation which was not started yet.
         """
+        assert self._allocated, "Allocation is not allocated"
         assert not self._previously_allocated, "Allocation is in invalid state"
+
+        self._scheduler.debug(
+            "Free allocation {allocation}",
+            allocation=self,
+            type="free_allocation")
+
         if not self._allocated:
             if self._job is not None:
                 self._free_job_from_allocation()
@@ -275,6 +303,9 @@ class Allocation:
             return
 
         for r in self.resources.copy():
+            r._do_free_allocation(self)
+
+        for r in self.special_resources:
             r._do_free_allocation(self)
 
         self._end_time = self._scheduler.time

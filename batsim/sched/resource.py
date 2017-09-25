@@ -148,7 +148,7 @@ class Resource:
 
         for alloc in self._allocations:
             # Allocation is currently active
-            if alloc.start_time <= time and alloc.end_time >= time:
+            if alloc.start_time <= time and alloc.estimated_end_time >= time:
                 result = 0
                 break
             # Allocation starts after current time
