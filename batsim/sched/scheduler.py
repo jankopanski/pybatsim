@@ -11,7 +11,7 @@ from abc import ABCMeta, abstractmethod
 
 from batsim.batsim import BatsimScheduler, Batsim
 
-from .resource import Resources, Resource
+from .resource import Resources, ComputeResource
 from .job import Job, Jobs
 from .reply import ConsumedEnergyReply
 from .utils import DictWrapper
@@ -241,6 +241,8 @@ class Scheduler(metaclass=ABCMeta):
         self._jobs = Jobs()
         self._resources = Resources()
 
+        self._find_resource_handler = []
+
         self._workload_map = {}
         self._dynamic_workload = WorkloadDescription(name="DYNAMIC_WORKLOAD")
 
@@ -302,6 +304,33 @@ class Scheduler(metaclass=ABCMeta):
     def has_time_sharing(self):
         """Whether or not time sharing is enabled."""
         return self._batsim.time_sharing
+
+    @property
+    def get_find_resource_handlers(self):
+        """The functions to find resource requirements for jobs."""
+        return self._find_resource_handler
+
+    def register_find_resource_handler(self, handler):
+        """Adds a resource handler for searching resource requirements for jobs.
+
+        :param handler: a function which should return an iterable
+                        (or generator) containing `ResourceRequirement`
+                        objects. The function should determine
+                        absolutely necessary resource requirements
+                        needed by this job. For example, when all jobs
+                        should always allocate a specific external
+                        special resource like allocating I/O nodes
+                        not managed by Batsim.
+                        Signature: scheduler, job
+        """
+        self._find_resource_handler.append(handler)
+
+    def unregister_find_resource_handler(self, handler):
+        """Removes a resource handler.
+
+        :param handler: the function to be removed
+        """
+        self._find_resource_handler.remove(handler)
 
     def run_scheduler_at(self, time):
         """Wake the scheduler at the given point in time (of the simulation)."""
@@ -421,12 +450,12 @@ class Scheduler(metaclass=ABCMeta):
         `super()._pre_init()`
         """
         for r in self._batsim.resources:
-            self._resources.add(Resource(self,
-                                         r["id"],
-                                         r["name"],
-                                         r["state"],
-                                         r["properties"],
-                                         self.resources))
+            self._resources.add(ComputeResource(self,
+                                                id=r["id"],
+                                                name=r["name"],
+                                                resources_list=self.resources,
+                                                state=r["state"],
+                                                properties=r["properties"]))
         self.info(
             "{num_resources} resources registered",
             num_resources=len(

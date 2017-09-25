@@ -6,7 +6,7 @@
 """
 import sys
 
-from .resource import Resources, Resource
+from .resource import Resources, Resource, ComputeResource
 from .utils import ListView
 
 
@@ -23,6 +23,7 @@ class Allocation:
     def __init__(self, start_time, walltime=None, resources=[], job=None):
         self._job = None
         self._resources = []
+        self._special_resources = []
 
         self._scheduler = None
 
@@ -56,6 +57,11 @@ class Allocation:
     def resources(self):
         """The list of assigned resources."""
         return ListView(self._resources)
+
+    @property
+    def special_resources(self):
+        """The list of assigned special resources."""
+        return ListView(self._special_resources)
 
     @property
     def allocated(self):
@@ -199,7 +205,10 @@ class Allocation:
         """
         assert not self.allocated and not self.previously_allocated, "Allocation is in invalid state"
         resource._do_add_allocation(self)
-        self._resources.append(resource)
+        if not isinstance(resource, ComputeResource):
+            self._special_resources.append(resource)
+        else:
+            self._resources.append(resource)
 
     def remove_resource(self, resource):
         """Removes a resource from this allocation.
@@ -208,12 +217,17 @@ class Allocation:
         """
         assert not self.allocated and not self.previously_allocated, "Allocation is in invalid state"
         resource._do_remove_allocation(self)
-        self._resources.remove(resource)
+        if not isinstance(resource, ComputeResource):
+            self._special_resources.remove(resource)
+        else:
+            self._resources.remove(resource)
 
     def remove_all_resources(self):
         """Removes all resources from this allocation."""
         assert not self.allocated and not self.previously_allocated, "Allocation is in invalid state"
         for r in self._resources.copy():
+            self.remove_resource(r)
+        for r in self._special_resources.copy():
             self.remove_resource(r)
 
     def allocate(self, scheduler, range1, *more_ranges):
