@@ -1,13 +1,15 @@
 """
 This scheduler is a FCFS sleeper one :
-  - Released jobs are pushed in the back of one single queue
-  - Two jobs cannot be executed on the same machine at the same time
-  - Only the job at the head of the queue can be allocated
-    - If the job is too big (will never fit the machine), it is rejected
-    - If the job can fit the machine now, it is allocated (and run) instantly
-    - If the job cannot fit the machine now
-      - If the job cannot fit because of other jobs, the unused machines are switched OFF
-      - Else (if the job cannot fit because of sleeping machines), those machines are switched ON
+- Released jobs are pushed in the back of one single queue
+- Two jobs cannot be executed on the same machine at the same time
+- Only the job at the head of the queue can be allocated
+
+  - If the job is too big (will never fit the machine), it is rejected
+  - If the job can fit the machine now, it is allocated (and run) instantly
+  - If the job cannot fit the machine now
+
+    - If the job cannot fit because of other jobs, the unused machines are switched OFF
+    - Else (if the job cannot fit because of sleeping machines), those machines are switched ON
 
 Let us assume all machines have the following pstates (corresponding to file
 energy_platform_homogeneous.xml)

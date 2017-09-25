@@ -5,12 +5,12 @@ Usage:
     launcher.py <scheduler> [-o <options_string>] [options]
 
 Options:
-    -h --help                           Show this help message and exit.
-    -v --verbose                        Be verbose.
-    -p --protect                        Protect the scheduler using a validating machine.
-    -s --socket-endpoint=<endpoint>     Batsim socket endpoint to use [default: tcp://*:28000]
-    -o --options=<options_string>       A Json string to pass to the scheduler [default: {}]
-    -t --timeout=<timeout>              How long to wait for responses from Batsim [default: 2000]
+    -h --help                               Show this help message and exit.
+    -v --verbose                            Be verbose.
+    -p --protect                            Protect the scheduler using a validating machine.
+    -s --socket-endpoint=<endpoint>         Batsim socket endpoint to use [default: tcp://*:28000]
+    -o --options=<options_string>           A Json string to pass to the scheduler [default: {}]
+    -t --timeout=<timeout>                  How long to wait for responses from Batsim [default: 2000]
 '''
 
 import json
