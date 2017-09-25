@@ -11,6 +11,7 @@ from abc import ABCMeta, abstractmethod
 
 from batsim.batsim import BatsimScheduler, Batsim
 from batsim.network import NetworkHandler
+from batsim.tools.launcher import launch_scheduler_main
 
 from .resource import Resources, ComputeResource
 from .job import Job, Jobs
@@ -204,6 +205,11 @@ class Scheduler(metaclass=ABCMeta):
     :param options: the options given to the launcher.
 
     """
+
+    @classmethod
+    def launch_main(cls, **kwargs):
+        """Initialise this scheduler class and run it as if it were started with the launcher."""
+        launch_scheduler_main(cls, **kwargs)
 
     def __init__(self, options={}):
         self._options = options
