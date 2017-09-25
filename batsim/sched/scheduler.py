@@ -385,7 +385,7 @@ class Scheduler(metaclass=ABCMeta):
 
         self.on_event(event)
 
-        return event_str
+        return str(event)
 
     def _log_job_header(self):
         header = [
