@@ -8,6 +8,7 @@ from batsim.sched import Profiles
 from batsim.sched.workloads import WorkloadDescription
 
 from batsim.sched.algorithms.filling import filler_sched
+from batsim.sched.algorithms.utils import default_resources_filter
 
 
 class DynamicTestScheduler(Scheduler):
@@ -39,4 +40,6 @@ class DynamicTestScheduler(Scheduler):
         w.submit(self)
 
     def schedule(self):
-        return filler_sched(self, abort_on_first_nonfitting=True)
+        return filler_sched(self,
+                            abort_on_first_nonfitting=True,
+                            resources_filter=default_resources_filter)
