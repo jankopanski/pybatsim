@@ -282,19 +282,61 @@ class Allocation:
         self._previously_allocated = True
 
     def __str__(self):
-        jobid = None
+        data = self.to_json_dict()
+
+        return (
+            "<{} starttime:{} est_endtime:{} endtime: {} walltime:{} resources:{} special:{} allocated:{} job:{}>"
+            .format(
+                self.__class__.__name__,
+                data["start_time"],
+                data["estimated_end_time"],
+                data["end_time"],
+                data["walltime"],
+                [r.name for r in self.resources],
+                [r.name for r in self.special_resources],
+                [r.name for r in self.allocated_resources],
+                data["job"]))
+
+    def to_json_dict(self, recursive=True):
+        """Returns a dict representation of this object.
+
+        :param recursive: whether object references should be resolved
+        """
+        job = None
         if self.job:
-            jobid = self.job.id
+            if recursive:
+                job = self.job.to_json_dict(recursive=False)
+            else:
+                job = self.job.id
 
         resources = []
         for r in self._resources:
-            resources.append(r.name)
+            if recursive:
+                resources.append(r.to_json_dict(recursive=False))
+            else:
+                resources.append(r.name)
+
+        special = []
+        for r in self._special_resources:
+            if recursive:
+                special.append(r.to_json_dict(recursive=False))
+            else:
+                special.append(r.name)
 
         allocated = []
         for r in self._allocated_resources:
-            allocated.append(r.name)
+            if recursive:
+                allocated.append(r.to_json_dict(recursive=False))
+            else:
+                allocated.append(r.name)
 
-        return (
-            "<Allocation starttime:{} endtime:{} walltime:{} resources:{} allocated:{} job:{}>"
-            .format(
-                self.start_time, self.end_time, self.walltime, resources, allocated, jobid))
+        return {
+            "start_time": self.start_time,
+            "estimated_end_time": self.estimated_end_time,
+            "end_time": self.end_time,
+            "walltime": self.walltime,
+            "resources": resources,
+            "special": special,
+            "allocated": allocated,
+            "job": job
+        }

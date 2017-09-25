@@ -206,11 +206,34 @@ class Resource:
         self.on_free(allocation)
 
     def __str__(self):
+        data = self.to_json_dict()
         return (
-            "<Resource {}; name:{} pstate:{} allocs:{}>"
-            .format(
-                self.id, self.name, self.pstate,
-                [str(a) for a in self.allocations]))
+            "<{} {}; name={} allocs:{}>"
+            .format(self.__class__.__name__, data["id"], data["name"],
+                    data["allocations"]))
+
+    def to_json_dict(self, recursive=True):
+        """Returns a dict representation of this object.
+
+        :param recursive: whether object references should be resolved
+        """
+        data = {
+            "id": self.id,
+            "name": self.name
+        }
+        if recursive:
+            allocations = []
+
+            for a in self.allocations:
+                if recursive:
+                    allocations.append(a.to_json_dict(recursive=False))
+                else:
+                    if a.job:
+                        allocations.append(a.job.id)
+                    else:
+                        allocations.append([r.name for r in a.resources])
+            data["allocations"] = allocations
+        return data
 
     def on_allocate(self, allocation):
         pass

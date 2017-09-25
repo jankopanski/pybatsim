@@ -9,6 +9,7 @@ Options:
     -v --verbose                            Be verbose.
     -p --protect                            Protect the scheduler using a validating machine.
     -s --socket-endpoint=<endpoint>         Batsim socket endpoint to use [default: tcp://*:28000]
+    -e --event-socket-endpoint=<endpoint>   Socket endpoint to use to publish scheduler events [default: tcp://*:28001]
     -o --options=<options_string>           A Json string to pass to the scheduler [default: {}]
     -t --timeout=<timeout>                  How long to wait for responses from Batsim [default: 2000]
 '''
@@ -26,6 +27,7 @@ from batsim.sched import as_scheduler
 from batsim.validatingmachine import ValidatingMachine
 
 from docopt import docopt
+import zmq
 
 
 def module_to_class(module):
@@ -105,6 +107,7 @@ def main():
 
     scheduler_filename = arguments['<scheduler>']
     socket_endpoint = arguments['--socket-endpoint']
+    event_socket_endpoint = arguments['--event-socket-endpoint']
 
     print("Starting simulation...", flush=True)
     print("Scheduler:", scheduler_filename, flush=True)

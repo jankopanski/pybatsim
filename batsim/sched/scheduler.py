@@ -351,12 +351,34 @@ class Scheduler(metaclass=ABCMeta):
     def _format_event_msg(self, level, msg, type="msg", **kwargs):
         msg = msg.format(**kwargs)
 
-        event = LoggingEvent(self.time, level, msg, type, kwargs)
+        try:
+            open_jobs = self._batsim.nb_jobs_received
+            processed_jobs = (self._batsim.nb_jobs_completed +
+                              self._batsim.nb_jobs_failed +
+                              self._batsim.nb_jobs_timeout +
+                              self._batsim.nb_jobs_killed +
+                              len(self._batsim.jobs_manually_changed))
+        except AttributeError:
+            # Batsim is not initialised
+            open_jobs = 0
+            processed_jobs = 0
+
+        event = LoggingEvent(self.time, level, open_jobs, processed_jobs,
+                             msg, type, kwargs)
 
         self._events.append(event)
+
+        event_str = event.to_message()
+
+        try:
+            self._batsim.publish_event(event_str)
+        except AttributeError:
+            # Batsim is not initialised
+            pass
+
         self.on_event(event)
 
-        return str(event)
+        return event_str
 
     def _log_job_header(self):
         header = [

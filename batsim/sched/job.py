@@ -584,16 +584,49 @@ class Job:
         self._jobs_list.update_element(self)
 
     def __str__(self):
+        data = self.to_json_dict()
+
         return (
             "<Job {}; queue:{} sub:{} reqtime:{} res:{} prof:{} start:{} fin:{} stat:{} killreason:{} ret:{} comment:{}>"
             .format(
-                self.id, self.number, self.submit_time, self.requested_time,
-                self.requested_resources, self.profile,
-                self.start_time,
-                self.finish_time, self.state,
-                self.kill_reason,
-                self.return_code,
-                self.comment))
+                data["id"], data["queue_number"], data["submit_time"], data["requested_time"],
+                data["requested_resources"], data["profile"],
+                data["start_time"],
+                data["finish_time"], data["state"],
+                data["kill_reason"],
+                data["return_code"],
+                data["comment"]))
+
+    def to_json_dict(self, recursive=True):
+        """Returns a dict representation of this object.
+
+        :param recursive: whether object references should be resolved
+        """
+        profile = None
+        profile_name = None
+        if self.profile is not None:
+            profile = self.profile.to_dict()
+            profile_name = self.profile.name
+
+        state = None
+        if self.state is not None:
+            state = self.state.name
+
+        return {
+            "id": self.id,
+            "queue_number": self.number,
+            "submit_time": self.submit_time,
+            "requested_time": self.requested_time,
+            "requested_resources": self.requested_resources,
+            "profile": profile,
+            "profile_name": profile_name,
+            "start_time": self.start_time,
+            "finish_time": self.finish_time,
+            "state": state,
+            "kill_reason": self.kill_reason,
+            "return_code": self.return_code,
+            "comment": self.comment
+        }
 
     def submit_sub_job(self, *args, **kwargs):
         job = self.sub_jobs_workload.new_job(*args, **kwargs)

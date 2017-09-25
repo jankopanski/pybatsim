@@ -5,69 +5,10 @@ from enum import Enum
 import json
 import sys
 
+from .network import NetworkHandler
+
 import redis
-
 import zmq
-
-
-class NetworkHandler:
-
-    def __init__(
-            self,
-            socket_endpoint='tcp://*:28000',
-            verbose=0,
-            timeout=2000):
-        self.socket_endpoint = socket_endpoint
-        self.verbose = verbose
-        self.timeout = timeout
-        self.context = zmq.Context()
-        self.connection = None
-
-    def send(self, msg):
-        assert self.connection, "Connection not open"
-        if self.verbose > 0:
-            print("[PYBATSIM]: SEND_MSG\n {}".format(msg),
-                  flush=True)
-        self.connection.send_string(json.dumps(msg))
-
-    def recv(self, blocking=False):
-        assert self.connection, "Connection not open"
-        if blocking or self.timeout is None or self.timeout <= 0:
-            self.connection.RCVTIMEO = -1
-        else:
-            self.connection.RCVTIMEO = self.timeout
-        try:
-            msg = self.connection.recv()
-        except zmq.error.Again:
-            return None
-        msg = json.loads(msg.decode('utf-8'))
-
-        if self.verbose > 0:
-            print('[PYBATSIM]: RECEIVED_MSG\n {}'.format(
-                json.dumps(msg, indent=2)), flush=True)
-
-        return msg
-
-    def open(self):
-        assert not self.connection, "Connection already open"
-        self.connection = self.context.socket(zmq.REP)
-
-        if self.verbose > 0:
-            print("[PYBATSIM]: binding to {addr}"
-                  .format(addr=self.socket_endpoint), flush=True)
-        self.connection.bind(self.socket_endpoint)
-
-    def close(self):
-        if self.connection:
-            self.connection.close()
-            self.connection = None
-
-    def __enter__(self):
-        self.open()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.close()
 
 
 class Batsim(object):
@@ -77,12 +18,17 @@ class Batsim(object):
 
     def __init__(self, scheduler,
                  network_handler=None,
+                 event_handler=None,
                  validatingmachine=None,
                  handle_dynamic_notify=True):
         self.running_simulation = False
         if network_handler is None:
-            network_handler = NetworkHandler()
+            network_handler = NetworkHandler('tcp://*:28000')
+        if event_handler is None:
+            event_handler = NetworkHandler(
+                'tcp://127.0.0.1:28001', type=zmq.PUB)
         self.network = network_handler
+        self.event_publisher = event_handler
         self.handle_dynamic_notify = handle_dynamic_notify
 
         self.jobs = dict()
@@ -110,7 +56,8 @@ class Batsim(object):
 
         self.has_dynamic_job_submissions = False
 
-        self.network.open()
+        self.network.bind()
+        self.event_publisher.bind()
 
         self.scheduler.bs = self
         # import pdb; pdb.set_trace()
@@ -119,6 +66,12 @@ class Batsim(object):
 
         self.scheduler.onAfterBatsimInit()
         self.initialized = True
+
+    def publish_event(self, event):
+        """Sends a message to subscribed event listeners (e.g. external processes which want to
+        observe the simulation).
+        """
+        self.event_publisher.send_string(event)
 
     def time(self):
         return self._current_time
@@ -391,9 +344,7 @@ class Batsim(object):
             elif event_type == "SIMULATION_ENDS":
                 assert self.running_simulation, "No simulation is currently running"
                 self.running_simulation = False
-                print(
-                    "[PYBATSIM]: All jobs have been submitted and completed!",
-                    flush=True)
+                print("All jobs have been submitted and completed!")
                 finished_received = True
                 self.scheduler.onSimulationEnds()
             elif event_type == "JOB_SUBMITTED":
@@ -477,6 +428,7 @@ class Batsim(object):
 
         if finished_received:
             self.network.close()
+            self.event_publisher.close()
 
         return not finished_received
 

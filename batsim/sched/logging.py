@@ -7,6 +7,7 @@
 
 import logging
 import os
+import json
 
 
 class LoggingEvent:
@@ -16,6 +17,10 @@ class LoggingEvent:
 
     :param level: the importance level of the event
 
+    :param open_jobs: the number of open jobs
+
+    :param processed_jobs: the number of processed jobs (completed, killed, etc.)
+
     :param msg: the actual message of the event
 
     :param type: the type of the event (`str`)
@@ -23,20 +28,55 @@ class LoggingEvent:
     :param data: additional data attached to the event (`dict`)
     """
 
-    def __init__(self, time, level, msg, type, data):
+    def __init__(
+            self,
+            time,
+            level,
+            open_jobs,
+            processed_jobs,
+            msg,
+            type,
+            data):
         self.time = time
+        self.open_jobs = open_jobs
+        self.processed_jobs = processed_jobs
         self.level = level
         self.msg = msg
         self.type = type
         self.data = data
 
+    def to_message(self):
+        """Returns a human readable message presentation of this event."""
+        return "[{:.6f}] {}/{} <{}> ({})".format(
+            self.time, self.processed_jobs, self.open_jobs,
+            self.type, self.msg)
+
     def __str__(self):
-        data = ";".join(
-            ["{}={}".format(
-                str(k).replace(";", ","),
-                str(v).replace(";", ",")) for k, v in self.data.items()])
-        return "{:.6f};{};{};{};{}".format(
-            self.time, self.level, self.type, self.msg, data)
+        data = []
+        for k, v in self.data.items():
+            try:
+                k = json.dumps(k, default=lambda o: o.__dict__)
+            except (AttributeError, ValueError):
+                k = json.dumps(str(k), default=lambda o: o.__dict__)
+
+            if hasattr(v, "to_json_dict"):
+                v = v.to_json_dict()
+                try:
+                    v = json.dumps(v, default=lambda o: o.__dict__)
+                except (AttributeError, ValueError):
+                    raise ValueError(
+                        "Object could not be serialised: {}".format(v))
+            else:
+                try:
+                    v = json.dumps(v, default=lambda o: o.__dict__)
+                except (AttributeError, ValueError):
+                    v = json.dumps(str(v), default=lambda o: o.__dict__)
+
+            data.append("{}: {}".format(k, v))
+        data = "{" + ", ".join(data) + "}"
+        return "{:.6f};{};{};{};{};{};{}".format(
+            self.time, self.level, self.processed_jobs, self.open_jobs,
+            self.type, self.msg, data)
 
 
 class Logger:
