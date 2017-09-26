@@ -1,5 +1,6 @@
 with import <nixpkgs> {};
 with pkgs.python36Packages;
+with import (fetchTarball "https://gitlab.inria.fr/vreis/datamove-nix/repository/master/archive.tar.gz") {};
 
 buildPythonPackage rec {
   name = "pybatsim";
@@ -14,6 +15,8 @@ buildPythonPackage rec {
       # for testing
       coverage
       pytest
-    ];
+      # for doc generation
+      sphinx
+    ] ++ [ batsim ];
 
 }
