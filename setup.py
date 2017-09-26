@@ -13,7 +13,7 @@ requirements = [
     "redis",
     "click",
     "pandas",
-    "docopt==0.6.1"
+    "docopt==0.6.2"
 ]
 
 setup_requirements = [
