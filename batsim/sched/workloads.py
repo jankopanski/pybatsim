@@ -316,7 +316,7 @@ class WorkloadDescription:
     @name.setter
     def name(self, name):
         assert not self.submitted_jobs, "A workload's properties can not be changed if it contains submitted jobs."
-        return self._name
+        self._name = name
 
     @property
     def description(self):
