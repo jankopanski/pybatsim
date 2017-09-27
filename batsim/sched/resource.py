@@ -291,11 +291,22 @@ class ComputeResource(Resource):
             time = self._scheduler.time
         time_updated = True
         while time_updated:
+            in_present = time == self._scheduler.time
             time_updated = False
             # Search the earliest time when a slot for an allocation is
             # available
             for alloc in self._allocations:
-                if alloc.start_time <= time and alloc.estimated_end_time >= time:
+                # If the result should be found for the current scheduling time
+                # (is_present) than not the estimated_end_time is used but the
+                # real end_time (or infinity) because there could be allocations
+                # in the current time which are not yet freed by Batsim (in case
+                # of jobs getting killed after their walltime). This is due to
+                # the implementation of killing jobs inside Batsim which is
+                # implemented by using a new killer process.
+                end_time = alloc.end_time if in_present else alloc.estimated_end_time
+                if end_time is None:
+                    end_time = float("Inf")
+                if alloc.start_time <= time and end_time >= time:
                     time = alloc.estimated_end_time + Resource.TIME_DELTA
                     time_updated = True
             # Check whether or not the full requested walltime fits into the
