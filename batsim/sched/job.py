@@ -550,6 +550,12 @@ class Job:
         for res in self.allocation.allocated_resources:
             alloc.append(res.id)
 
+        self._scheduler.debug(
+            "Start job {batsim_job} on {resources}",
+            batsim_job=self._batsim_job,
+            resources=alloc,
+            type="start_job")
+
         # Start the jobs
         self._scheduler._batsim.start_jobs(
             [self._batsim_job], {self.id: alloc})
