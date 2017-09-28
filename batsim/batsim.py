@@ -554,7 +554,7 @@ class Job(object):
     def from_json_dict(json_dict, profile_dict=None):
         return Job(json_dict["id"],
                    json_dict["subtime"],
-                   json_dict["walltime"],
+                   json_dict.get("walltime", -1),
                    json_dict["res"],
                    json_dict["profile"],
                    json_dict, profile_dict)
