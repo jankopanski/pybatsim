@@ -4,7 +4,7 @@
 #   nix-shell release.nix
 #
 #   # create the package
-#   python setup.py bdist
+#   python setup.py sdist
 #
 #   # register to pypi (if not registered yet)
 #   twine register dist/project_name-x.y.z.tar.gz
