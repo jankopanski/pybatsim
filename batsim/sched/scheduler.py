@@ -366,6 +366,7 @@ class Scheduler(metaclass=ABCMeta):
             open_jobs = self._batsim.nb_jobs_received
             processed_jobs = (self._batsim.nb_jobs_completed +
                               self._batsim.nb_jobs_failed +
+                              self._batsim.nb_jobs_rejected +
                               self._batsim.nb_jobs_timeout +
                               self._batsim.nb_jobs_killed +
                               len(self._batsim.jobs_manually_changed))
