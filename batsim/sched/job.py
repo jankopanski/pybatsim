@@ -196,6 +196,7 @@ class Job:
         """Whether or not this job has been completed."""
         return self.state in [
             BatsimJob.State.COMPLETED_KILLED,
+            BatsimJob.State.COMPLETED_WALLTIME_REACHED,
             BatsimJob.State.COMPLETED_SUCCESSFULLY,
             BatsimJob.State.COMPLETED_FAILED]
 
@@ -240,6 +241,7 @@ class Job:
         """Whether this job has failed its execution."""
         return self.state in [
             BatsimJob.State.COMPLETED_KILLED,
+            BatsimJob.State.COMPLETED_WALLTIME_REACHED,
             BatsimJob.State.COMPLETED_FAILED]
 
     @property
@@ -582,6 +584,7 @@ class Job:
             self._scheduled = True
         elif state in [Job.State.COMPLETED_FAILED,
                        Job.State.COMPLETED_SUCCESSFULLY,
+                       Job.State.COMPLETED_WALLTIME_REACHED,
                        Job.State.COMPLETED_KILLED]:
             self._batsim_job.finish_time = self._scheduler.time
             self._batsim_job.kill_reason = kill_reason

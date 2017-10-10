@@ -478,8 +478,9 @@ class Job(object):
         RUNNING = 2
         COMPLETED_SUCCESSFULLY = 3
         COMPLETED_FAILED = 4
-        COMPLETED_KILLED = 5
-        REJECTED = 6
+        COMPLETED_WALLTIME_REACHED = 5
+        COMPLETED_KILLED = 6
+        REJECTED = 7
 
     def __init__(
             self,
