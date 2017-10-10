@@ -10,11 +10,12 @@
     walltime. However, it shows how jobs can be split into smaller jobs and still achieve
     the almost same makespan.
 """
-
 from batsim.sched import Job
 from batsim.sched import Scheduler
 from batsim.sched import Allocation
 from batsim.sched import Profiles
+
+from batsim.sched.algorithms.utils import consecutive_resources_filter
 
 
 class SchedDelayProfilesAsTasks(Scheduler):
@@ -30,7 +31,7 @@ class SchedDelayProfilesAsTasks(Scheduler):
             elif job.profile.type == "delay":
                 max_delay = int(job.profile.delay)
 
-                # Split the delay of the job in smaller tasks
+                # Split the delay of the job into smaller tasks
                 tasks = []
                 for i in range(0, max_delay, 5):
                     next_val = i + 5
@@ -39,7 +40,10 @@ class SchedDelayProfilesAsTasks(Scheduler):
                     length = next_val - i
                     tasks.append((i, length))
 
-                walltimes_each = job.requested_time / len(tasks)
+                # Calculate the walltime for the individual tasks.
+                # Increase the walltime by a small amount since otherwise it
+                # could happen that Batsim will kill the individual tasks.
+                walltimes_each = job.requested_time / len(tasks) + 0.00001
 
                 # Create all sub jobs and submit them to Batsim
                 for task in tasks:
@@ -57,7 +61,7 @@ class SchedDelayProfilesAsTasks(Scheduler):
         for job in self.jobs.static_job.runnable:
             for sj in job.sub_jobs.runnable:
                 start_time, res = self.resources.find_with_earliest_start_time(
-                    job)
+                    job, filter=consecutive_resources_filter)
 
                 # If no resources are found this time, it will be tried again at
                 # the next scheduler iteration (i.e. when another job has
@@ -81,27 +85,38 @@ class SchedDelayProfilesAsTasks(Scheduler):
         if job.is_dynamic_job:
             scheduled = False
 
-            # Search for the first sub job which is runnable (i.e. an another
-            # sub job of the same parent job as the job which has completed)
-            for j in job.parent_job.sub_jobs.runnable:
-                scheduled = True
+            if job.success:
+                # Search for the first sub job which is runnable (i.e. an another
+                # sub job of the same parent job as the job which has completed)
+                for j in job.parent_job.sub_jobs.runnable:
+                    scheduled = True
 
-                # Collect information about the remaining allocation
-                alloc = job.parent_job.remaining_allocation
-                res = alloc.resources.copy()
-                starttime = alloc.start_time
-                walltime = alloc.walltime
-                alloc.remove_all_resources()
+                    # Collect information about the remaining allocation
+                    alloc = job.parent_job.remaining_allocation
+                    res = alloc.resources.copy()
+                    starttime = alloc.start_time
+                    walltime = alloc.walltime
+                    alloc.remove_all_resources()
 
-                # Schedule the sub job. Afterwards create a new reservation for
-                # the remaining part of the parent job's walltime.
-                j.schedule(res)
-                if walltime - j.requested_time > 0:
-                    job.parent_job.remaining_allocation = Allocation(
-                        self.time + j.requested_time + 1, walltime - j.requested_time, res)
-                break
+                    # Schedule the sub job. Afterwards create a new reservation for
+                    # the remaining part of the parent job's walltime.
+                    j.schedule(res)
+                    if walltime - j.requested_time > 0:
+                        job.parent_job.remaining_allocation = Allocation(
+                            self.time + j.requested_time + 1, walltime - j.requested_time, res)
+                    break
 
-            # This was the last sub job of its parent if nothing was scheduled.
-            # Set the state to completed in Batsim.
-            if not scheduled:
-                job.parent_job.change_state(Job.State.COMPLETED_SUCCESSFULLY)
+                # This was the last sub job of its parent if nothing was scheduled.
+                # Set the state to completed in Batsim.
+                if not scheduled:
+                    job.parent_job.remaining_allocation.remove_all_resources()
+                    job.parent_job.change_state(Job.State.COMPLETED_SUCCESSFULLY)
+            else:
+                # Reject the other sub jobs which should be removed from the
+                # queue.
+                for j in job.parent_job.sub_jobs.open:
+                    j.reject(self)
+
+                # Set the state of the parent job
+                job.parent_job.remaining_allocation.remove_all_resources()
+                job.parent_job.change_state(job.state)
