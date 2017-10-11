@@ -13,7 +13,7 @@ requirements = [
     "redis",
     "click",
     "pandas",
-    "docopt==0.6.1"
+    "docopt==0.6.2"
 ]
 
 setup_requirements = [
@@ -109,7 +109,7 @@ setup(
     name='pybatsim',
     author="Michael Mercier",
     author_email="michael.mercier@inria.fr",
-    version=1.2,
+    version=2.0,
     url='https://gitlab.inria.fr/batsim/pybatsim',
     packages=find_packages(),
     install_requires=requirements,
