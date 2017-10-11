@@ -87,7 +87,8 @@ class SchedDelayProfilesAsTasks(Scheduler):
 
             if job.success:
                 # Search for the first sub job which is runnable (i.e. an another
-                # sub job of the same parent job as the job which has completed)
+                # sub job of the same parent job as the job which has
+                # completed)
                 for j in job.parent_job.sub_jobs.runnable:
                     scheduled = True
 
@@ -110,7 +111,8 @@ class SchedDelayProfilesAsTasks(Scheduler):
                 # Set the state to completed in Batsim.
                 if not scheduled:
                     job.parent_job.remaining_allocation.remove_all_resources()
-                    job.parent_job.change_state(Job.State.COMPLETED_SUCCESSFULLY)
+                    job.parent_job.change_state(
+                        Job.State.COMPLETED_SUCCESSFULLY)
             else:
                 # Reject the other sub jobs which should be removed from the
                 # queue.

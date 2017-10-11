@@ -72,12 +72,18 @@ class ValidatingMachine(BatsimScheduler):
             try:
                 self.jobs_waiting.remove(job)
             except KeyError:
-                raise ValueError("Job {} was not waiting (waiting: {})".format(job, [j2.id for j2 in self.jobs_waiting]))
+                raise ValueError(
+                    "Job {} was not waiting (waiting: {})".format(
+                        job, [
+                            j2.id for j2 in self.jobs_waiting]))
             for r in range(first_res, last_res + 1):
                 try:
                     self.availableResources.remove(r)
                 except KeyError:
-                    raise ValueError("Resource {} was not available (available: {})".format(r, list(self.availableResources)))
+                    raise ValueError(
+                        "Resource {} was not available (available: {})".format(
+                            r, list(
+                                self.availableResources)))
         self.bs_start_jobs_continuous(allocs)
 
     def start_jobs(self, jobs, res):
@@ -85,11 +91,16 @@ class ValidatingMachine(BatsimScheduler):
             try:
                 self.jobs_waiting.remove(j)
             except KeyError:
-                raise ValueError("Job {} was not waiting (waiting: {})".format(j, [j2.id for j2 in self.jobs_waiting]))
+                raise ValueError(
+                    "Job {} was not waiting (waiting: {})".format(
+                        j, [j2.id for j2 in self.jobs_waiting]))
             self.previousAllocations[j.id] = res[j.id]
             for r in res[j.id]:
                 try:
                     self.availableResources.remove(r)
                 except KeyError:
-                    raise ValueError("Resource {} was not available (available: {})".format(r, list(self.availableResources)))
+                    raise ValueError(
+                        "Resource {} was not available (available: {})".format(
+                            r, list(
+                                self.availableResources)))
         self.bs_start_jobs(jobs, res)
