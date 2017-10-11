@@ -19,7 +19,8 @@ from .reply import ConsumedEnergyReply
 from .utils import DictWrapper
 from .messages import Message
 from .utils import ListView
-from .logging import LoggingEvent, Logger, EventLogger
+from .logging import Logger
+from .events import LoggingEvent, EventLogger
 from .workloads import WorkloadDescription
 
 
@@ -215,18 +216,16 @@ class Scheduler(metaclass=ABCMeta):
         self._options = options
         debug = self.options.get("debug", False)
         export_prefix = self.options.get("export-prefix", "out")
-        write_events = bool(self.options.get("write-events", False))
+        self._log_debug_events = self.options.get("log-debug-events", False)
 
         # Create the logger
         self._logger = Logger(self, debug=debug)
 
         self._last_published_event = None
         self._event_logger = None
-        if write_events:
-            self._event_logger = EventLogger(
-                self, "Events", debug=debug,
-                to_file="{}_last_events.csv".format(export_prefix),
-                append_to_file="{}_events.csv".format(export_prefix))
+        self._event_logger = EventLogger(
+            self, "Events", debug=debug,
+            to_file="{}_events.csv".format(export_prefix))
 
         self._sched_jobs_logger = EventLogger(
             self,
@@ -465,37 +464,34 @@ class Scheduler(metaclass=ABCMeta):
         """Writes a debug message to the logging facility."""
         self._logger.debug(self._format_log_msg(msg, **kwargs))
         event = self._format_event_msg(1, msg, **kwargs)
-        if self._event_logger:
+
+        if self._log_debug_events:
             self._event_logger.info(event)
 
     def info(self, msg, **kwargs):
         """Writes a info message to the logging facility."""
         self._logger.info(self._format_log_msg(msg, **kwargs))
         event = self._format_event_msg(2, msg, **kwargs)
-        if self._event_logger:
-            self._event_logger.info(event)
+        self._event_logger.info(event)
 
     def warn(self, msg, **kwargs):
         """Writes a warn message to the logging facility."""
         self._logger.warn(self._format_log_msg(msg, **kwargs))
         event = self._format_event_msg(3, msg, **kwargs)
-        if self._event_logger:
-            self._event_logger.info(event)
+        self._event_logger.info(event)
 
     def error(self, msg, **kwargs):
         """Writes a error message to the logging facility."""
         self._logger.error(self._format_log_msg(msg, **kwargs))
         event = self._format_event_msg(4, msg, **kwargs)
-        if self._event_logger:
-            self._event_logger.info(event)
+        self._event_logger.info(event)
 
     def fatal(self, msg, **kwargs):
         """Writes a fatal message to the logging facility and terminates the scheduler."""
         error_msg = self._format_log_msg(msg, **kwargs)
         self._logger.error(error_msg)
         event = self._format_event_msg(5, msg, **kwargs)
-        if self._event_logger:
-            self._event_logger.info(event)
+        self._event_logger.info(event)
         raise ValueError("Fatal error: {}".format(error_msg))
 
     def _on_pre_init(self):

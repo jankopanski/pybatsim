@@ -10,9 +10,10 @@ import os
 import pandas
 
 from batsim.batsim import Batsim
+from batsim.sched.events import load_events_from_file
 
 
-def merge_by_parent_job(in_jobs, in_sched_jobs, out_jobs, **kwargs):
+def merge_by_parent_job(in_jobs, in_sched_jobs, in_events, out_jobs, **kwargs):
     """Function used as function in `process_jobs` to merge jobs with the same parent job id."""
     idx = 0
 
@@ -59,13 +60,16 @@ def merge_by_parent_job(in_jobs, in_sched_jobs, out_jobs, **kwargs):
             r1["allocated_processors"])
 
 
-def process_jobs(in_jobs, in_sched_jobs, functions=[], float_precision=6,
+def process_jobs(in_jobs, in_sched_jobs, in_events,
+                 functions=[], float_precision=6,
                  output_separator=",", **kwargs):
     """Tool for processing the job results.
 
     :param in_jobs: the file name of the jobs file written by Batsim
 
     :param in_sched_jobs: the file name of the jobs file written by PyBatsim
+
+    :param in_events: the file name of the events file written by PyBatsim
 
     :param functions: the functions which should be used for processing the jobs
                       and generating new data files.
@@ -83,6 +87,7 @@ def process_jobs(in_jobs, in_sched_jobs, functions=[], float_precision=6,
             open(in_sched_jobs, 'r') as in_sched_jobs_file:
         in_jobs_data = pandas.read_csv(in_jobs_file, sep=",")
         in_sched_jobs_data = pandas.read_csv(in_sched_jobs_file, sep=";")
+        in_events_data = load_events_from_file(in_events)
 
         for f in functions:
             out_jobs = "{}_{}.csv".format(
@@ -95,7 +100,8 @@ def process_jobs(in_jobs, in_sched_jobs, functions=[], float_precision=6,
                     index=in_jobs_data.index)
                 out_jobs_data.drop(out_jobs_data.index, inplace=True)
 
-                f(in_jobs_data, in_sched_jobs_data, out_jobs_data, **kwargs)
+                f(in_jobs_data, in_sched_jobs_data,
+                  in_events_data, out_jobs_data, **kwargs)
 
                 out_jobs_data.to_csv(
                     out_jobs_file,

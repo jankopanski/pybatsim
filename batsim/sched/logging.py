@@ -7,76 +7,6 @@
 
 import logging
 import os
-import json
-
-
-class LoggingEvent:
-    """Class for storing data about events triggered by the scheduler.
-
-    :param time: the simulation time when the event occurred
-
-    :param level: the importance level of the event
-
-    :param open_jobs: the number of open jobs
-
-    :param processed_jobs: the number of processed jobs (completed, killed, etc.)
-
-    :param msg: the actual message of the event
-
-    :param type: the type of the event (`str`)
-
-    :param data: additional data attached to the event (`dict`)
-    """
-
-    def __init__(
-            self,
-            time,
-            level,
-            open_jobs,
-            processed_jobs,
-            msg,
-            type,
-            data):
-        self.time = time
-        self.open_jobs = open_jobs
-        self.processed_jobs = processed_jobs
-        self.level = level
-        self.msg = msg
-        self.type = type
-        self.data = data
-
-    def to_message(self):
-        """Returns a human readable message presentation of this event."""
-        return "[{:.6f}] {}/{} <{}> ({})".format(
-            self.time, self.processed_jobs, self.open_jobs,
-            self.type, self.msg)
-
-    def __str__(self):
-        data = []
-        for k, v in self.data.items():
-            try:
-                k = json.dumps(k, default=lambda o: o.__dict__)
-            except (AttributeError, ValueError):
-                k = json.dumps(str(k), default=lambda o: o.__dict__)
-
-            if hasattr(v, "to_json_dict"):
-                v = v.to_json_dict()
-                try:
-                    v = json.dumps(v, default=lambda o: o.__dict__)
-                except (AttributeError, ValueError):
-                    raise ValueError(
-                        "Object could not be serialised: {}".format(v))
-            else:
-                try:
-                    v = json.dumps(v, default=lambda o: o.__dict__)
-                except (AttributeError, ValueError):
-                    v = json.dumps(str(v), default=lambda o: o.__dict__)
-
-            data.append("{}: {}".format(k, v))
-        data = "{" + ", ".join(data) + "}"
-        return "{:.6f};{};{};{};{};{};{}".format(
-            self.time, self.level, self.processed_jobs, self.open_jobs,
-            self.type, self.msg, data)
 
 
 class Logger:
@@ -171,16 +101,3 @@ class Logger:
     def error(self, *args, **kwargs):
         """Writes a error message to the logger."""
         self._logger.error(*args, **kwargs)
-
-
-class EventLogger(Logger):
-    """Logger for events which will only log to files and will write the log messages
-    without any additional formatting.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, streamhandler=False, **kwargs)
-
-    @property
-    def file_formatter(self):
-        return logging.Formatter('%(message)s')
