@@ -90,7 +90,12 @@ def instanciate_scheduler(name, options):
         del sys.path[1]
         del sys.path[0]
 
-        scheduler_non_instancied = mod.__dict__[my_class]
+        try:
+            scheduler_non_instancied = mod.__dict__[my_class]
+        except KeyError:
+            print("Module {} contains no scheduler named {}".format(
+                mod, my_class))
+            sys.exit(1)
 
     if isinstance(scheduler_non_instancied, types.FunctionType):
         from batsim.sched import as_scheduler
