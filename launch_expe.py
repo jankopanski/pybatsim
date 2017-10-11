@@ -2,8 +2,9 @@
 '''
 Run PyBatsim experiments.
 '''
+import sys
 
-from batsim.tools import launch_experiments
+from batsim.cmds.experiments import main
 
 if __name__ == "__main__":
-    launch_experiments.main()
+    sys.exit(main())

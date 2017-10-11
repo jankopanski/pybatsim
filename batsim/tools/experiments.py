@@ -1,8 +1,8 @@
 """
-    batsim.tools.launch_experiments
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    batsim.tools.experiments
+    ~~~~~~~~~~~~~~~~~~~~~~~~
 
-    Command to launch experiments.
+    Tools to launch experiments.
 """
 
 import subprocess
@@ -285,7 +285,7 @@ def prepare_exec_cl(options, name):
         return [path] + args
 
 
-def launch_expe(options, verbose=True):
+def launch_experiment(options, verbose=True):
     if options.get("output-dir", "SELF") == "SELF":
         options["output-dir"] = os.path.dirname("./" + options["options-file"])
     if not os.path.exists(options["output-dir"]):
@@ -419,54 +419,3 @@ def launch_expe(options, verbose=True):
                     sys.exit(post_exec.returncode)
 
     return ret_code
-
-
-def usage():
-    print(
-        "usage: [--quiet|--debug|--help] {} path/to/file.json".format(
-            os.path.basename(
-                sys.argv[0])))
-    return 1
-
-
-def main():
-    verbose = True
-    debug = False
-    options_file = None
-
-    for arg in sys.argv[1:]:
-        if arg == "--quiet":
-            verbose = False
-        elif arg == "--debug":
-            debug = True
-        elif arg == "--help":
-            return usage()
-        elif not arg.startswith("-"):
-            if options_file is not None:
-                return usage()
-            options_file = arg
-        else:
-            return usage()
-
-    if options_file is None:
-        return usage()
-
-    try:
-        with open(options_file) as f:
-            options = json.loads(f.read())
-    except Exception:
-        if debug:
-            raise
-        print("Error in json file: {}".format(options_file), file=sys.stderr)
-        sys.exit(1)
-
-    options["options-file"] = options_file
-
-    if verbose:
-        print("Running experiment: {}".format(options_file))
-
-    return launch_expe(options, verbose=verbose)
-
-
-if __name__ == "__main__":
-    sys.exit(main())

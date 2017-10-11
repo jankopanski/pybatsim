@@ -126,9 +126,9 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "pybatsim=batsim.tools.launcher:main",
-            "pybatsim-experiment=batsim.tools.launch_experiments:main",
             "pybatsim-postprocess-jobs=batsim.tools.postprocess_jobs:main"
+            "pybatsim=batsim.cmds.launcher:main",
+            "pybatsim-experiment=batsim.cmds.experiments:main"
         ]
     },
     cmdclass={
