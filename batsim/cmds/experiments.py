@@ -23,7 +23,7 @@ def main():
 
     verbose = not bool(arguments["--quiet"])
     debug = bool(arguments["--debug"])
-    options_file = arguments["experiment"]
+    options_file = arguments["<experiment>"]
 
     try:
         with open(options_file) as f:
