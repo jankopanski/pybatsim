@@ -110,10 +110,16 @@ class Resource:
     @property
     def active(self):
         """Whether or not this resource is currently active in some of its resources."""
+        return self.num_active > 0
+
+    @property
+    def num_active(self):
+        """Number of allocations in which this resource is currently active."""
+        num = 0
         for alloc in self._allocations:
             if self in alloc.allocated_resources:
-                return True
-        return False
+                num += 1
+        return num
 
     @property
     def resources(self):
