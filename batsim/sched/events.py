@@ -49,13 +49,24 @@ class LoggingEvent:
         self.type = type
         self.data = data
 
-    def to_message(self):
-        """Returns a human readable message presentation of this event."""
+    def __str__(self):
         return "[{:.6f}] {}/{} <{}> ({})".format(
             self.time, self.processed_jobs, self.open_jobs,
             self.type, self.msg)
 
-    def __str__(self):
+    @classmethod
+    def get_csv_header(self):
+        output = io.StringIO()
+        csvdata = ["time", "level", "processed_jobs", "open_jobs",
+                   "type", "message", "data"]
+        writer = csv.writer(
+            output,
+            quoting=csv.QUOTE_NONNUMERIC,
+            delimiter=';')
+        writer.writerow(csvdata)
+        return output.getvalue().strip()
+
+    def to_csv_line(self):
         def conv_obj(o):
             try:
                 return o.__dict__
@@ -191,6 +202,10 @@ class EventLogger(Logger):
 def load_events_from_file(in_file):
     events = EventList()
     reader = csv.reader(in_file, quoting=csv.QUOTE_NONNUMERIC, delimiter=';')
+
+    # Skip header
+    next(reader)
+
     for row in reader:
         if row:
             events.add(LoggingEvent.from_entries(row))

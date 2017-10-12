@@ -224,6 +224,7 @@ class Scheduler(metaclass=ABCMeta):
         self._event_logger = EventLogger(
             self, "Events", debug=debug,
             to_file="{}_events.csv".format(export_prefix))
+        self._event_logger.info(LoggingEvent.get_csv_header())
 
         self._events = EventList()
 
@@ -370,7 +371,7 @@ class Scheduler(metaclass=ABCMeta):
 
         self._events.add(event)
 
-        event_str = event.to_message()
+        event_str = str(event)
 
         try:
             do_publish = True
@@ -390,7 +391,7 @@ class Scheduler(metaclass=ABCMeta):
 
         self.on_event(event)
 
-        return str(event)
+        return event.to_csv_line()
 
     def debug(self, msg, **kwargs):
         """Writes a debug message to the logging facility."""
