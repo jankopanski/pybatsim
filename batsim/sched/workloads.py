@@ -209,8 +209,10 @@ class JobDescription:
         assert self.walltime is not None and self.walltime >= 0, "Job.walltime was not set"
 
         scheduler.info(
-            "Submitting job description (job={job}, profile={profile_name})",
-            job=self.to_json_string(flat=True),
+            "Submitting job description (workload_name={workload_name}, job={job}, profile={profile_name})",
+            job=self.to_json_string(
+                flat=True),
+            workload_name=self.workload.name,
             profile_name=self.profile.name,
             type="job_description_submit")
 
