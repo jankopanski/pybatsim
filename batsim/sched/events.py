@@ -190,9 +190,8 @@ class EventLogger(Logger):
 
 def load_events_from_file(in_file):
     events = EventList()
-    with open(in_file, 'r') as f:
-        reader = csv.reader(f, quoting=csv.QUOTE_NONNUMERIC, delimiter=';')
-        for row in reader:
-            if row:
-                events.add(LoggingEvent.from_entries(row))
+    reader = csv.reader(in_file, quoting=csv.QUOTE_NONNUMERIC, delimiter=';')
+    for row in reader:
+        if row:
+            events.add(LoggingEvent.from_entries(row))
     return events
