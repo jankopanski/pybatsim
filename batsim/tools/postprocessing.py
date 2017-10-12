@@ -88,7 +88,7 @@ def process_jobs(result_prefix,
     in_batsim_jobs_data = pandas.read_csv(in_batsim_jobs, sep=",")
     in_sched_events_data = load_events_from_file(in_sched_events)
 
-    for f in functions:
+    for f_idx, f in enumerate(functions):
         result = "{}{}.csv".format(result_prefix, f.__name__)
 
         try:
@@ -105,9 +105,12 @@ def process_jobs(result_prefix,
             result_data.drop(result_data.index, inplace=True)
 
             if verbose:
-                print("{}: {}, {} => {}"
-                      .format(f.__name__, in_batsim_jobs.name,
-                              in_sched_events.name, result))
+                print("[{}/{}] {}: {}, {} => {}" .format(f_idx + 1,
+                                                         len(functions),
+                                                         f.__name__,
+                                                         in_batsim_jobs.name,
+                                                         in_sched_events.name,
+                                                         result))
             f(in_batsim_jobs_data, in_sched_events_data, result_data, **kwargs)
 
             result_data.to_csv(
