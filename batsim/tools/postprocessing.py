@@ -22,7 +22,7 @@ def merge_by_parent_job(in_batsim_jobs, in_sched_events, result, **kwargs):
         result.loc[idx] = args
         idx += 1
 
-    submit_events = in_sched_events.filter(type="job_submission_received")
+    submit_events = in_sched_events.filter(types=["job_submission_received"])
 
     for i1, r1 in in_batsim_jobs.iterrows():
         job_id = r1["job_id"]

@@ -120,7 +120,7 @@ class EventList(ObserveList):
             time_at=None,
             time_before=None,
             level=None,
-            type=None,
+            types=[],
             **kwargs):
         """Filter the event list to search for specific events.
 
@@ -132,12 +132,12 @@ class EventList(ObserveList):
 
         :param level: Search for events with a given logging level.
 
-        :param type: Search for events with a given event type.
+        :param types: Search for events with one of the given event types.
         """
 
         no_filters = False
         if time_after is None and time_at is None and time_before is None and \
-                level is None and type is None:
+                level is None and not types:
             no_filters = True
 
         # Filter events
@@ -162,8 +162,8 @@ class EventList(ObserveList):
                         if e.level == level:
                             yield e
                             continue
-                    if type is not None:
-                        if e.type == type:
+                    if types:
+                        if e.type in types:
                             yield e
                             continue
 
