@@ -24,6 +24,28 @@ class ObserveList:
         """A view of the content of the list."""
         return ListView(self._data)
 
+    def get(self, idx, default=None):
+        """Returns the element at the specified index.
+
+        :param idx: the index
+
+        :param default: the default value if the list does have less elements.
+        """
+        try:
+            return self._data[idx]
+        except IndexError:
+            return default
+
+    @property
+    def first(self):
+        """Return the first element."""
+        return self.get(0)
+
+    @property
+    def last(self):
+        """Return the last element."""
+        return self.get(len(self._data) - 1)
+
     def _check_new_elem(self, element):
         """Checks whether a new element should be added.
 

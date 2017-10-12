@@ -13,7 +13,7 @@ from batsim.batsim import Batsim
 from batsim.sched.events import load_events_from_file
 
 
-def merge_by_parent_job(in_jobs, in_sched_jobs, in_events, out_jobs, **kwargs):
+def merge_by_parent_job(in_batsim_jobs, in_sched_events, out_jobs, **kwargs):
     """Function used as function in `process_jobs` to merge jobs with the same parent job id."""
     idx = 0
 
@@ -22,25 +22,22 @@ def merge_by_parent_job(in_jobs, in_sched_jobs, in_events, out_jobs, **kwargs):
         out_jobs.loc[idx] = args
         idx += 1
 
-    for i1, r1 in in_jobs.iterrows():
+    submit_events = in_sched_events.filter(type="job_submission_received")
+
+    for i1, r1 in in_batsim_jobs.iterrows():
         job_id = r1["job_id"]
         workload_name = r1["workload_name"]
 
-        sched_job = in_sched_jobs.loc[in_sched_jobs['full_job_id'] == str(
-            workload_name) + Batsim.WORKLOAD_JOB_SEPARATOR + str(job_id)].iloc[0]
+        full_job_id = str(
+            workload_name) + Batsim.WORKLOAD_JOB_SEPARATOR + str(job_id)
 
-        parent_workload_name = sched_job["parent_workload_name"]
-        parent_job_id = sched_job["parent_job_id"]
+        event = submit_events.filter(
+            cond=lambda ev: ev.data["job"]["id"] == full_job_id).first
+        job_obj = event.data["job"]
 
-        if not pandas.isnull(parent_job_id):
-            try:
-                workload_name = str(int(parent_workload_name))
-            except ValueError:
-                workload_name = str(parent_workload_name)
-            try:
-                job_id = str(int(parent_job_id))
-            except ValueError:
-                job_id = str(parent_job_id)
+        if job_obj["parent_id"]:
+            job_id = str(job_obj["parent_number"])
+            workload_name = str(job_obj["parent_workload_name"])
 
         add_job(
             job_id,
@@ -60,16 +57,14 @@ def merge_by_parent_job(in_jobs, in_sched_jobs, in_events, out_jobs, **kwargs):
             r1["allocated_processors"])
 
 
-def process_jobs(in_jobs, in_sched_jobs, in_events,
+def process_jobs(in_batsim_jobs, in_sched_events,
                  functions=[], float_precision=6,
                  output_separator=",", **kwargs):
     """Tool for processing the job results.
 
-    :param in_jobs: the file name of the jobs file written by Batsim
+    :param in_batsim_jobs: the file name of the jobs file written by Batsim
 
-    :param in_sched_jobs: the file name of the jobs file written by PyBatsim
-
-    :param in_events: the file name of the events file written by PyBatsim
+    :param in_sched_events: the file name of the events file written by PyBatsim.sched
 
     :param functions: the functions which should be used for processing the jobs
                       and generating new data files.
@@ -83,25 +78,22 @@ def process_jobs(in_jobs, in_sched_jobs, in_events,
     """
     result_files = []
 
-    with open(in_jobs, 'r') as in_jobs_file, \
-            open(in_sched_jobs, 'r') as in_sched_jobs_file:
-        in_jobs_data = pandas.read_csv(in_jobs_file, sep=",")
-        in_sched_jobs_data = pandas.read_csv(in_sched_jobs_file, sep=";")
-        in_events_data = load_events_from_file(in_events)
+    with open(in_batsim_jobs, 'r') as in_batsim_jobs_file:
+        in_batsim_jobs_data = pandas.read_csv(in_batsim_jobs_file, sep=",")
+        in_sched_events_data = load_events_from_file(in_sched_events)
 
         for f in functions:
             out_jobs = "{}_{}.csv".format(
-                os.path.splitext(in_jobs)[0], f.__name__)
+                os.path.splitext(in_batsim_jobs)[0], f.__name__)
             result_files.append(out_jobs)
             with open(out_jobs, 'w') as out_jobs_file:
                 out_jobs_data = pandas.DataFrame(
                     data=None,
-                    columns=in_jobs_data.columns,
-                    index=in_jobs_data.index)
+                    columns=in_batsim_jobs_data.columns,
+                    index=in_batsim_jobs_data.index)
                 out_jobs_data.drop(out_jobs_data.index, inplace=True)
 
-                f(in_jobs_data, in_sched_jobs_data,
-                  in_events_data, out_jobs_data, **kwargs)
+                f(in_batsim_jobs_data, in_sched_events_data, out_jobs_data, **kwargs)
 
                 out_jobs_data.to_csv(
                     out_jobs_file,

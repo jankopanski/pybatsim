@@ -8,8 +8,10 @@
 import logging
 import json
 import csv
+import io
 
 from .logging import Logger
+from .utils import ObserveList, filter_list
 
 
 class LoggingEvent:
@@ -54,33 +56,42 @@ class LoggingEvent:
             self.type, self.msg)
 
     def __str__(self):
-        data = []
-        for k, v in self.data.items():
+        def conv_obj(o):
             try:
-                k = json.dumps(k, default=lambda o: o.__dict__)
+                return o.__dict__
             except (AttributeError, ValueError):
-                k = json.dumps(str(k), default=lambda o: o.__dict__)
+                return str(o)
+
+        data = {}
+        for k, v in self.data.items():
+            k = str(k)
 
             if hasattr(v, "to_json_dict"):
                 v = v.to_json_dict()
-                try:
-                    v = json.dumps(v, default=lambda o: o.__dict__)
-                except (AttributeError, ValueError):
-                    raise ValueError(
-                        "Object could not be serialised: {}".format(v))
-            else:
-                try:
-                    v = json.dumps(v, default=lambda o: o.__dict__)
-                except (AttributeError, ValueError):
-                    v = json.dumps(str(v), default=lambda o: o.__dict__)
+            elif hasattr(v, "__iter__") and not isinstance(v, str):
+                new_v = []
+                for e in v:
+                    if hasattr(e, "to_json_dict"):
+                        e = e.to_json_dict()
+                    new_v.append(e)
+                v = new_v
+            data[k] = v
+        try:
+            data = json.dumps(data, default=lambda o: conv_obj(o))
+        except Exception as e:
+            raise ValueError(
+                "Error while dumping json data: {}"
+                .format(data))
 
-            data.append("{}: {}".format(k, v))
-        data = "{" + ", ".join(data) + "}"
-        return "{:.6f};{};{};{};{};{};{}".format(
-            self.time, self.level, self.processed_jobs, self.open_jobs,
-            json.dumps(self.type),
-            json.dumps(self.msg),
-            data)
+        output = io.StringIO()
+        csvdata = [self.time, self.level, self.processed_jobs, self.open_jobs,
+                   self.type, self.msg, data]
+        writer = csv.writer(
+            output,
+            quoting=csv.QUOTE_NONNUMERIC,
+            delimiter=';')
+        writer.writerow(csvdata)
+        return output.getvalue().strip()
 
     @classmethod
     def from_entries(cls, parts):
@@ -90,10 +101,78 @@ class LoggingEvent:
         open_jobs = int(parts[3])
         type = parts[4]
         msg = parts[5]
-        data = json.loads(parts[6])
+        try:
+            data = json.loads(parts[6])
+        except Exception:
+            raise ValueError(
+                "Error while parsing data entry in line: {}"
+                .format(parts))
 
         return LoggingEvent(time, level, open_jobs, processed_jobs, msg, type,
                             data)
+
+
+class EventList(ObserveList):
+    def filter(
+            self,
+            *args,
+            time_after=None,
+            time_at=None,
+            time_before=None,
+            level=None,
+            type=None,
+            **kwargs):
+        """Filter the event list to search for specific events.
+
+        :param time_after: Search for events after a specified time.
+
+        :param time_at: Search for events at a specified time.
+
+        :param time_before: Search for events before a specified time.
+
+        :param level: Search for events with a given logging level.
+
+        :param type: Search for events with a given event type.
+        """
+
+        no_filters = False
+        if time_after is None and time_at is None and time_before is None and \
+                level is None and type is None:
+            no_filters = True
+
+        # Filter events
+        def filter_events(events, **kwargs):
+            if no_filters:
+                yield from events
+            else:
+                for e in events:
+                    if time_after is not None:
+                        if e.time > time_after:
+                            yield e
+                            continue
+                    if time_before is not None:
+                        if e.time < time_before:
+                            yield e
+                            continue
+                    if time_at is not None:
+                        if e.time == time_at:
+                            yield e
+                            continue
+                    if level is not None:
+                        if e.level == level:
+                            yield e
+                            continue
+                    if type is not None:
+                        if e.type == type:
+                            yield e
+                            continue
+
+        return self.create(
+            filter_list(
+                self._data,
+                [filter_events],
+                *args,
+                **kwargs))
 
 
 class EventLogger(Logger):
@@ -110,10 +189,10 @@ class EventLogger(Logger):
 
 
 def load_events_from_file(in_file):
-    events = []
+    events = EventList()
     with open(in_file, 'r') as f:
-        reader = csv.reader(f, delimiter=';')
+        reader = csv.reader(f, quoting=csv.QUOTE_NONNUMERIC, delimiter=';')
         for row in reader:
             if row:
-                events.append(LoggingEvent.from_entries(row))
+                events.add(LoggingEvent.from_entries(row))
     return events

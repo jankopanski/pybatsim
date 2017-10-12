@@ -479,8 +479,6 @@ class Job:
         self._scheduler.info(
             "Rejecting job ({job}), reason={reason}",
             job=self, reason=self.rejected_reason, type="job_rejection")
-        self._scheduler._log_job(
-            self._scheduler.time, self, "rejected", reason)
         self._scheduler._batsim.reject_jobs([self._batsim_job])
         del self._scheduler._scheduler._jobmap[self._batsim_job.id]
 
@@ -593,8 +591,8 @@ class Job:
                        Job.State.COMPLETED_KILLED]:
             self._batsim_job.finish_time = self._scheduler.time
             self._batsim_job.kill_reason = kill_reason
-            self._batsim_job.return_code = return_code or 0 if state == Job.State.COMPLETED_SUCCESSFULLY else 1
-            self._scheduler._log_job(self._scheduler.time, self, "completed")
+            self._batsim_job.return_code = (
+                return_code or 0 if state == Job.State.COMPLETED_SUCCESSFULLY else 1)
         self._jobs_list.update_element(self)
 
     def __str__(self):
@@ -626,8 +624,25 @@ class Job:
         if self.state is not None:
             state = self.state.name
 
+        split_id = self.id.split(Batsim.WORKLOAD_JOB_SEPARATOR)
+
+        parent_id = ""
+        parent_workload_name = ""
+        parent_number = ""
+
+        if self.parent_job:
+            parent_id = self.parent_job.id
+            parent_split_id = parent_id.split(Batsim.WORKLOAD_JOB_SEPARATOR)
+            parent_workload_name = parent_split_id[0]
+            parent_number = parent_split_id[1]
+
         return {
             "id": self.id,
+            "workload_name": split_id[0],
+            "number": split_id[1],
+            "parent_id": parent_id,
+            "parent_workload_name": parent_workload_name,
+            "parent_number": parent_number,
             "queue_number": self.number,
             "submit_time": self.submit_time,
             "requested_time": self.requested_time,
@@ -637,6 +652,7 @@ class Job:
             "start_time": self.start_time,
             "finish_time": self.finish_time,
             "state": state,
+            "success": True if self.success else False,
             "kill_reason": self.kill_reason,
             "return_code": self.return_code,
             "comment": self.comment
