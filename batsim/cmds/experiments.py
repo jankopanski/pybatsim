@@ -28,6 +28,13 @@ def main():
     try:
         with open(options_file) as f:
             options = json.loads(f.read())
+    except FileNotFoundError:
+        if debug:
+            raise
+        print("Experiment file does not exist: {}".format(
+            options_file), file=sys.stderr)
+        sys.exit(1)
+
     except Exception:
         if debug:
             raise
