@@ -345,3 +345,16 @@ class DictView(ContainerView):
 
     def get(self, *args, **kwargs):
         return self._data.get(*args, **kwargs)
+
+
+def increment_float(base, delta, until_changed=False):
+    old_base = base
+    while True:
+        base += delta
+        if not until_changed:
+            break
+        elif base == old_base:
+            delta *= 10
+        else:
+            break
+    return base

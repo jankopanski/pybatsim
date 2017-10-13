@@ -7,7 +7,7 @@
 """
 from enum import Enum
 
-from .utils import ObserveList, filter_list, ListView, build_filter
+from .utils import ObserveList, filter_list, ListView, build_filter, increment_float
 
 
 class ResourceRequirement:
@@ -313,7 +313,10 @@ class ComputeResource(Resource):
                 if end_time is None:
                     end_time = float("Inf")
                 if alloc.start_time <= time and end_time >= time:
-                    time = alloc.estimated_end_time + Resource.TIME_DELTA
+                    time = increment_float(
+                        alloc.estimated_end_time,
+                        Resource.TIME_DELTA,
+                        until_changed=True)
                     time_updated = True
             # Check whether or not the full requested walltime fits into the
             # slot, otherwise move the slot at the end of the found conflicting
@@ -322,7 +325,10 @@ class ComputeResource(Resource):
             for alloc in self._allocations:
                 if alloc.start_time > time and alloc.start_time < (
                         estimated_end_time + Resource.TIME_DELTA):
-                    time = alloc.estimated_end_time + Resource.TIME_DELTA
+                    time = increment_float(
+                        alloc.estimated_end_time,
+                        Resource.TIME_DELTA,
+                        until_changed=True)
                     estimated_end_time = time + requested_walltime
                     time_updated = True
         return time
