@@ -11,6 +11,7 @@ from .job import *
 from .resource import *
 from .profiles import *
 from .alloc import *
+from .workloads import *
 
 __all__ = [
     "Scheduler",
@@ -24,4 +25,7 @@ __all__ = [
     "Profiles",
     "Profile",
     "Allocation",
+    "JobDescription",
+    "WorkloadDescription",
+    "generate_workload",
 ]

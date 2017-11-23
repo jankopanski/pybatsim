@@ -16,9 +16,9 @@ import sys
 from datetime import datetime
 from abc import ABCMeta, abstractmethod
 
-from .utils import ListView
-from .profiles import Profiles, Profile
-from ..batsim import Batsim
+from ..utils import ListView
+from ..profiles import Profiles, Profile
+from ...batsim import Batsim
 
 
 class JobDescription:
@@ -551,16 +551,20 @@ class WorkloadDescription:
         self.reduce_profiles()
         self.fill_profile_names()
 
+    def print(self, file=None):
+        """Print this workload."""
+        if file is None:
+            file = sys.stdout
+        file.write(self.to_json_string())
+        file.write("\n")
+        file.flush()
+
     def prepare_and_print(self, file=None):
         """Prepare this workload for execution and print its json representation to
         stdout or to the given file.
         """
-        if file is None:
-            file = sys.stdout
         self.prepare()
-        file.write(self.to_json_string())
-        file.write("\n")
-        file.flush()
+        self.print(file=file)
 
     def submit(self, scheduler, prepare=True):
         """Submit this workload and all contained jobs to Batsim.
