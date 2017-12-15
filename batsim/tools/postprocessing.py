@@ -46,21 +46,21 @@ def merge_by_parent_job(in_batsim_jobs, in_sched_events, **kwargs):
             workload_name = str(job_obj["parent_workload_name"])
 
         add_job(
-            job_id,
-            r1["hacky_job_id"],
-            workload_name,
-            r1["submission_time"],
-            r1["requested_number_of_processors"],
-            r1["requested_time"],
-            r1["success"],
-            r1["starting_time"],
+            r1["allocated_processors"],
+            r1["consumed_energy"],
             r1["execution_time"],
             r1["finish_time"],
-            r1["waiting_time"],
-            r1["turnaround_time"],
+            job_id,
+            r1["metadata"],
+            r1["requested_number_of_processors"],
+            r1["requested_time"],
+            r1["starting_time"],
             r1["stretch"],
-            r1["consumed_energy"],
-            r1["allocated_processors"])
+            r1["submission_time"],
+            r1["success"],
+            r1["turnaround_time"],
+            r1["waiting_time"],
+            workload_name)
 
     return result
 
