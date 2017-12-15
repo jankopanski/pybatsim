@@ -47,14 +47,12 @@ class Logger:
         self._debug = debug = debug or str(debug).lower() in [
             "y", "yes", "true", "1"]
 
-        if debug:
-            logger.setLevel(logging.DEBUG)
-        else:
-            logger.setLevel(logging.INFO)
+        log_level = logging.DEBUG if debug else logging.INFO
+        logger.setLevel(log_level)
 
         if streamhandler:
             handler = logging.StreamHandler()
-            handler.setLevel(logging.INFO)
+            handler.setLevel(log_level)
             handler.setFormatter(self.formatter)
             logger.addHandler(handler)
 
