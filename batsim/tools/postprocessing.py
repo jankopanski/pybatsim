@@ -13,9 +13,15 @@ from batsim.batsim import Batsim
 from batsim.sched.events import load_events_from_file
 
 
-def merge_by_parent_job(in_batsim_jobs, in_sched_events, result, **kwargs):
+def merge_by_parent_job(in_batsim_jobs, in_sched_events, **kwargs):
     """Function used as function in `process_jobs` to merge jobs with the same parent job id."""
     idx = 0
+
+    result = pandas.DataFrame(
+        data=None,
+        columns=in_batsim_jobs.columns,
+        index=in_batsim_jobs.index)
+    result.drop(result.index, inplace=True)
 
     def add_job(*args):
         nonlocal idx
@@ -55,6 +61,8 @@ def merge_by_parent_job(in_batsim_jobs, in_sched_events, result, **kwargs):
             r1["stretch"],
             r1["consumed_energy"],
             r1["allocated_processors"])
+
+    return result
 
 
 def process_jobs(result_prefix,
@@ -98,12 +106,6 @@ def process_jobs(result_prefix,
 
         result_files.append(result)
         with open(result, 'w') as result_file:
-            result_data = pandas.DataFrame(
-                data=None,
-                columns=in_batsim_jobs_data.columns,
-                index=in_batsim_jobs_data.index)
-            result_data.drop(result_data.index, inplace=True)
-
             if verbose:
                 print("[{}/{}] {}: {}, {} => {}" .format(f_idx + 1,
                                                          len(functions),
@@ -111,7 +113,7 @@ def process_jobs(result_prefix,
                                                          in_batsim_jobs.name,
                                                          in_sched_events.name,
                                                          result))
-            f(in_batsim_jobs_data, in_sched_events_data, result_data, **kwargs)
+            result_data = f(in_batsim_jobs_data, in_sched_events_data, **kwargs)
 
             result_data.to_csv(
                 result_file,
