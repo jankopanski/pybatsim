@@ -157,7 +157,7 @@ class JobModelData:
     def copy_job(self):
         return copy.deepcopy(self)
 
-    def submit(self, workload):
+    def submit(self, model, workload):
         assert None not in [
             self.submit_time,
             self.requested_time,
@@ -165,7 +165,8 @@ class JobModelData:
         ], "Job misses required fields: " + str(self)
 
         kwargs = {}
-        for field in self.fields_to_export:
+        for field in (self.fields_to_export
+                + model.additional_job_fields_to_export):
             try:
                 if self.__dict__[field] is not None:
                     kwargs[field] = self.__dict__[field]
@@ -253,8 +254,12 @@ class WorkloadModel:
                 100),
         }
 
+    @property
+    def additional_job_fields_to_export(self):
+        return []
+
     def create_jobs(self, random, parameters):
-        pass
+        raise NotImplementedError()
 
     def generate(self, name, description=None, date=None, verbose=0,
                  **kwargs):
@@ -292,7 +297,7 @@ class WorkloadModel:
         for job in jobs:
             if verbose >= 2:
                 print("Generating job: {}".format(job), file=sys.stderr)
-            job.submit(workload)
+            job.submit(self, workload)
 
         if verbose >= 1:
             print("Finalising workload...", file=sys.stderr)
