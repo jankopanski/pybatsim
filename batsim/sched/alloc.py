@@ -146,7 +146,7 @@ class Allocation:
         :param newjob: the job to be allocated on this allocation
         """
         assert not self.allocated and not self.previously_allocated, "Allocation is in invalid state"
-        assert self._job is None, "Job is not assigned"
+        assert self._job is None, "Job is already assigned"
         assert newjob.open, "Job is not in state open"
         assert self.fits_job(newjob), "Job does not fit in allocation"
 
