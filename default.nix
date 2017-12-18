@@ -9,7 +9,6 @@ buildPythonPackage rec {
       sortedcontainers
       pyzmq
       redis
-      click
       pandas
       docopt
       # for testing

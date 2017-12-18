@@ -24,6 +24,28 @@ class ObserveList:
         """A view of the content of the list."""
         return ListView(self._data)
 
+    def get(self, idx, default=None):
+        """Returns the element at the specified index.
+
+        :param idx: the index
+
+        :param default: the default value if the list does have less elements.
+        """
+        try:
+            return self._data[idx]
+        except IndexError:
+            return default
+
+    @property
+    def first(self):
+        """Return the first element."""
+        return self.get(0)
+
+    @property
+    def last(self):
+        """Return the last element."""
+        return self.get(len(self._data) - 1)
+
     def _check_new_elem(self, element):
         """Checks whether a new element should be added.
 
@@ -323,3 +345,16 @@ class DictView(ContainerView):
 
     def get(self, *args, **kwargs):
         return self._data.get(*args, **kwargs)
+
+
+def increment_float(base, delta, until_changed=False):
+    old_base = base
+    while True:
+        base += delta
+        if not until_changed:
+            break
+        elif base == old_base:
+            delta *= 10
+        else:
+            break
+    return base

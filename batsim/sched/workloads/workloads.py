@@ -16,9 +16,9 @@ import sys
 from datetime import datetime
 from abc import ABCMeta, abstractmethod
 
-from .utils import ListView
-from .profiles import Profiles, Profile
-from ..batsim import Batsim
+from ..utils import ListView
+from ..profiles import Profiles, Profile
+from ...batsim import Batsim
 
 
 class JobDescription:
@@ -209,8 +209,10 @@ class JobDescription:
         assert self.walltime is not None and self.walltime >= 0, "Job.walltime was not set"
 
         scheduler.info(
-            "Submitting job description (job={job}, profile={profile_name})",
-            job=self.to_json_string(flat=True),
+            "Submitting job description (workload_name={workload_name}, job={job}, profile={profile_name})",
+            job=self.to_json_string(
+                flat=True),
+            workload_name=self.workload.name,
             profile_name=self.profile.name,
             type="job_description_submit")
 
@@ -316,7 +318,7 @@ class WorkloadDescription:
     @name.setter
     def name(self, name):
         assert not self.submitted_jobs, "A workload's properties can not be changed if it contains submitted jobs."
-        return self._name
+        self._name = name
 
     @property
     def description(self):
@@ -549,16 +551,20 @@ class WorkloadDescription:
         self.reduce_profiles()
         self.fill_profile_names()
 
+    def print(self, file=None):
+        """Print this workload."""
+        if file is None:
+            file = sys.stdout
+        file.write(self.to_json_string())
+        file.write("\n")
+        file.flush()
+
     def prepare_and_print(self, file=None):
         """Prepare this workload for execution and print its json representation to
         stdout or to the given file.
         """
-        if file is None:
-            file = sys.stdout
         self.prepare()
-        file.write(self.to_json_string())
-        file.write("\n")
-        file.flush()
+        self.print(file=file)
 
     def submit(self, scheduler, prepare=True):
         """Submit this workload and all contained jobs to Batsim.

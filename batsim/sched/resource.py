@@ -7,7 +7,7 @@
 """
 from enum import Enum
 
-from .utils import ObserveList, filter_list, ListView, build_filter
+from .utils import ObserveList, filter_list, ListView, build_filter, increment_float
 
 
 class ResourceRequirement:
@@ -110,10 +110,16 @@ class Resource:
     @property
     def active(self):
         """Whether or not this resource is currently active in some of its resources."""
+        return self.num_active > 0
+
+    @property
+    def num_active(self):
+        """Number of allocations in which this resource is currently active."""
+        num = 0
         for alloc in self._allocations:
             if self in alloc.allocated_resources:
-                return True
-        return False
+                num += 1
+        return num
 
     @property
     def resources(self):
@@ -291,12 +297,26 @@ class ComputeResource(Resource):
             time = self._scheduler.time
         time_updated = True
         while time_updated:
+            in_present = time == self._scheduler.time
             time_updated = False
             # Search the earliest time when a slot for an allocation is
             # available
             for alloc in self._allocations:
-                if alloc.start_time <= time and alloc.estimated_end_time >= time:
-                    time = alloc.estimated_end_time + Resource.TIME_DELTA
+                # If the result should be found for the current scheduling time
+                # (is_present) than not the estimated_end_time is used but the
+                # real end_time (or infinity) because there could be allocations
+                # in the current time which are not yet freed by Batsim (in case
+                # of jobs getting killed after their walltime). This is due to
+                # the implementation of killing jobs inside Batsim which is
+                # implemented by using a new killer process.
+                end_time = alloc.end_time if in_present else alloc.estimated_end_time
+                if end_time is None:
+                    end_time = float("Inf")
+                if alloc.start_time <= time and end_time >= time:
+                    time = increment_float(
+                        alloc.estimated_end_time,
+                        Resource.TIME_DELTA,
+                        until_changed=True)
                     time_updated = True
             # Check whether or not the full requested walltime fits into the
             # slot, otherwise move the slot at the end of the found conflicting
@@ -305,7 +325,10 @@ class ComputeResource(Resource):
             for alloc in self._allocations:
                 if alloc.start_time > time and alloc.start_time < (
                         estimated_end_time + Resource.TIME_DELTA):
-                    time = alloc.estimated_end_time + Resource.TIME_DELTA
+                    time = increment_float(
+                        alloc.estimated_end_time,
+                        Resource.TIME_DELTA,
+                        until_changed=True)
                     estimated_end_time = time + requested_walltime
                     time_updated = True
         return time

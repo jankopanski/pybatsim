@@ -69,15 +69,38 @@ class ValidatingMachine(BatsimScheduler):
     def start_jobs_continuous(self, allocs):
         for (job, (first_res, last_res)) in allocs:
             self.previousAllocations[job.id] = range(first_res, last_res + 1)
-            self.jobs_waiting.remove(job)
+            try:
+                self.jobs_waiting.remove(job)
+            except KeyError:
+                raise ValueError(
+                    "Job {} was not waiting (waiting: {})".format(
+                        job, [
+                            j2.id for j2 in self.jobs_waiting]))
             for r in range(first_res, last_res + 1):
-                self.availableResources.remove(r)
+                try:
+                    self.availableResources.remove(r)
+                except KeyError:
+                    raise ValueError(
+                        "Resource {} was not available (available: {})".format(
+                            r, list(
+                                self.availableResources)))
         self.bs_start_jobs_continuous(allocs)
 
     def start_jobs(self, jobs, res):
         for j in jobs:
-            self.jobs_waiting.remove(j)
+            try:
+                self.jobs_waiting.remove(j)
+            except KeyError:
+                raise ValueError(
+                    "Job {} was not waiting (waiting: {})".format(
+                        j, [j2.id for j2 in self.jobs_waiting]))
             self.previousAllocations[j.id] = res[j.id]
             for r in res[j.id]:
-                self.availableResources.remove(r)
+                try:
+                    self.availableResources.remove(r)
+                except KeyError:
+                    raise ValueError(
+                        "Resource {} was not available (available: {})".format(
+                            r, list(
+                                self.availableResources)))
         self.bs_start_jobs(jobs, res)
