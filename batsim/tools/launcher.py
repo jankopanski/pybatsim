@@ -160,6 +160,9 @@ def launch_scheduler_main(
             kwargs["verbose"] = 999
         elif arg.startswith("--options="):
             kwargs["options"] = json.loads(arg[arg.index("=") + 1:])
+        elif arg.startswith("--options-file="):
+            with open(arg) as options_file:
+                kwargs["options"] = json.load(options_file)
         elif arg.startswith("--timeout="):
             kwargs["timeout"] = int(arg[arg.index("=") + 1:])
         elif arg.startswith("--socket-endpoint="):
