@@ -165,8 +165,8 @@ class JobModelData:
         ], "Job misses required fields: " + str(self)
 
         kwargs = {}
-        for field in (self.fields_to_export
-                + model.additional_job_fields_to_export):
+        for field in (self.fields_to_export +
+                      model.additional_job_fields_to_export):
             try:
                 if self.__dict__[field] is not None:
                     kwargs[field] = self.__dict__[field]

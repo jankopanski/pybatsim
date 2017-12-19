@@ -126,7 +126,7 @@ class Profiles(metaclass=ABCMeta):
         try:
             t = d["type"]
         except KeyError:
-            return Unknown(data=data, name=name)
+            return Profiles.Unknown(data=d, name=name)
 
         profiles = [
             cls.Delay,
@@ -143,7 +143,7 @@ class Profiles(metaclass=ABCMeta):
         for p in profiles:
             if t == p.type:
                 return p.from_dict(d, name=name)
-        return Unknown(data=data, type=t, name=name)
+        return Profiles.Unknown(data=d, type=t, name=name)
 
     class Unknown(Profile):
         """The profile was not recognized."""

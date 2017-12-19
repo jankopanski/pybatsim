@@ -11,6 +11,7 @@ Options:
     -s --socket-endpoint=<endpoint>         Batsim socket endpoint to use [default: tcp://*:28000]
     -e --event-socket-endpoint=<endpoint>   Socket endpoint to use to publish scheduler events [default: tcp://*:28001]
     -o --options=<options_string>           A Json string to pass to the scheduler [default: {}]
+    -O --options-file=<options_file>        A file containing the json options
     -t --timeout=<timeout>                  How long to wait for responses from Batsim [default: 2000]
 '''
 
@@ -34,7 +35,13 @@ def main():
 
     protect = bool(arguments['--protect'])
 
-    options = json.loads(arguments['--options'])
+    if arguments["--options-file"]:
+        with open(arguments["--options-file"]) as options_file:
+            options = json.load(options_file)
+    elif arguments["--options"]:
+        options = json.loads(arguments['--options'])
+    else:
+        options = {}
 
     scheduler_filename = arguments['<scheduler>']
     socket_endpoint = arguments['--socket-endpoint']
