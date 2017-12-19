@@ -113,7 +113,10 @@ def process_jobs(result_prefix,
                                                          in_batsim_jobs.name,
                                                          in_sched_events.name,
                                                          result))
-            result_data = f(in_batsim_jobs_data, in_sched_events_data, **kwargs)
+            result_data = f(
+                in_batsim_jobs_data,
+                in_sched_events_data,
+                **kwargs)
 
             result_data.to_csv(
                 result_file,
