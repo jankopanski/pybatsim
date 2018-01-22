@@ -7,6 +7,7 @@ import sys
 
 from .network import NetworkHandler
 
+from procset import ProcSet
 import redis
 import zmq
 
@@ -20,7 +21,7 @@ class Batsim(object):
                  network_handler=None,
                  event_handler=None,
                  validatingmachine=None,
-                 handle_dynamic_notify=True):
+                 handle_dynamic_notify=False):
         self.running_simulation = False
         if network_handler is None:
             network_handler = NetworkHandler('tcp://*:28000')
@@ -116,7 +117,7 @@ class Batsim(object):
 
     def start_jobs_continuous(self, allocs):
         """
-        allocs should have the followinf format:
+        allocs should have the following format:
         [ (job, (first res, last res)), (job, (first res, last res)), ...]
         """
 
@@ -143,8 +144,7 @@ class Batsim(object):
                 "type": "EXECUTE_JOB",
                 "data": {
                         "job_id": job.id,
-                        # FixMe do not send "[9]"
-                        "alloc": " ".join(map(str, res[job.id]))
+                        "alloc": str(ProcSet(*res[job.id]))
                 }
             }
             )
@@ -354,9 +354,15 @@ class Batsim(object):
                 self.scheduler.onJobSubmission(self.jobs[job_id])
                 self.nb_jobs_received += 1
             elif event_type == "JOB_KILLED":
-                self.scheduler.onJobsKilled(
-                    [self.jobs[jid] for jid in event_data["job_ids"]])
-                self.nb_jobs_killed += len(event_data["job_ids"])
+                # get progress
+                killed_jobs = []
+                for jid in event_data["job_ids"]:
+                    j = self.jobs[jid]
+                    j.progress = event_data["progress"][jid]
+                    killed_jobs.append(j)
+
+                self.scheduler.onJobsKilled(killed_jobs)
+                self.nb_jobs_killed += len(killed_jobs)
             elif event_type == "JOB_COMPLETED":
                 job_id = event_data["job_id"]
                 j = self.jobs[job_id]
@@ -401,6 +407,10 @@ class Batsim(object):
             elif event_type == 'REQUESTED_CALL':
                 self.scheduler.onNOP()
                 # TODO: separate NOP / REQUESTED_CALL (here and in the algos)
+            elif event_type == 'ADD_RESOURCES':
+                self.scheduler.onAddResources(event_data["resources"])
+            elif event_type == 'REMOVE_RESOURCES':
+                self.scheduler.onRemoveResources(event_data["resources"])
             else:
                 raise Exception("Unknow event type {}".format(event_type))
 
@@ -425,6 +435,8 @@ class Batsim(object):
             "events": self._events_to_send
         }
         self.network.send(new_msg)
+        print("Sent Message: ", new_msg)
+
 
         if finished_received:
             self.network.close()
@@ -501,6 +513,7 @@ class Job(object):
         self.job_state = Job.State.UNKNOWN
         self.kill_reason = None
         self.return_code = None
+        self.progress = None
         self.json_dict = json_dict
         self.profile_dict = profile_dict
 
@@ -569,4 +582,10 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onReportEnergyConsumed(self, consumed_energy):
+        raise NotImplementedError()
+
+    def onAddResources(self, to_add):
+        raise NotImplementedError()
+
+    def onRemoveResources(self, to_remove):
         raise NotImplementedError()

@@ -195,6 +195,21 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler.on_report_energy_consumed(reply)
         self._scheduler._do_schedule(reply)
 
+    def onAddResources(self, resources):
+        self._scheduler._update_time()
+        self._scheduler.info(
+            "Received add Resources message: {resources}",
+            resources=resources,
+            type="add_resources_received")
+        self._scheduler.on_add_resources(resources)
+
+    def onRemoveResources(self, resources):
+        self._scheduler.info(
+            "Received remove Resources message: {resources}",
+            resources=resources,
+            type="remove_resources_received")
+        self._scheduler.on_remove_resources(resources)
+
 
 class Scheduler(metaclass=ABCMeta):
     """The high-level scheduler which should be interited from by concrete scheduler
@@ -586,6 +601,20 @@ class Scheduler(metaclass=ABCMeta):
         """Hook similar to the low-level API.
 
         :param consumed_energy: the consumed energy (higher-level reply object)
+        """
+        pass
+
+    def on_add_resources(self, resources):
+        """Hook similar to the low-level API.
+
+        :param resources: a procset of resources
+        """
+        pass
+
+    def on_remove_resources(self, resources):
+        """Hook similar to the low-level API.
+
+        :param resources: a procset of resources
         """
         pass
 

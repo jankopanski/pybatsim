@@ -413,16 +413,16 @@ class Resources(ObserveList):
         """The list of all special resources (managed by the scheduler logic)."""
         return self.filter(special=True)
 
-    def __getitem__(self, items):
+    def __getitem__(self, item):
         """Returns either a slice of resources or returns a resource based on a given resource id."""
-        if isinstance(items, slice):
-            return self.create(self.all[items])
+        if isinstance(item, slice):
+            return self.create(self.all[item])
         else:
-            return self._resource_map[items]
+            return self._resource_map[item]
 
-    def __delitem__(self, index):
+    def __delitem__(self, item):
         """Deletes a resource with the given resource id."""
-        resource = self._resource_map[items]
+        resource = self._resource_map[item]
         self.remove(resource)
 
     def _element_new(self, resource):

@@ -140,6 +140,9 @@ class ObserveList:
     def __str__(self):
         return str([str(entry) for entry in self._data])
 
+    def __rep__(self):
+        return __str__(self)
+
     def apply(self, apply):
         """Apply a function to modify the list (e.g. sorting the list).
 
@@ -328,6 +331,9 @@ class ContainerView:
 
     def __str__(self, *args, **kwargs):
         return self._data.__str__(*args, **kwargs)
+
+    def __rep__(self, *args, **kwargs):
+        return self._data.__rep__(*args, **kwargs)
 
 
 class ListView(ContainerView):
