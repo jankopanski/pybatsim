@@ -12,7 +12,7 @@
 
 """
 
-from batsim.sched import Scheduler
+from batsim.sched import Scheduler, Jobs
 from batsim.sched.algorithms.filling import filler_sched
 from batsim.sched.algorithms.utils import default_resources_filter
 
@@ -28,20 +28,23 @@ class SchedBebida(Scheduler):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.to_be_removed_resources = []
+        self.to_be_removed_resources = {}
 
     def on_remove_resources(self, resources):
         # find the list of jobs that are impacted
         # and kill all those jobs
         #import ipdb; ipdb.set_trace()
+        self.to_be_removed_resources[resources] = []
+        to_be_killed = Jobs()
         for job in self.jobs.running:
             if ProcSet(*to_set(job.allocation)) & ProcSet.from_str(resources):
-                job.kill()
-        self.to_be_removed_resources.append(resources)
+                to_be_killed.add(job)
+        self._batsim.kill_jobs(to_be_killed)
+        self.to_be_removed_resources[resources] = to_be_killed
 
     def on_add_resources(self, resources):
         # add the resources
-        for resource in ProcSet(*to_set(resources)):
+        for resource in ProcSet.from_str(resources):
             bat_res = { id: resource }
             self._batsim.resources.append(bat_res)
         # Initialize new API data structure
@@ -51,23 +54,43 @@ class SchedBebida(Scheduler):
         # kill jobs, so tey will be resubmited taking free resources, until
         # tere is no more resources
         free_resource_nb = len(self.resources.free)
+        to_be_killed = []
         for job in self.jobs.running:
             wanted_resource_nb = job.requested_resources - len(job.allocation.resources)
             if wanted_resource_nb > 0:
-                job.kill()
+                to_be_killed.append(job)
                 free_resource_nb = free_resource_nb - wanted_resource_nb
             if free_resource_nb <= 0:
                 break
+        self._batsim.kill_jobs(to_be_killed)
 
     def on_jobs_killed(self, jobs):
-        # Do remove resources that was decommisionned
-        for resouce in self.to_be_removed_resources:
-            del self.resources[resource]
-        self.to_be_removed_resources = []
+        # check if all jobs associated to one decomission are killed
+        #for job in jobs:
+        #    for _, to_be_killed in self.to_be_removed_resources.items():
+        #        for tbk_job in to_be_killed:
+        #            if tbk_job.id == job.id:
+        #                del tbk_job
+        #for resources, to_be_killed in self.to_be_removed_resources.items():
+        #    if to_be_killed == []:
+        #        # Nothing to kill any more: delete the resources
+        #        for resource in ProcSet.from_str(resources):
+        #            del self.resources[resource]
+        #        # Notify that the resources was removed
+        #        self.notify_resources_removed(resources)
 
-        # resubmit the job
+        for resources, to_be_killed in self.to_be_removed_resources.items():
+            if to_be_killed == Jobs(from_list=jobs):
+                #import ipdb; ipdb.set_trace()
+                # Nothing to kill any more: delete the resources
+                for resource in ProcSet.from_str(resources):
+                    del self.resources[resource]
+                # Notify that the resources was removed
+                self._batsim.notify_resources_removed(resources)
 
-        # TODO get killed jobs progress and resubmit what's left of the jobs
+
+        # TODO resubmit the job
+        # get killed jobs progress and resubmit what's left of the jobs
         # for job in jobs:
         #     job.get_job_data("progress")
 

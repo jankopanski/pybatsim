@@ -291,6 +291,17 @@ class Batsim(object):
             }
         )
 
+    def notify_resources_removed(self, resources):
+        self._events_to_send.append(
+            {
+                "timestamp": self.time(),
+                "type": "RESOURCES_REMOVED",
+                "data": {
+                    "resources": resources
+                }
+            }
+        )
+
     def do_next_event(self):
         return self._read_bat_msg()
 
@@ -358,7 +369,7 @@ class Batsim(object):
                 killed_jobs = []
                 for jid in event_data["job_ids"]:
                     j = self.jobs[jid]
-                    j.progress = event_data["progress"][jid]
+                    j.progress = event_data["job_progress"][jid]
                     killed_jobs.append(j)
 
                 self.scheduler.onJobsKilled(killed_jobs)
