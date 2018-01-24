@@ -88,8 +88,7 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler.info("The following jobs were killed: ({jobs})",
                              jobs=jobobjs, type="jobs_killed_received")
 
-        for job in jobobjs:
-            job._do_complete_job()
+        jobobj._do_complete_job()
 
         self._scheduler.on_jobs_killed(jobobjs)
         self._scheduler._do_schedule()
