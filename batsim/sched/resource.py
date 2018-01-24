@@ -426,11 +426,11 @@ class Resources(ObserveList):
         self.remove(resource)
 
     def _element_new(self, resource):
-        if resource.id:
+        if resource.id is not None:
             self._resource_map[resource.id] = resource
 
     def _element_del(self, resource):
-        if resource.id:
+        if resource.id is not None:
             del self._resource_map[resource.id]
 
     def find_first_time_and_resources_to_fit_walltime(
