@@ -684,6 +684,16 @@ class Jobs(ObserveList):
         self._job_map = {}
         super().__init__(*args, **kwargs)
 
+    def __eq__(self, other):
+        if type(other) is not Jobs:
+            return False
+        if len(self._job_map) != len(other._job_map):
+            return False
+        return all(
+            [me.id == him.id
+             for me, him
+             in zip(self._job_map.values(), other._job_map.values())])
+
     @property
     def runnable(self):
         """Returns all jobs which are runnable."""
