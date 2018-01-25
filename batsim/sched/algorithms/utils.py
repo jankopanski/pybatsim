@@ -34,6 +34,9 @@ def find_resources_without_delaying_priority_jobs(
                        the allocations of the jobs with allocations in the future
                        (reserved jobs).
     """
+    scheduler.debug("Reserve priority jobs {jobs}",
+            jobs=priority_jobs,
+            type="reserve_priority_jobs")
 
     # Temporarily allocate the priority jobs
     temporary_allocations = []
@@ -49,6 +52,10 @@ def find_resources_without_delaying_priority_jobs(
         a.allocate_all(scheduler)
         temporary_allocations.append(a)
 
+    scheduler.debug("Search resources for backfilling job {job}",
+            job=job,
+            type="search_backfilling_resources")
+
     # Search for allocations for the given job (not in the future)
     res = resources.find_sufficient_resources_for_job(
         job, filter=resources_filter)
@@ -57,9 +64,18 @@ def find_resources_without_delaying_priority_jobs(
         if not check_func(job, res, temporary_allocations):
             res = None
 
+    scheduler.debug("Free priority jobs {jobs}",
+            jobs=priority_jobs,
+            type="free_priority_jobs")
+
     # Free the temporarily acquired allocations
     for t in temporary_allocations:
         t.free()
+
+    scheduler.debug("Results of resources for backfilling job {job}: {res}",
+            job=job,
+            res=res,
+            type="search_backfilling_resources_result")
 
     return res
 
