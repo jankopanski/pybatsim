@@ -83,7 +83,8 @@ class BaseBatsimScheduler(BatsimScheduler):
         for job in jobs:
             jobobj = self._jobmap[job.id]
             del self._jobmap[job.id]
-            jobobjs.append(job)
+            jobobj.progress = job.progress
+            jobobjs.append(jobobj)
 
         self._scheduler.info("The following jobs were killed: ({jobs})",
                              jobs=jobobjs, type="jobs_killed_received")

@@ -379,6 +379,14 @@ class Job:
                 result.append(dep)
         return ListView(result)
 
+    @property
+    def progress(self):
+        return self._batsim_job.progress
+
+    @progress.setter
+    def progress(self, value):
+        self._batsim_job.progress = value
+
     def free(self):
         """Free the current allocation of this job."""
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
