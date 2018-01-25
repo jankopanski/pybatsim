@@ -126,7 +126,11 @@ class Resource:
         """Returns a list containing only the resource (for compatibility with the `Resources` class)."""
         return [self]
 
-    def find_first_time_to_fit_job(self, job, time=None, future_reservation=False):
+    def find_first_time_to_fit_job(
+            self,
+            job,
+            time=None,
+            future_reservation=False):
         """Finds the first time after which the job can start.
 
         :param job: the job to find a time slot for
@@ -283,12 +287,16 @@ class ComputeResource(Resource):
         self._old_pstate = None
         self._pstate_update_in_progress = False
 
-    def find_first_time_to_fit_job(self, job, time=None, future_reservation=False):
+    def find_first_time_to_fit_job(
+            self,
+            job,
+            time=None,
+            future_reservation=False):
         return self.find_first_time_to_fit_walltime(job.requested_time, time,
-                future_reservation)
+                                                    future_reservation)
 
     def find_first_time_to_fit_walltime(self, requested_walltime, time=None,
-            future_reservation=False):
+                                        future_reservation=False):
         """Finds the first time after which the requested walltime is available for a job start.
 
         :param requested_walltime: the size of the requested time slot
@@ -322,7 +330,8 @@ class ComputeResource(Resource):
                 else:
                     end_time = alloc.estimated_end_time
 
-                if alloc.start_time <= time and end_time == float("Inf") and not future_reservation and time <= present_time:
+                if alloc.start_time <= time and end_time == float(
+                        "Inf") and not future_reservation and time <= present_time:
                     return None
 
                 if alloc.start_time <= time and end_time >= time:
@@ -341,10 +350,10 @@ class ComputeResource(Resource):
             # allocation and then repeat the loop.
             if not time_updated:
                 estimated_end_time = increment_float(time, requested_walltime,
-                        until_changed=True)
+                                                     until_changed=True)
                 estimated_end_time = increment_float(estimated_end_time,
-                        Resource.TIME_DELTA,
-                        until_changed=True)
+                                                     Resource.TIME_DELTA,
+                                                     until_changed=True)
                 for alloc in self._allocations:
                     if alloc.start_time > time and alloc.start_time < (
                             estimated_end_time):
@@ -532,7 +541,8 @@ class Resources(ObserveList):
                 else:
                     if max_matches is not None:
                         found_resources = found_resources[:max_matches]
-                    if min_matches is not None and len(found_resources) < min_matches:
+                    if min_matches is not None and len(
+                            found_resources) < min_matches:
                         found_resources = []
                     return time, found_resources
 
@@ -568,9 +578,9 @@ class Resources(ObserveList):
                 is_valid = False
 
             if new_time < time:
-                job._scheduler.fatal("Found time is before the current time: old={time_old}, new={time_new}",
-                    time_old=time,
-                    time_new=new_time,
+                job._scheduler.fatal(
+                    "Found time is before the current time: old={time_old}, new={time_new}",
+                    time_old=time, time_new=new_time,
                     type="find_resource_failed_time_old")
             times_found.add(new_time)
 
@@ -590,9 +600,9 @@ class Resources(ObserveList):
                         is_valid = False
 
                     if new_time2 < new_time:
-                        job._scheduler.fatal("Found time is before the current time: old={time_old}, new={time_new}",
-                            time_old=new_time,
-                            time_new=new_time2,
+                        job._scheduler.fatal(
+                            "Found time is before the current time: old={time_old}, new={time_new}",
+                            time_old=new_time, time_new=new_time2,
                             type="find_resource_failed_time_old2")
                     s_found_all += s_found
                     times_found.add(new_time2)
@@ -606,9 +616,9 @@ class Resources(ObserveList):
             else:
                 new_time = max(times_found)
                 if time == new_time:
-                    job._scheduler.fatal("Finding new resource failed. Time has not changed: old={time_old}, new={time_new}",
-                        time_old=time,
-                        time_new=list(times_found),
+                    job._scheduler.fatal(
+                        "Finding new resource failed. Time has not changed: old={time_old}, new={time_new}",
+                        time_old=time, time_new=list(times_found),
                         type="find_resource_failed_time_not_changed")
                 time = new_time
 

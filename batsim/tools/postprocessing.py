@@ -43,7 +43,7 @@ def merge_by_parent_job(in_batsim_jobs, in_sched_events, **kwargs):
             job_obj = event.data["job"]
         except (AttributeError, KeyError):
             raise ValueError("Job with id {} not found in job result data"
-                    .format(full_job_id))
+                             .format(full_job_id))
 
         if job_obj["parent_id"]:
             job_id = str(job_obj["parent_number"])

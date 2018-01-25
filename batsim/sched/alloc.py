@@ -89,7 +89,7 @@ class Allocation:
         """The estimated end time of this allocation (either explicit or based on the walltime)."""
         if self._estimated_end_time is None:
             self._estimated_end_time = self.end_time or (
-                    self.start_time + (self.walltime or float("Inf")))
+                self.start_time + (self.walltime or float("Inf")))
         return self._estimated_end_time
 
     @property
