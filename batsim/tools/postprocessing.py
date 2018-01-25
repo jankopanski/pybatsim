@@ -30,36 +30,40 @@ def merge_by_parent_job(in_batsim_jobs, in_sched_events, **kwargs):
 
     submit_events = in_sched_events.filter(types=["job_submission_received"])
 
-    for i1, r1 in in_batsim_jobs.iterrows():
-        job_id = r1["job_id"]
-        workload_name = r1["workload_name"]
+    for t in in_batsim_jobs.itertuples():
+        job_id = t.job_id
+        workload_name = t.workload_name
 
         full_job_id = str(
             workload_name) + Batsim.WORKLOAD_JOB_SEPARATOR + str(job_id)
 
         event = submit_events.filter(
             cond=lambda ev: ev.data["job"]["id"] == full_job_id).first
-        job_obj = event.data["job"]
+        try:
+            job_obj = event.data["job"]
+        except (AttributeError, KeyError):
+            raise ValueError("Job with id {} not found in job result data"
+                    .format(full_job_id))
 
         if job_obj["parent_id"]:
             job_id = str(job_obj["parent_number"])
             workload_name = str(job_obj["parent_workload_name"])
 
         add_job(
-            r1["allocated_processors"],
-            r1["consumed_energy"],
-            r1["execution_time"],
-            r1["finish_time"],
+            t.allocated_processors,
+            t.consumed_energy,
+            t.execution_time,
+            t.finish_time,
             job_id,
-            r1["metadata"],
-            r1["requested_number_of_processors"],
-            r1["requested_time"],
-            r1["starting_time"],
-            r1["stretch"],
-            r1["submission_time"],
-            r1["success"],
-            r1["turnaround_time"],
-            r1["waiting_time"],
+            t.metadata,
+            t.requested_number_of_processors,
+            t.requested_time,
+            t.starting_time,
+            t.stretch,
+            t.submission_time,
+            t.success,
+            t.turnaround_time,
+            t.waiting_time,
             workload_name)
 
     return result
@@ -93,7 +97,24 @@ def process_jobs(result_prefix,
     """
     result_files = []
 
-    in_batsim_jobs_data = pandas.read_csv(in_batsim_jobs, sep=",")
+    in_batsim_jobs_data = pandas.read_csv(in_batsim_jobs, sep=",", dtype={
+        'workload_name': 'str',
+        'job_id': 'int',
+        'allocated_processors': 'str',
+        'consumed_energy': 'float64',
+        'execution_time': 'float64',
+        'finish_time': 'float64',
+        'metadata': 'str',
+        'requested_number_of_processors': 'int',
+        'requested_time': 'float64',
+        'starting_time': 'float64',
+        'stretch': 'float64',
+        'submission_time': 'float64',
+        'success': 'int',
+        'turnaround_time': 'float64',
+        'waiting_time': 'float64'
+    })
+
     in_sched_events_data = load_events_from_file(in_sched_events)
 
     for f_idx, f in enumerate(functions):
