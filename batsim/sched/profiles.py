@@ -322,7 +322,7 @@ class Profiles(metaclass=ABCMeta):
             return {
                 "type": self.type,
                 "size": self.size,
-                "direction": self.direction.name,
+                "direction": self.direction.name.lower(),
                 "host": self.host.name,
                 "ret": self.ret,
             }
@@ -354,7 +354,7 @@ class Profiles(metaclass=ABCMeta):
             return {
                 "type": self.type,
                 "size": self.size,
-                "direction": self.direction.name,
+                "direction": self.direction.name.lower(),
                 "ret": self.ret,
             }
 
