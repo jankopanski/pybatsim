@@ -549,7 +549,7 @@ class Job:
         alloc = []
         for res in self.allocation.allocated_resources:
             if res.num_active != 1:
-                scheduler.fatal(
+                self._scheduler.fatal(
                     "Scheduled resource {res} was already part of a Batsim allocation",
                     res=res,
                     type="resource_already_allocated")
