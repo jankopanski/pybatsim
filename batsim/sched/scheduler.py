@@ -395,10 +395,9 @@ class Scheduler(metaclass=ABCMeta):
 
     def debug(self, msg, **kwargs):
         """Writes a debug message to the logging facility."""
-        self._logger.debug(self._format_log_msg(msg, **kwargs))
-        event = self._format_event_msg(1, msg, **kwargs)
-
         if self._log_debug_events:
+            self._logger.debug(self._format_log_msg(msg, **kwargs))
+            event = self._format_event_msg(1, msg, **kwargs)
             self._event_logger.info(event)
 
     def info(self, msg, **kwargs):
