@@ -116,7 +116,7 @@ class Batsim(object):
 
     def start_jobs_continuous(self, allocs):
         """
-        allocs should have the followinf format:
+        allocs should have the following format:
         [ (job, (first res, last res)), (job, (first res, last res)), ...]
         """
 
@@ -280,13 +280,35 @@ class Batsim(object):
             job = Job.from_json_dict(json_dict, profile_dict)
         return job
 
-    def request_consumed_energy(self):
+    def request_consumed_energy(self): #TODO CHANGE NAME 
         self._events_to_send.append(
             {
                 "timestamp": self.time(),
                 "type": "QUERY_REQUEST",
                 "data": {
                     "requests": {"consumed_energy": {}}
+                }
+            }
+        )
+
+    def request_air_temperature_all(self):
+        self._events_to_send.append(
+            {
+                "timestamp": self.time(),
+                "type": "QUERY",
+                "data": {
+                    "requests": {"air_temperature_all": {}}
+                }
+            }
+        )
+
+    def request_processor_temperature_all(self):
+        self._events_to_send.append(
+            {
+                "timestamp": self.time(),
+                "type": "QUERY",
+                "data": {
+                    "requests": {"processor_temperature_all": {}}
                 }
             }
         )
@@ -395,30 +417,29 @@ class Batsim(object):
                         raise Exception("Multiple intervals are not supported")
                     self.scheduler.onMachinePStateChanged(
                         nodeInterval, event_data["state"])
-            elif event_type == "QUERY_REPLY":
-                consumed_energy = event_data["consumed_energy"]
-                self.scheduler.onReportEnergyConsumed(consumed_energy)
+            elif event_type == "ANSWER":
+                if "consumed_energy" in event_data:
+                    consumed_energy = event_data["consumed_energy"]
+                    self.scheduler.onReportEnergyConsumed(consumed_energy)
+                elif "processor_temperature_all" in event_data:
+                    proc_temperature_all = event_data["processor_temperature_all"]
+                    self.scheduler.onAnswerProcessorTemperatureAll(proc_temperature_all)
+                elif "air_temperature_all" in event_data:
+                    air_temperature_all = event_data["air_temperature_all"]
+                    self.scheduler.onAnswerAirTemperatureAll(air_temperature_all)
+                
             elif event_type == 'REQUESTED_CALL':
                 self.scheduler.onNOP()
                 # TODO: separate NOP / REQUESTED_CALL (here and in the algos)
             else:
                 raise Exception("Unknow event type {}".format(event_type))
 
-        if self.handle_dynamic_notify and not finished_received:
-            if ((self.nb_jobs_completed +
-                 self.nb_jobs_failed +
-                 self.nb_jobs_timeout +
-                 self.nb_jobs_killed) == self.nb_jobs_scheduled and
-                    not self.has_dynamic_job_submissions) and self.initialized:
-                self.notify_submission_finished()
-            else:
-                self.notify_submission_continue()
-                self.has_dynamic_job_submissions = False
-
         if len(self._events_to_send) > 0:
             # sort msgs by timestamp
             self._events_to_send = sorted(
                 self._events_to_send, key=lambda event: event['timestamp'])
+
+            #print("------[{time}] Nb events: {nb}".format(time=self.time(), nb=len(self._events_to_send)))
 
         new_msg = {
             "now": self._current_time,
@@ -569,4 +590,10 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onReportEnergyConsumed(self, consumed_energy):
+        raise NotImplementedError()
+
+    def onAnswerProcessorTemperatureAll(self, proc_temperature_all):
+        raise NotImplementedError()
+
+    def onAnswerAirTemperatureAll(self, air_temperature_all):
         raise NotImplementedError()
