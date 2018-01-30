@@ -318,6 +318,19 @@ class Batsim(object):
                 }
             }
         )
+
+    def resubmit_job(self, job, workload="DYNAMIC_WORKLOAD"):
+        new_job_id = self.submit_job(job.id.split(Batsim.WORKLOAD_JOB_SEPARATOR)[0],
+                                     job.requested_resources,
+                                     job.walltime,
+                                     job.profile_name,
+                                     workload)
+
+        if job.metadata is None:
+            job.metadata = job.id
+        # Keep parent job
+        self.set_job_metadata(new_job_id, job.metadata)
+
     def do_next_event(self):
         return self._read_bat_msg()
 
@@ -549,6 +562,7 @@ class Job(object):
         self.json_dict = json_dict
         self.profile_dict = profile_dict
         self.allocation = None
+        self.metadata = None
 
     def __repr__(self):
         return(
