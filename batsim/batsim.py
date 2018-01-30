@@ -180,6 +180,8 @@ class Batsim(object):
 
     def kill_jobs(self, jobs):
         """Kill the given jobs."""
+        for job in jobs:
+            job.state = Job.State.COMPLETED_KILLED
 
         self._events_to_send.append({
             "timestamp": self.time(),
@@ -305,6 +307,20 @@ class Batsim(object):
             }
         )
 
+    def set_job_metadata(self, job_id, metadata):
+        # Consume some time to be sur that the job was created before the
+        # metadata is set
+        self.consume_time(0.00001)
+        self._events_to_send.append(
+            {
+                "timestamp": self.time(),
+                "type": "SET_JOB_METADATA",
+                "data": {
+                    "job_id": str(job_id),
+                    "metadata": str(metadata)
+                }
+            }
+        )
     def do_next_event(self):
         return self._read_bat_msg()
 
@@ -531,9 +547,12 @@ class Job(object):
         self.progress = None
         self.json_dict = json_dict
         self.profile_dict = profile_dict
+        self.allocation = None
 
     def __repr__(self):
-        return("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} stat:{5} jstat:{6} killreason:{7} ret:{8}>".format(
+        return(
+            ("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} stat:{5} "
+             "jstat:{6} kill_reason:{7} ret:{8}>").format(
             self.id, self.submit_time, self.requested_resources,
             self.requested_time, self.profile, self.status,
             self.job_state, self.kill_reason,
