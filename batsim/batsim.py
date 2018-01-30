@@ -1,4 +1,4 @@
-from __future__ import print_function
+# from __future__ import print_function
 
 from enum import Enum
 
@@ -10,7 +10,10 @@ from .network import NetworkHandler
 from procset import ProcSet
 import redis
 import zmq
+import logging
 
+
+logger = logging.getLogger(__name__)
 
 class Batsim(object):
 
@@ -316,6 +319,7 @@ class Batsim(object):
             msg = self.network.recv(blocking=not self.running_simulation)
             if msg is None:
                 self.scheduler.onDeadlock()
+        logger.info("Message Received from Batsim: {}".format(msg))
 
         self._current_time = msg["now"]
 
@@ -355,7 +359,7 @@ class Batsim(object):
             elif event_type == "SIMULATION_ENDS":
                 assert self.running_simulation, "No simulation is currently running"
                 self.running_simulation = False
-                print("All jobs have been submitted and completed!")
+                # print("All jobs have been submitted and completed!")
                 finished_received = True
                 self.scheduler.onSimulationEnds()
             elif event_type == "JOB_SUBMITTED":
@@ -446,7 +450,7 @@ class Batsim(object):
             "events": self._events_to_send
         }
         self.network.send(new_msg)
-        print("Sent Message: ", new_msg)
+        logger.info("Message Sent to Batsim: {}".format(new_msg))
 
 
         if finished_received:
