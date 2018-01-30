@@ -180,9 +180,6 @@ class Batsim(object):
 
     def kill_jobs(self, jobs):
         """Kill the given jobs."""
-        for job in jobs:
-            job.state = Job.State.COMPLETED_KILLED
-
         self._events_to_send.append({
             "timestamp": self.time(),
             "type": "KILL_JOB",
@@ -381,8 +378,10 @@ class Batsim(object):
             elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
                 job_id = event_data["job_id"]
-                self.jobs[job_id] = self.get_job(event)
-                self.scheduler.onJobSubmission(self.jobs[job_id])
+                job = self.get_job(event)
+                job.state = Job.State.SUBMITTED
+                self.jobs[job_id] = job
+                self.scheduler.onJobSubmission(job)
                 self.nb_jobs_received += 1
             elif event_type == "JOB_KILLED":
                 # get progress
@@ -390,6 +389,7 @@ class Batsim(object):
                 for jid in event_data["job_ids"]:
                     j = self.jobs[jid]
                     j.progress = event_data["job_progress"][jid]
+                    j.state = Job.State.COMPLETED_KILLED
                     killed_jobs.append(j)
 
                 self.scheduler.onJobsKilled(killed_jobs)
