@@ -13,7 +13,6 @@ import zmq
 import logging
 
 
-logger = logging.getLogger(__name__)
 
 class Batsim(object):
 
@@ -23,8 +22,14 @@ class Batsim(object):
     def __init__(self, scheduler,
                  network_handler=None,
                  event_handler=None,
-                 validatingmachine=None,
-                 handle_dynamic_notify=False):
+                 validatingmachine=None):
+
+
+        FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        logging.basicConfig(format=FORMAT)
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
+
         self.running_simulation = False
         if network_handler is None:
             network_handler = NetworkHandler('tcp://*:28000')
@@ -33,7 +38,6 @@ class Batsim(object):
                 'tcp://127.0.0.1:28001', type=zmq.PUB)
         self.network = network_handler
         self.event_publisher = event_handler
-        self.handle_dynamic_notify = handle_dynamic_notify
 
         self.jobs = dict()
 
@@ -54,8 +58,6 @@ class Batsim(object):
         self.nb_jobs_failed = 0
         self.nb_jobs_timeout = 0
 
-        self.initialized = False
-
         self.jobs_manually_changed = set()
 
         self.has_dynamic_job_submissions = False
@@ -69,7 +71,6 @@ class Batsim(object):
         self._read_bat_msg()
 
         self.scheduler.onAfterBatsimInit()
-        self.initialized = True
 
     def publish_event(self, event):
         """Sends a message to subscribed event listeners (e.g. external processes which want to
@@ -255,7 +256,6 @@ class Batsim(object):
 
         self._events_to_send.append(msg)
         self.nb_jobs_submitted += 1
-        self.has_dynamic_job_submissions = True
 
         return full_job_id
 
@@ -362,7 +362,7 @@ class Batsim(object):
             msg = self.network.recv(blocking=not self.running_simulation)
             if msg is None:
                 self.scheduler.onDeadlock()
-        logger.info("Message Received from Batsim: {}".format(msg))
+        self.logger.info("Message Received from Batsim: {}".format(msg))
 
         self._current_time = msg["now"]
 
@@ -383,6 +383,7 @@ class Batsim(object):
                 self.nb_res = event_data["nb_resources"]
                 batconf = event_data["config"]
                 self.time_sharing = event_data["allow_time_sharing"]
+                self.handle_dynamic_notify = batconf["job_submission"]["from_scheduler"]["enabled"]
 
                 self.redis_enabled = batconf["redis"]["enabled"]
                 redis_hostname = batconf["redis"]["hostname"]
@@ -403,14 +404,14 @@ class Batsim(object):
             elif event_type == "SIMULATION_ENDS":
                 assert self.running_simulation, "No simulation is currently running"
                 self.running_simulation = False
-                # print("All jobs have been submitted and completed!")
+                self.logger.info("All jobs have been submitted and completed!")
                 finished_received = True
                 self.scheduler.onSimulationEnds()
             elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
                 job_id = event_data["job_id"]
                 job = self.get_job(event)
-                job.state = Job.State.SUBMITTED
+                job.job_state = Job.State.SUBMITTED
                 self.jobs[job_id] = job
                 self.scheduler.onJobSubmission(job)
                 self.nb_jobs_received += 1
@@ -420,7 +421,6 @@ class Batsim(object):
                 for jid in event_data["job_ids"]:
                     j = self.jobs[jid]
                     j.progress = event_data["job_progress"][jid]
-                    j.state = Job.State.COMPLETED_KILLED
                     killed_jobs.append(j)
 
                 self.scheduler.onJobsKilled(killed_jobs)
@@ -443,8 +443,7 @@ class Batsim(object):
                     self.nb_jobs_timeout += 1
                 elif j.status == "FAILED":
                     self.nb_jobs_failed += 1
-                else:
-                    self.nb_jobs_completed += 1
+                self.nb_jobs_completed += 1
             elif event_type == "FROM_JOB_MSG":
                 job_id = event_data["job_id"]
                 j = self.jobs[job_id]
@@ -476,12 +475,11 @@ class Batsim(object):
             else:
                 raise Exception("Unknow event type {}".format(event_type))
 
+        self.scheduler.onNoMoreEvents()
+
         if self.handle_dynamic_notify and not finished_received:
             if ((self.nb_jobs_completed +
-                 self.nb_jobs_failed +
-                 self.nb_jobs_timeout +
-                 self.nb_jobs_killed) == self.nb_jobs_scheduled and
-                    not self.has_dynamic_job_submissions) and self.initialized:
+                 self.nb_jobs_killed) == self.nb_jobs_scheduled):
                 self.notify_submission_finished()
             else:
                 self.notify_submission_continue()
@@ -497,7 +495,7 @@ class Batsim(object):
             "events": self._events_to_send
         }
         self.network.send(new_msg)
-        logger.info("Message Sent to Batsim: {}".format(new_msg))
+        self.logger.info("Message Sent to Batsim: {}".format(new_msg))
 
 
         if finished_received:
@@ -584,7 +582,7 @@ class Job(object):
     def __repr__(self):
         return(
             ("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} stat:{5} "
-             "jstat:{6} kill_reason:{7} ret:{8}>").format(
+             "jstat:{6} kill_reason:{7} ret:{8}>\n").format(
             self.id, self.submit_time, self.requested_resources,
             self.requested_time, self.profile, self.status,
             self.job_state, self.kill_reason,
@@ -613,6 +611,11 @@ class BatsimScheduler(object):
 
     def __init__(self, options):
         self.options = options
+
+        FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        logging.basicConfig(format=FORMAT)
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
 
     def onAfterBatsimInit(self):
         # You now have access to self.bs and all other functions
@@ -655,3 +658,6 @@ class BatsimScheduler(object):
 
     def onRemoveResources(self, to_remove):
         raise NotImplementedError()
+
+    def onNoMoreEvents(self):
+        pass
