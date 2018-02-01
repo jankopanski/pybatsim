@@ -12,22 +12,22 @@
 
 """
 
-from batsim.batsim import BatsimScheduler
+from batsim.batsim import BatsimScheduler, Job
 
-from procset import ProcSet
-import itertools
+from procset import ProcSet, ProcInt
+import logging
 
 
 class SchedBebida(BatsimScheduler):
 
     def filter_jobs_by_state(self, state):
-        return [job for job in self.jobs if job.job_state == state]
+        return [job for job in self.bs.jobs.values() if job.job_state == state]
 
     def runnning_jobs(self):
-        return filter_jobs_by_state(Job.state.RUNNING)
+        return self.filter_jobs_by_state(Job.State.RUNNING)
 
     def submitted_jobs(self):
-        return filter_jobs_by_state(Job.state.SUBMITTED)
+        return self.filter_jobs_by_state(Job.State.SUBMITTED)
 
     def allocate_first_fit_in_best_effort(self, job):
         """
@@ -35,34 +35,47 @@ class SchedBebida(BatsimScheduler):
         the job's `requeqted_resources` number.
         return None if no resources at all are available.
         """
-        logger.info("Try to allocate Job: {}".format(job.id))
+        self.logger.info("Try to allocate Job: {}".format(job.id))
+        assert(job.allocation is None ,
+               "Job allocation should be None and not {}".format(job.allocation))
+
         nb_found_resources = 0
         allocation = ProcSet()
         nb_resources_still_needed = job.requested_resources
 
-        curr_interval = next(self.free_resources.intervals)
+        iter_intervals = self.free_resources.intervals()
+        curr_interval = next(iter_intervals)
 
-        while (len(allocation) < job.requested_resources or curr_interval is None):
-            interval_size = len(interval)
+        while (len(allocation) < job.requested_resources
+               and curr_interval is not None):
+            #import ipdb; ipdb.set_trace()
+            interval_size = len(curr_interval)
+            self.logger.debug("Interval lookup: {}".format(curr_interval))
+            #self.logger.debug("Interval lookup: {}".format(curr_interval))
 
             if interval_size > nb_resources_still_needed:
-                allocation = allocation + ProcInt(
+                allocation.add(
+                    ProcInt(
                         inf=curr_interval.inf,
-                        sup=(curr_interval + nb_resources_still_needed -1))
+                        sup=(curr_interval.inf + nb_resources_still_needed -1))
+                )
             elif interval_size == nb_resources_still_needed:
                 allocation.add(ProcInt(*curr_interval))
             elif interval_size < nb_resources_still_needed:
                 allocation.add(ProcInt(*curr_interval))
                 nb_resources_still_needed = nb_resources_still_needed - interval_size
-                curr_interval = next(self.free_resources.intervals)
+                try:
+                    curr_interval = next(iter_intervals)
+                except StopIteration:
+                    curr_interval = None
         job.allocation = allocation
         job.state = Job.State.RUNNING
 
         # udate free resources
         self.free_resources = self.free_resources - job.allocation
 
-        logger.info("Allocation for job {}: {}".format(job.id, job.allocation))
-
+        self.logger.info("Allocation for job {}: {}".format(
+            job.id, job.allocation))
 
 
     def __init__(self, *args, **kwargs):
@@ -71,13 +84,30 @@ class SchedBebida(BatsimScheduler):
 
     def onSimulationBegins(self):
         self.free_resources = ProcSet(*[res_id for res_id in
-            self.resources.keys()])
+            self.bs.resources.keys()])
 
+    def onJobSubmission(self, job):
+        pass
+
+    def onJobCompletion(self, job):
+        # udate free resources
+        self.free_resources = self.free_resources | job.allocation
+
+    def onNoMoreEvents(self):
+        if len(self.free_resources) > 0:
+            self.schedule()
+
+        self.logger.debug(("\nSUBMITTED = {}\n"
+                           "SCHEDULED = {}\n"
+                           "COMPLETED = {}\n").format(
+                               self.bs.nb_jobs_received,
+                               self.bs.nb_jobs_scheduled,
+                               self.bs.nb_jobs_completed))
+        self.logger.debug("\nJOBS: \n{}".format(self.bs.jobs))
 
     def onRemoveResources(self, resources):
         # find the list of jobs that are impacted
         # and kill all those jobs
-        #import ipdb; ipdb.set_trace()
         self.to_be_removed_resources[resources] = []
         to_be_killed = []
         for job in self.running_jobs():
@@ -144,16 +174,22 @@ class SchedBebida(BatsimScheduler):
 
     def schedule(self):
         # Implement a simple FIFO scheduler
+        to_execute = []
         to_schedule_jobs = self.submitted_jobs()
-        logger.info("Start scheduling jobs, nb jobs to schedule: {}".format(
+        self.logger.info("Start scheduling jobs, nb jobs to schedule: {}".format(
             len(to_schedule_jobs)))
 
-        nb_job = 0
+        self.logger.debug("jobs to be scheduled: \n{}".format(to_schedule_jobs))
         for job in to_schedule_jobs:
             if len(self.free_resources) == 0:
                 break
             self.allocate_first_fit_in_best_effort(job)
-            nb_job = nb_job + 1
+            to_execute.append(job)
 
-        logger.info("Finished scheduling jobs, nb jobs scheduled: {}".format(
-            nb_jobs))
+        self.bs.execute_jobs(to_execute)
+        for job in to_execute:
+            job.job_state = Job.State.RUNNING
+        self.logger.info("Finished scheduling jobs, nb jobs scheduled: {}".format(
+            len(to_execute)))
+        self.logger.debug("jobs to be executed: \n{}".format(to_execute))
+
