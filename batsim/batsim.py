@@ -153,6 +153,23 @@ class Batsim(object):
             )
             self.nb_jobs_scheduled += 1
 
+    def execute_jobs(self, jobs):
+        """ args:jobs: list of jobs to execute (job.allocation MSUT be set) """
+
+        for job in jobs:
+            assert job.allocation is not None
+            self._events_to_send.append({
+                "timestamp": self.time(),
+                "type": "EXECUTE_JOB",
+                "data": {
+                        "job_id": job.id,
+                        "alloc": str(job.allocation)
+                }
+            }
+            )
+            self.nb_jobs_scheduled += 1
+
+
     def reject_jobs(self, jobs):
         """Reject the given jobs."""
         for job in jobs:
