@@ -23,7 +23,7 @@ class SchedBebida(BatsimScheduler):
     def filter_jobs_by_state(self, state):
         return [job for job in self.bs.jobs.values() if job.job_state == state]
 
-    def runnning_jobs(self):
+    def running_jobs(self):
         return self.filter_jobs_by_state(Job.State.RUNNING)
 
     def submitted_jobs(self):
@@ -54,15 +54,15 @@ class SchedBebida(BatsimScheduler):
             #self.logger.debug("Interval lookup: {}".format(curr_interval))
 
             if interval_size > nb_resources_still_needed:
-                allocation.add(
+                allocation.insert(
                     ProcInt(
                         inf=curr_interval.inf,
                         sup=(curr_interval.inf + nb_resources_still_needed -1))
                 )
             elif interval_size == nb_resources_still_needed:
-                allocation.add(ProcInt(*curr_interval))
+                allocation.insert(ProcInt(*curr_interval))
             elif interval_size < nb_resources_still_needed:
-                allocation.add(ProcInt(*curr_interval))
+                allocation.insert(ProcInt(*curr_interval))
                 nb_resources_still_needed = nb_resources_still_needed - interval_size
                 try:
                     curr_interval = next(iter_intervals)
@@ -81,6 +81,7 @@ class SchedBebida(BatsimScheduler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.to_be_removed_resources = {}
+        self.submitted_profiles = {}
 
     def onSimulationBegins(self):
         self.free_resources = ProcSet(*[res_id for res_id in
@@ -112,19 +113,22 @@ class SchedBebida(BatsimScheduler):
         to_be_killed = []
         for job in self.running_jobs():
             if job.allocation & ProcSet.from_str(resources):
-                to_be_killed.add(job)
-        self.kill_jobs(to_be_killed)
+                to_be_killed.append(job)
+        self.bs.kill_jobs(to_be_killed)
         self.to_be_removed_resources[resources] = to_be_killed
 
     def onAddResources(self, resources):
         # add the resources
-        self.free_resources = self.free_resources + ProcSet.from_str(resources)
+        self.free_resources = self.free_resources | ProcSet.from_str(resources)
 
         # find the list of jobs that need more resources
         # kill jobs, so tey will be resubmited taking free resources, until
         # tere is no more resources
         free_resource_nb = len(self.free_resources)
         to_be_killed = []
+        #
+        # FIXME: The job killed use parent job id and not actual job id
+        #
         for job in self.running_jobs():
             wanted_resource_nb = job.requested_resources - len(job.allocation)
             if wanted_resource_nb > 0:
@@ -133,7 +137,7 @@ class SchedBebida(BatsimScheduler):
             if free_resource_nb <= 0:
                 break
         if len(to_be_killed) > 0:
-            self.kill_jobs(to_be_killed)
+            self.bs.kill_jobs(to_be_killed)
 
         self.schedule()
 
@@ -153,12 +157,11 @@ class SchedBebida(BatsimScheduler):
         #        self.notify_resources_removed(resources)
 
         for resources, to_be_killed in self.to_be_removed_resources.items():
-            if to_be_killed == Jobs(from_list=jobs):
-                #import ipdb; ipdb.set_trace()
+            if len(to_be_killed) > 0 and to_be_killed == jobs:
                 # Nothing to kill any more: delete the resources
                 self.free_resources = self.free_resources - ProcSet.from_str(resources)
                 # Notify that the resources was removed
-                self.notify_resources_removed(resources)
+                self.bs.notify_resources_removed(resources)
                 to_remove.append(resources)
 
         # TODO resubmit the job
@@ -169,8 +172,11 @@ class SchedBebida(BatsimScheduler):
                 curr_task = progress["current_task_index"]
                 # TODO get profile to resubmit current and following sequential
                 # tasks
-            self.resubmit_job(job)
+            # TODO Submit the profile if not already done
+            self.bs.resubmit_job(job)
 
+    def onDeadlock(self):
+        pass
 
     def schedule(self):
         # Implement a simple FIFO scheduler

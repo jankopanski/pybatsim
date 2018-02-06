@@ -244,7 +244,7 @@ class Batsim(object):
                 "job_id": full_job_id,
                 "job": {
                     "profile": profile_name,
-                    "id": id,
+                    "id": full_job_id,
                     "res": res,
                     "walltime": walltime,
                     "subtime": subtime,
@@ -256,6 +256,8 @@ class Batsim(object):
 
         self._events_to_send.append(msg)
         self.nb_jobs_submitted += 1
+
+        self.has_dynamic_job_submissions = True
 
         return full_job_id
 
@@ -337,11 +339,14 @@ class Batsim(object):
         )
 
     def resubmit_job(self, job, workload="DYNAMIC_WORKLOAD"):
-        new_job_id = self.submit_job(job.id.split(Batsim.WORKLOAD_JOB_SEPARATOR)[0],
-                                     job.requested_resources,
-                                     job.walltime,
-                                     job.profile_name,
-                                     workload)
+        self.submit_profiles(workload, {job.profile: job.profile_dict})
+
+        new_job_id = self.submit_job(
+                int(job.id.split(Batsim.WORKLOAD_JOB_SEPARATOR)[1]),
+                job.requested_resources,
+                job.requested_time,
+                job.profile,
+                workload)
 
         if job.metadata is None:
             job.metadata = job.id
@@ -362,6 +367,7 @@ class Batsim(object):
             msg = self.network.recv(blocking=not self.running_simulation)
             if msg is None:
                 self.scheduler.onDeadlock()
+                continue
         self.logger.info("Message Received from Batsim: {}".format(msg))
 
         self._current_time = msg["now"]
@@ -478,11 +484,12 @@ class Batsim(object):
         self.scheduler.onNoMoreEvents()
 
         if self.handle_dynamic_notify and not finished_received:
-            if ((self.nb_jobs_completed +
-                 self.nb_jobs_killed) == self.nb_jobs_scheduled):
+            if ((self.nb_jobs_completed + self.nb_jobs_killed) == self.nb_jobs_scheduled
+                    and not self.has_dynamic_job_submissions):
                 self.notify_submission_finished()
             else:
-                self.notify_submission_continue()
+                #self.notify_submission_continue()
+                # Some jobs just have been dynamically submitted
                 self.has_dynamic_job_submissions = False
 
         if len(self._events_to_send) > 0:
