@@ -9,7 +9,7 @@ Options:
     -v --verbose                            Be verbose.
     -p --protect                            Protect the scheduler using a validating machine.
     -s --socket-endpoint=<endpoint>         Batsim socket endpoint to use [default: tcp://*:28000]
-    -e --event-socket-endpoint=<endpoint>   Socket endpoint to use to publish scheduler events [default: tcp://*:28001]
+    -e --event-socket-endpoint=<endpoint>   Socket endpoint to use to publish scheduler events [default: tcp://*:29000]
     -o --options=<options_string>           A Json string to pass to the scheduler [default: {}]
     -O --options-file=<options_file>        A file containing the json options
     -t --timeout=<timeout>                  How long to wait for responses from Batsim [default: 2000]
@@ -31,7 +31,7 @@ def main():
     else:
         verbose = 0
 
-    timeout = int(arguments['--timeout'] or 2000)
+    timeout = int(arguments['--timeout'] or float("inf"))
 
     protect = bool(arguments['--protect'])
 

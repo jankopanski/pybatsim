@@ -8,7 +8,12 @@
     It is a Simple fcfs algoritihm.
 
     It take into account preemption by respounding to Add/Remove resource
-    events.
+    events. It kills the jobs that are allocated to removed resources. It also
+    kill some jobs in the queue in order to re-schedule them on a larger set of
+    resources.
+
+    The Batsim job profile "msg_hg_tot" is MANDATORY for this mechanism to work.
+    Also, the batsim option  "job_submission":{"forward_profiles":true} is mandatory
 
 """
 
@@ -86,9 +91,12 @@ class SchedBebida(BatsimScheduler):
     def onSimulationBegins(self):
         self.free_resources = ProcSet(*[res_id for res_id in
             self.bs.resources.keys()])
+        assert self.bs.batconf["job_submission"]["forward_profiles"] == True, (
+                "Forward profile is mandatory for resubmit to work")
 
     def onJobSubmission(self, job):
-        pass
+        assert "type" in job.profile_dict, "Forward profile is mandatory"
+        assert (job.profile_dict["type"] == "msg_par_hg_tot")
 
     def onJobCompletion(self, job):
         # udate free resources
@@ -98,9 +106,12 @@ class SchedBebida(BatsimScheduler):
         if len(self.free_resources) > 0:
             self.schedule()
 
-        self.logger.debug(("\nSUBMITTED = {}\n"
-                           "SCHEDULED = {}\n"
-                           "COMPLETED = {}\n").format(
+        self.logger.debug("=====================NO MORE EVENTS======================")
+        self.logger.debug("\nFREE RESOURCES = {}".format(str(self.free_resources)))
+
+        self.logger.debug(("\nSUBMITTED JOBS = {}\n"
+                           "SCHEDULED JOBS = {}\n"
+                           "COMPLETED JOBS = {}").format(
                                self.bs.nb_jobs_received,
                                self.bs.nb_jobs_scheduled,
                                self.bs.nb_jobs_completed))
@@ -121,14 +132,14 @@ class SchedBebida(BatsimScheduler):
         # add the resources
         self.free_resources = self.free_resources | ProcSet.from_str(resources)
 
+        # self.bs.notify_resources_added(resources)
+
         # find the list of jobs that need more resources
         # kill jobs, so tey will be resubmited taking free resources, until
         # tere is no more resources
         free_resource_nb = len(self.free_resources)
         to_be_killed = []
-        #
-        # FIXME: The job killed use parent job id and not actual job id
-        #
+
         for job in self.running_jobs():
             wanted_resource_nb = job.requested_resources - len(job.allocation)
             if wanted_resource_nb > 0:
@@ -150,11 +161,6 @@ class SchedBebida(BatsimScheduler):
         #                del tbk_job
         #for resources, to_be_killed in self.to_be_removed_resources.items():
         #    if to_be_killed == []:
-        #        # Nothing to kill any more: delete the resources
-        #        for resource in ProcSet.from_str(resources):
-        #            del self.resources[resource]
-        #        # Notify that the resources was removed
-        #        self.notify_resources_removed(resources)
 
         for resources, to_be_killed in self.to_be_removed_resources.items():
             if len(to_be_killed) > 0 and to_be_killed == jobs:
@@ -164,7 +170,6 @@ class SchedBebida(BatsimScheduler):
                 self.bs.notify_resources_removed(resources)
                 to_remove.append(resources)
 
-        # TODO resubmit the job
         # get killed jobs progress and resubmit what's left of the jobs
         for job in jobs:
             progress = job.progress

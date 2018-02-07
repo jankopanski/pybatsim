@@ -1,6 +1,7 @@
 # from __future__ import print_function
 
 from enum import Enum
+from copy import deepcopy
 
 import json
 import sys
@@ -155,7 +156,7 @@ class Batsim(object):
             self.nb_jobs_scheduled += 1
 
     def execute_jobs(self, jobs):
-        """ args:jobs: list of jobs to execute (job.allocation MSUT be set) """
+        """ args:jobs: list of jobs to execute (job.allocation MUST be set) """
 
         for job in jobs:
             assert job.allocation is not None
@@ -198,6 +199,8 @@ class Batsim(object):
 
     def kill_jobs(self, jobs):
         """Kill the given jobs."""
+        for job in jobs:
+            job.job_state = Job.State.IN_KILLING
         self._events_to_send.append({
             "timestamp": self.time(),
             "type": "KILL_JOB",
@@ -236,28 +239,33 @@ class Batsim(object):
 
         if subtime is None:
             subtime = self.time()
-
+        job_dict = {
+            "profile": profile_name,
+            "id": full_job_id,
+            "res": res,
+            "walltime": walltime,
+            "subtime": subtime,
+        }
         msg = {
             "timestamp": self.time(),
             "type": "SUBMIT_JOB",
             "data": {
                 "job_id": full_job_id,
-                "job": {
-                    "profile": profile_name,
-                    "id": full_job_id,
-                    "res": res,
-                    "walltime": walltime,
-                    "subtime": subtime,
-                },
+                "job": job_dict,
             }
         }
-        if profile:
+        if profile is not None:
+            assert isinstance(profile, dict)
             msg["data"]["profile"] = profile
 
         self._events_to_send.append(msg)
         self.nb_jobs_submitted += 1
 
         self.has_dynamic_job_submissions = True
+
+        # Create the job here
+        self.jobs[full_job_id] = Job.from_json_dict(job_dict, profile_dict=profile)
+        self.jobs[full_job_id].job_state = Job.State.SUBMITTED
 
         return full_job_id
 
@@ -305,9 +313,20 @@ class Batsim(object):
         self._events_to_send.append(
             {
                 "timestamp": self.time(),
-                "type": "QUERY_REQUEST",
+                "type": "QUERY",
                 "data": {
                     "requests": {"consumed_energy": {}}
+                }
+            }
+        )
+
+    def notify_resources_added(self, resources):
+        self._events_to_send.append(
+            {
+                "timestamp": self.time(),
+                "type": "RESOURCES_ADDED",
+                "data": {
+                    "resources": resources
                 }
             }
         )
@@ -326,7 +345,8 @@ class Batsim(object):
     def set_job_metadata(self, job_id, metadata):
         # Consume some time to be sur that the job was created before the
         # metadata is set
-        self.consume_time(0.00001)
+
+        self.jobs[job_id].metadata = metadata
         self._events_to_send.append(
             {
                 "timestamp": self.time(),
@@ -338,20 +358,38 @@ class Batsim(object):
             }
         )
 
-    def resubmit_job(self, job, workload="DYNAMIC_WORKLOAD"):
-        self.submit_profiles(workload, {job.profile: job.profile_dict})
+    def resubmit_job(self, job, workload="resubmit"):
+        """
+        The given job is resubmited but in a dynamic workload. The name of this
+        workload is "resubmit=N" where N is the number of resubmission.
+        The job metadata is fill with a dict that contains the original job
+        full id in "parent_job" and the number of resubmission in "nb_resumit".
+
+        Warning: The profile_dict of the given job must be filled
+        """
+
+        if job.metadata is None:
+            metadata = {"parent_job" : job.id, "nb_resubmit": 1}
+        else:
+            metadata = deepcopy(job.metadata)
+            if "parent_job" not in metadata:
+                metadata["parent_job"] = job.id
+            metadata["nb_resubmit"] = metadata["nb_resubmit"] + 1
+
+        #self.submit_profiles(workload, {job.profile: job.profile_dict})
+
+        # define new job id nb_job_submitted
 
         new_job_id = self.submit_job(
-                int(job.id.split(Batsim.WORKLOAD_JOB_SEPARATOR)[1]),
+                self.nb_jobs_submitted,
                 job.requested_resources,
                 job.requested_time,
                 job.profile,
-                workload)
+                workload,
+                profile=job.profile_dict)
 
-        if job.metadata is None:
-            job.metadata = job.id
-        # Keep parent job
-        self.set_job_metadata(new_job_id, job.metadata)
+        # log in job metadata parent job and nb resubmit
+        self.set_job_metadata(new_job_id, metadata)
 
     def do_next_event(self):
         return self._read_bat_msg()
@@ -387,14 +425,14 @@ class Batsim(object):
                 assert not self.running_simulation, "A simulation is already running (is more than one instance of Batsim active?!)"
                 self.running_simulation = True
                 self.nb_res = event_data["nb_resources"]
-                batconf = event_data["config"]
+                self.batconf = event_data["config"]
                 self.time_sharing = event_data["allow_time_sharing"]
-                self.handle_dynamic_notify = batconf["job_submission"]["from_scheduler"]["enabled"]
+                self.handle_dynamic_notify = self.batconf["job_submission"]["from_scheduler"]["enabled"]
 
-                self.redis_enabled = batconf["redis"]["enabled"]
-                redis_hostname = batconf["redis"]["hostname"]
-                redis_port = batconf["redis"]["port"]
-                redis_prefix = batconf["redis"]["prefix"]
+                self.redis_enabled = self.batconf["redis"]["enabled"]
+                redis_hostname = self.batconf["redis"]["hostname"]
+                redis_port = self.batconf["redis"]["port"]
+                redis_prefix = self.batconf["redis"]["prefix"]
 
                 if self.redis_enabled:
                     self.redis = DataStorage(redis_prefix, redis_hostname,
@@ -418,7 +456,11 @@ class Batsim(object):
                 job_id = event_data["job_id"]
                 job = self.get_job(event)
                 job.job_state = Job.State.SUBMITTED
-                self.jobs[job_id] = job
+
+                # don't override dynamic job
+                if job_id not in self.jobs:
+                    self.jobs[job_id] = job
+
                 self.scheduler.onJobSubmission(job)
                 self.nb_jobs_received += 1
             elif event_type == "JOB_KILLED":
@@ -427,6 +469,7 @@ class Batsim(object):
                 for jid in event_data["job_ids"]:
                     j = self.jobs[jid]
                     j.progress = event_data["job_progress"][jid]
+                    j.job_state = Job.State["COMPLETED_KILLED"]
                     killed_jobs.append(j)
 
                 self.scheduler.onJobsKilled(killed_jobs)
@@ -468,7 +511,7 @@ class Batsim(object):
                         raise Exception("Multiple intervals are not supported")
                     self.scheduler.onMachinePStateChanged(
                         nodeInterval, event_data["state"])
-            elif event_type == "QUERY_REPLY":
+            elif event_type == "ANSWER":
                 consumed_energy = event_data["consumed_energy"]
                 self.scheduler.onReportEnergyConsumed(consumed_energy)
             elif event_type == 'REQUESTED_CALL':
@@ -484,8 +527,9 @@ class Batsim(object):
         self.scheduler.onNoMoreEvents()
 
         if self.handle_dynamic_notify and not finished_received:
-            if ((self.nb_jobs_completed + self.nb_jobs_killed) == self.nb_jobs_scheduled
-                    and not self.has_dynamic_job_submissions):
+            if (self.nb_jobs_completed + self.nb_jobs_killed) == (
+                    self.nb_jobs_received + self.nb_jobs_submitted):
+                # All the received and submited jobs are completed or killed
                 self.notify_submission_finished()
             else:
                 #self.notify_submission_continue()
@@ -508,6 +552,8 @@ class Batsim(object):
         if finished_received:
             self.network.close()
             self.event_publisher.close()
+            if self.handle_dynamic_notify:
+                self.notify_submission_finished()
 
         return not finished_received
 
@@ -560,6 +606,7 @@ class Job(object):
         COMPLETED_WALLTIME_REACHED = 5
         COMPLETED_KILLED = 6
         REJECTED = 7
+        IN_KILLING = 8
 
     def __init__(
             self,
@@ -607,7 +654,8 @@ class Job(object):
                    json_dict.get("walltime", -1),
                    json_dict["res"],
                    json_dict["profile"],
-                   json_dict, profile_dict)
+                   json_dict,
+                   profile_dict)
     # def __eq__(self, other):
         # return self.id == other.id
     # def __ne__(self, other):
