@@ -10,6 +10,7 @@
 def filler_sched(scheduler, abort_on_first_nonfitting=False, jobs=None,
                  resources=None,
                  resources_filter=None, check_func=None,
+                 respect_deps=False,
                  handle_scheduled_func=None):
     """Helper to implement a filler scheduling algorithm.
 
@@ -29,6 +30,8 @@ def filler_sched(scheduler, abort_on_first_nonfitting=False, jobs=None,
     :param check_func: a function to check whether or not a job is allowed to be scheduled.
                        Signature: job, res, list_of_already_scheduled_jobs
 
+    :param respect_deps: priority jobs are reserved even if their dependencies are not fulfilled yet.
+
     :param handle_scheduled_func: a function which will be given the latest scheduled job
                                   as a parameter
     """
@@ -45,7 +48,15 @@ def filler_sched(scheduler, abort_on_first_nonfitting=False, jobs=None,
 
     already_scheduled = []
 
-    for job in jobs.runnable:
+    for job in jobs.open:
+        if not job.runnable:
+            if abort_on_first_nonfitting:
+                if respect_deps:
+                    break
+                else:
+                    continue
+            else:
+                continue
         res = resources.find_sufficient_resources_for_job(
             job, filter=resources_filter)
         if res:

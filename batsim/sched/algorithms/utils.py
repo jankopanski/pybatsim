@@ -7,11 +7,14 @@
 """
 
 from ..alloc import Allocation
+from ..job import Job
+from ..utils import increment_float
+from ..resource import Resource
 
 
 def find_resources_without_delaying_priority_jobs(
         scheduler, priority_jobs, resources, job, resources_filter=None,
-        check_func=None):
+        respect_deps=False, check_func=None):
     """Helper method to find resources for a job without delaying the jobs given as `priority_jobs`.
 
     To accomplish this the resources are temporarily reserved and freed later.
@@ -27,6 +30,8 @@ def find_resources_without_delaying_priority_jobs(
     :param resources_filter: the filter to use for the resource filtering
                              (can be used to implement topology aware scheduling)
 
+    :param respect_deps: priority jobs are reserved even if their dependencies are not fulfilled yet.
+
     :param check_func: a function to check whether or not the job should be scheduled.
                        The signature is: job, res, temporary_allocations; whereas
                        the job is the job to be scheduled, res are the resources
@@ -41,11 +46,36 @@ def find_resources_without_delaying_priority_jobs(
     # Temporarily allocate the priority jobs
     temporary_allocations = []
     for j in priority_jobs:
+        time = scheduler.time
+        if respect_deps:
+            for dep in j.resolved_dependencies:
+                if isinstance(dep, Job):
+                    if dep.running:
+                        time = max(
+                            time,
+                            increment_float(
+                                dep.start_time +
+                                dep.requested_time,
+                                Resource.TIME_DELTA,
+                                True))
+                    elif dep.completed:
+                        time = max(
+                            time,
+                            increment_float(
+                                dep.finish_time,
+                                Resource.TIME_DELTA,
+                                True))
+                    else:
+                        return resources.create()
+                else:
+                    return resources.create()
+
         # Allow allocations in the future to find the first fit for all priority
         # jobs
         start_time, res = resources.find_with_earliest_start_time(
             j, allow_future_allocations=True,
-            filter=resources_filter)
+            filter=resources_filter,
+            time=time)
         assert res, "No future allocations were found in backfilling for priority job"
 
         a = Allocation(start_time, resources=res, job=j)
@@ -83,7 +113,7 @@ def find_resources_without_delaying_priority_jobs(
 def schedule_jobs_without_delaying_priorities(
         scheduler, priority_jobs, resources, jobs,
         abort_on_first_nonfitting=False, resources_filter=None,
-        check_func=None, handle_scheduled_func=None):
+        check_func=None, respect_deps=False, handle_scheduled_func=None):
     """Schedule jobs without delaying given priority jobs.
 
     :param scheduler: the scheduler
@@ -107,6 +137,8 @@ def schedule_jobs_without_delaying_priorities(
                        the allocations of the jobs with allocations in the future
                        (reserved jobs).
 
+    :param respect_deps: priority jobs are reserved even if their dependencies are not fulfilled yet.
+
     :param handle_scheduled_func: a function which will be given the latest scheduled job
                                   as a parameter
     """
@@ -114,7 +146,7 @@ def schedule_jobs_without_delaying_priorities(
     for job in jobs:
         res = find_resources_without_delaying_priority_jobs(
             scheduler, priority_jobs, resources, job, resources_filter,
-            check_func)
+            respect_deps, check_func)
         if res:
             job.schedule(res)
             if handle_scheduled_func is not None:

@@ -19,6 +19,7 @@ def do_backfilling(
         resources_filter=None,
         check_func=None,
         handle_scheduled_func=None,
+        respect_deps=False,
         backfilling_sort=None):
     """Helper to implement the backfilling step of backfilling algorithms.
 
@@ -44,14 +45,23 @@ def do_backfilling(
     :param handle_scheduled_func: a function which will be given the latest scheduled job
                                   as a parameter
 
+    :param respect_deps: priority jobs are reserved even if their dependencies are not fulfilled yet.
+
     :param backfilling_sort: after the priority jobs were reserved, this function will
                              be used to call jobs.sorted(f) with it to sort the remaining
                              jobs.
     """
-    runnable_jobs = jobs.runnable
 
-    reserved_jobs = runnable_jobs[:reservation_depth]
-    remaining_jobs = runnable_jobs[reservation_depth:]
+    if respect_deps:
+        open_jobs = jobs.open
+
+        reserved_jobs = open_jobs[:reservation_depth]
+        remaining_jobs = open_jobs[reservation_depth:].runnable
+    else:
+        runnable_jobs = jobs.runnable
+
+        reserved_jobs = runnable_jobs[:reservation_depth]
+        remaining_jobs = runnable_jobs[reservation_depth:]
 
     if backfilling_sort:
         remaining_jobs = remaining_jobs.sorted(backfilling_sort)
@@ -63,6 +73,7 @@ def do_backfilling(
         remaining_jobs,
         resources_filter=resources_filter,
         check_func=check_func,
+        respect_deps=respect_deps,
         handle_scheduled_func=handle_scheduled_func)
 
 
@@ -75,6 +86,7 @@ def backfilling_sched(
         filler_check_func=None,
         backfilling_check_func=None,
         handle_scheduled_func=None,
+        respect_deps=False,
         backfilling_sort=None,
         priority_sort=None):
     """Backfilling algorithm using the filler scheduler to run the first jobs and backfill the remaining jobs.
@@ -105,6 +117,8 @@ def backfilling_sched(
     :param handle_scheduled_func: a function which will be given the latest scheduled job
                                   as a parameter
 
+    :param respect_deps: priority jobs are reserved even if their dependencies are not fulfilled yet.
+
     :param backfilling_sort: after the priority jobs were reserved, this function will
                              be used to call jobs.sorted(f) with it to sort the remaining
                              jobs.
@@ -126,13 +140,14 @@ def backfilling_sched(
     filler_sched(scheduler, abort_on_first_nonfitting=True, jobs=jobs,
                  resources=resources, resources_filter=resources_filter,
                  check_func=filler_check_func,
+                 respect_deps=respect_deps,
                  handle_scheduled_func=handle_scheduled_func)
 
     # Do backfilling if there are still runnable jobs and free resources.
-    if resources.free and len(
-            jobs.runnable) > reservation_depth:
+    if len(jobs.runnable) > reservation_depth:
         do_backfilling(scheduler, reservation_depth, jobs=jobs,
                        resources=resources, resources_filter=resources_filter,
                        check_func=backfilling_check_func,
                        handle_scheduled_func=handle_scheduled_func,
+                       respect_deps=respect_deps,
                        backfilling_sort=backfilling_sort)

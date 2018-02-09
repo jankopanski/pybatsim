@@ -624,7 +624,7 @@ class Resources(ObserveList):
 
     def find_with_earliest_start_time(
             self, job, allow_future_allocations=False,
-            filter=None):
+            filter=None, time=None):
         """Find sufficient resources and the earlierst start time for a given job.
 
         :param job: the job for which the start times and resources should be found
@@ -634,15 +634,18 @@ class Resources(ObserveList):
 
         :param filter: the filter to be applied when a set of resources was found
         """
+        if time is None:
+            time = job._scheduler.time
+
         start_time, found_resources = self.find_first_time_and_resources_to_fit_walltime(job, max(
-            job._scheduler.time, job.submit_time), job.requested_resources, job.requested_resources, filter,
+            time, job.submit_time), job.requested_resources, job.requested_resources, filter,
             allow_future_allocations)
 
         if not allow_future_allocations:
             if start_time is None:
-                start_time = job._scheduler.time
+                start_time = time
                 found_resources = self.create()
-            elif start_time != job._scheduler.time:
+            elif start_time != time:
                 found_resources = self.create()
 
         return start_time, found_resources
