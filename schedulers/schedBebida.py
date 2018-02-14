@@ -96,7 +96,8 @@ class SchedBebida(BatsimScheduler):
 
     def onJobSubmission(self, job):
         assert "type" in job.profile_dict, "Forward profile is mandatory"
-        assert (job.profile_dict["type"] == "msg_par_hg_tot")
+        assert (job.profile_dict["type"] == "msg_par_hg_tot" or
+                job.profile_dict["type"] == "composed")
 
     def onJobCompletion(self, job):
         # udate free resources
