@@ -18,6 +18,7 @@ import logging
 class Batsim(object):
 
     WORKLOAD_JOB_SEPARATOR = "!"
+    ATTEMPT_JOB_SEPARATOR = "#"
     WORKLOAD_JOB_SEPARATOR_REPLACEMENT = "%"
 
     def __init__(self, scheduler,
@@ -228,20 +229,14 @@ class Batsim(object):
             res,
             walltime,
             profile_name,
-            workload_name,
             subtime=None,
             profile=None):
-        assert Batsim.WORKLOAD_JOB_SEPARATOR not in workload_name
-        assert isinstance(id, int)
-        assert isinstance(workload_name, str)
-
-        full_job_id = workload_name + Batsim.WORKLOAD_JOB_SEPARATOR + str(id)
 
         if subtime is None:
             subtime = self.time()
         job_dict = {
             "profile": profile_name,
-            "id": full_job_id,
+            "id": id,
             "res": res,
             "walltime": walltime,
             "subtime": subtime,
@@ -250,7 +245,7 @@ class Batsim(object):
             "timestamp": self.time(),
             "type": "SUBMIT_JOB",
             "data": {
-                "job_id": full_job_id,
+                "job_id": id,
                 "job": job_dict,
             }
         }
@@ -264,10 +259,10 @@ class Batsim(object):
         self.has_dynamic_job_submissions = True
 
         # Create the job here
-        self.jobs[full_job_id] = Job.from_json_dict(job_dict, profile_dict=profile)
-        self.jobs[full_job_id].job_state = Job.State.SUBMITTED
+        self.jobs[id] = Job.from_json_dict(job_dict, profile_dict=profile)
+        self.jobs[id].job_state = Job.State.SUBMITTED
 
-        return full_job_id
+        return id
 
     def set_resource_state(self, resources, state):
         """ args:resources: is a list of resource numbers or intervals as strings (e.g. "1-5").
@@ -358,7 +353,7 @@ class Batsim(object):
             }
         )
 
-    def resubmit_job(self, job, workload="resubmit"):
+    def resubmit_job(self, job):
         """
         The given job is resubmited but in a dynamic workload. The name of this
         workload is "resubmit=N" where N is the number of resubmission.
@@ -376,16 +371,20 @@ class Batsim(object):
                 metadata["parent_job"] = job.id
             metadata["nb_resubmit"] = metadata["nb_resubmit"] + 1
 
-        #self.submit_profiles(workload, {job.profile: job.profile_dict})
-
-        # define new job id nb_job_submitted
+        # Keep the curent workload and add a resubmit number
+        splitted_id = job.id.split(Batsim.ATTEMPT_JOB_SEPARATOR)
+        if len(splitted_id) == 0:
+            new_job_name = job.id
+        else:
+            # This job as already an attempt number
+            new_job_name = splitted_id[0]
+        new_job_name =  new_job_name + Batsim.ATTEMPT_JOB_SEPARATOR + str(metadata["nb_resubmit"])
 
         new_job_id = self.submit_job(
-                self.nb_jobs_submitted,
+                new_job_name,
                 job.requested_resources,
                 job.requested_time,
                 job.profile,
-                workload,
                 profile=job.profile_dict)
 
         # log in job metadata parent job and nb resubmit
