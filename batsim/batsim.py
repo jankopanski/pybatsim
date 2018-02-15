@@ -57,6 +57,7 @@ class Batsim(object):
         self.nb_jobs_rejected = 0
         self.nb_jobs_scheduled = 0
         self.nb_jobs_completed = 0
+        self.nb_jobs_successful = 0
         self.nb_jobs_failed = 0
         self.nb_jobs_timeout = 0
 
@@ -175,6 +176,7 @@ class Batsim(object):
 
     def reject_jobs(self, jobs):
         """Reject the given jobs."""
+        assert len(jobs) > 0, "The list of jobs to reject is empty"
         for job in jobs:
             self._events_to_send.append({
                 "timestamp": self.time(),
@@ -200,6 +202,7 @@ class Batsim(object):
 
     def kill_jobs(self, jobs):
         """Kill the given jobs."""
+        assert len(jobs) > 0, "The list of jobs to kill is empty"
         for job in jobs:
             job.job_state = Job.State.IN_KILLING
         self._events_to_send.append({
@@ -468,16 +471,12 @@ class Batsim(object):
                 for jid in event_data["job_ids"]:
                     j = self.jobs[jid]
                     j.progress = event_data["job_progress"][jid]
-                    j.job_state = Job.State["COMPLETED_KILLED"]
                     killed_jobs.append(j)
-
                 self.scheduler.onJobsKilled(killed_jobs)
-                self.nb_jobs_killed += len(killed_jobs)
             elif event_type == "JOB_COMPLETED":
                 job_id = event_data["job_id"]
                 j = self.jobs[job_id]
                 j.finish_time = event["timestamp"]
-                j.status = event["data"]["status"]
 
                 try:
                     j.job_state = Job.State[event["data"]["job_state"]]
@@ -487,10 +486,14 @@ class Batsim(object):
                 j.return_code = event["data"]["return_code"]
 
                 self.scheduler.onJobCompletion(j)
-                if j.status == "TIMEOUT":
+                if j.job_state == Job.State.COMPLETED_WALLTIME_REACHED:
                     self.nb_jobs_timeout += 1
-                elif j.status == "FAILED":
+                elif j.job_state == Job.State.COMPLETED_FAILED:
                     self.nb_jobs_failed += 1
+                elif j.job_state == Job.State.COMPLETED_SUCCESSFULLY:
+                    self.nb_jobs_successful += 1
+                elif j.job_state == Job.State.COMPLETED_KILLED:
+                    self.nb_jobs_killed += 1
                 self.nb_jobs_completed += 1
             elif event_type == "FROM_JOB_MSG":
                 job_id = event_data["job_id"]
@@ -526,8 +529,8 @@ class Batsim(object):
         self.scheduler.onNoMoreEvents()
 
         if self.handle_dynamic_notify and not finished_received:
-            if (self.nb_jobs_completed + self.nb_jobs_killed) == (
-                    self.nb_jobs_received + self.nb_jobs_submitted):
+            if (self.nb_jobs_completed == (self.nb_jobs_received +
+                    self.nb_jobs_submitted) != 0):
                 # All the received and submited jobs are completed or killed
                 self.notify_submission_finished()
             else:
@@ -622,7 +625,6 @@ class Job(object):
         self.requested_resources = res
         self.profile = profile
         self.finish_time = None  # will be set on completion by batsim
-        self.status = None
         self.job_state = Job.State.UNKNOWN
         self.kill_reason = None
         self.return_code = None
@@ -634,12 +636,12 @@ class Job(object):
 
     def __repr__(self):
         return(
-            ("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} stat:{5} "
-             "jstat:{6} kill_reason:{7} ret:{8}>\n").format(
+            ("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} "
+                "state:{5} kill_reason:{6} ret:{7} alloc:{8}>\n").format(
             self.id, self.submit_time, self.requested_resources,
-            self.requested_time, self.profile, self.status,
+            self.requested_time, self.profile,
             self.job_state, self.kill_reason,
-            self.return_code))
+            self.return_code, self.allocation))
 
     @staticmethod
     def from_json_string(json_str):
@@ -698,8 +700,7 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onJobsKilled(self, jobs):
-        for job in jobs:
-            self.onJobCompletion(job)
+        raise NotImplementedError()
 
     def onMachinePStateChanged(self, nodeid, pstate):
         raise NotImplementedError()
