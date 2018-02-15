@@ -34,6 +34,9 @@ class SchedBebida(BatsimScheduler):
     def submitted_jobs(self):
         return self.filter_jobs_by_state(Job.State.SUBMITTED)
 
+    def in_killing_jobs(self):
+        return self.filter_jobs_by_state(Job.State.IN_KILLING)
+
     def allocate_first_fit_in_best_effort(self, job):
         """
         return the allocation with as much resources as possible up to
@@ -101,6 +104,8 @@ class SchedBebida(BatsimScheduler):
 
     def onJobCompletion(self, job):
         # udate free resources
+        if job.job_state == Job.State.COMPLETED_KILLED:
+            return
         self.free_resources = self.free_resources | job.allocation
 
     def onNoMoreEvents(self):
@@ -117,23 +122,41 @@ class SchedBebida(BatsimScheduler):
                                self.bs.nb_jobs_scheduled,
                                self.bs.nb_jobs_completed))
         self.logger.debug("\nJOBS: \n{}".format(self.bs.jobs))
+        self.logger.debug("\nTo be removed: \n{}".format(self.to_be_removed_resources))
 
     def onRemoveResources(self, resources):
         # find the list of jobs that are impacted
         # and kill all those jobs
-        self.to_be_removed_resources[resources] = []
         to_be_killed = []
         for job in self.running_jobs():
             if job.allocation & ProcSet.from_str(resources):
                 to_be_killed.append(job)
-        self.bs.kill_jobs(to_be_killed)
-        self.to_be_removed_resources[resources] = to_be_killed
+
+        # Mark the resources as not available
+        self.free_resources = self.free_resources - ProcSet.from_str(resources)
+
+        if len(to_be_killed) > 0:
+            self.bs.kill_jobs(to_be_killed)
+
+        # check that no job in Killing are still allocated to this resources
+        # because some jobs can be already in killing before this function call
+        self.logger.debug("Jobs that are in killing: {}".format(self.in_killing_jobs()))
+        in_killing = self.in_killing_jobs()
+        if not in_killing or all([len(job.allocation & ProcSet.from_str(resources)) == 0
+                                for job in in_killing]):
+            # notify resources removed now
+            self.bs.notify_resources_removed(resources)
+        else:
+            # keep track of resources to be removed that are from killed jobs
+            # related to a previous event
+            self.to_be_removed_resources[resources] = [
+                    job for job in
+                    in_killing if len(job.allocation &
+                        ProcSet.from_str(resources)) != 0]
 
     def onAddResources(self, resources):
         # add the resources
         self.free_resources = self.free_resources | ProcSet.from_str(resources)
-
-        # self.bs.notify_resources_added(resources)
 
         # find the list of jobs that need more resources
         # kill jobs, so tey will be resubmited taking free resources, until
@@ -151,25 +174,17 @@ class SchedBebida(BatsimScheduler):
         if len(to_be_killed) > 0:
             self.bs.kill_jobs(to_be_killed)
 
-        self.schedule()
-
     def onJobsKilled(self, jobs):
-        # check if all jobs associated to one decomission are killed
-        #for job in jobs:
-        #    for _, to_be_killed in self.to_be_removed_resources.items():
-        #        for tbk_job in to_be_killed:
-        #            if tbk_job.id == job.id:
-        #                del tbk_job
-        #for resources, to_be_killed in self.to_be_removed_resources.items():
-        #    if to_be_killed == []:
-
+        to_remove = []
         for resources, to_be_killed in self.to_be_removed_resources.items():
-            if len(to_be_killed) > 0 and to_be_killed == jobs:
-                # Nothing to kill any more: delete the resources
-                self.free_resources = self.free_resources - ProcSet.from_str(resources)
+            if (len(to_be_killed) > 0
+                and any([job in jobs for job in to_be_killed])):
                 # Notify that the resources was removed
                 self.bs.notify_resources_removed(resources)
                 to_remove.append(resources)
+        # Clean structure
+        for resources in to_remove:
+            del self.to_be_removed_resources[resources]
 
         # get killed jobs progress and resubmit what's left of the jobs
         for job in jobs:
