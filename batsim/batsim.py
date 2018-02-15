@@ -529,8 +529,7 @@ class Batsim(object):
         self.scheduler.onNoMoreEvents()
 
         if self.handle_dynamic_notify and not finished_received:
-            if (self.nb_jobs_completed == (self.nb_jobs_received +
-                    self.nb_jobs_submitted) != 0):
+            if (self.nb_jobs_completed == self.nb_jobs_received != 0):
                 # All the received and submited jobs are completed or killed
                 self.notify_submission_finished()
             else:
