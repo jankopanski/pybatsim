@@ -21,6 +21,7 @@ from batsim.batsim import BatsimScheduler, Job
 
 from procset import ProcSet, ProcInt
 import logging
+import copy
 
 
 class SchedBebida(BatsimScheduler):
@@ -107,6 +108,7 @@ class SchedBebida(BatsimScheduler):
         if job.job_state == Job.State.COMPLETED_KILLED:
             return
         self.free_resources = self.free_resources | job.allocation
+        self.load_balance_jobs(job.allocation)
 
     def onNoMoreEvents(self):
         if len(self.free_resources) > 0:
@@ -157,10 +159,14 @@ class SchedBebida(BatsimScheduler):
     def onAddResources(self, resources):
         # add the resources
         self.free_resources = self.free_resources | ProcSet.from_str(resources)
+        self.load_balance_jobs(resources)
 
-        # find the list of jobs that need more resources
-        # kill jobs, so tey will be resubmited taking free resources, until
-        # tere is no more resources
+    def load_balance_jobs(self, resources):
+        """
+        find the list of jobs that need more resources
+        kill jobs, so tey will be resubmited taking free resources, until
+        tere is no more resources
+        """
         free_resource_nb = len(self.free_resources)
         to_be_killed = []
 
@@ -187,14 +193,31 @@ class SchedBebida(BatsimScheduler):
             del self.to_be_removed_resources[resources]
 
         # get killed jobs progress and resubmit what's left of the jobs
-        for job in jobs:
-            progress = job.progress
+        for old_job in jobs:
+            progress = old_job.progress
             if "current_task_index" in progress:
                 curr_task = progress["current_task_index"]
-                # TODO get profile to resubmit current and following sequential
+                # get profile to resubmit current and following sequential
                 # tasks
-            # TODO Submit the profile if not already done
-            self.bs.resubmit_job(job)
+                new_job_seq_size = len(old_job.profile_dict["seq"][curr_task:])
+                old_job_seq_size = len(old_job.profile_dict["seq"])
+
+                self.logger.debug("Job {} resubmitted stages: {} out of {}".format(
+                        old_job.id,
+                        new_job_seq_size,
+                        old_job_seq_size))
+
+                if (new_job_seq_size == old_job_seq_size):
+                    # no modification to do: resubmit the same job
+                    new_job = old_job
+                else:
+                    # create a new profile: remove already finished stages
+                    new_job = copy.deepcopy(old_job)
+                    new_job.profile = old_job.profile + "#" + str(curr_task)
+                    new_job.profile_dict["seq"] = old_job.profile_dict["seq"][curr_task:]
+
+            # Re-submit the profile
+            self.bs.resubmit_job(new_job)
 
     def onDeadlock(self):
         pass
