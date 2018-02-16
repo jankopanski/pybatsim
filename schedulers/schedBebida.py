@@ -104,11 +104,14 @@ class SchedBebida(BatsimScheduler):
                 job.profile_dict["type"] == "composed")
 
     def onJobCompletion(self, job):
-        # udate free resources
+        # If it is a job killed, resources where already where already removed
+        # and we don't want other jobs to use these resources
         if job.job_state == Job.State.COMPLETED_KILLED:
             return
+
+        # udate free resources
         self.free_resources = self.free_resources | job.allocation
-        self.load_balance_jobs(job.allocation)
+        self.load_balance_jobs()
 
     def onNoMoreEvents(self):
         if len(self.free_resources) > 0:
@@ -159,9 +162,9 @@ class SchedBebida(BatsimScheduler):
     def onAddResources(self, resources):
         # add the resources
         self.free_resources = self.free_resources | ProcSet.from_str(resources)
-        self.load_balance_jobs(resources)
+        self.load_balance_jobs()
 
-    def load_balance_jobs(self, resources):
+    def load_balance_jobs(self):
         """
         find the list of jobs that need more resources
         kill jobs, so tey will be resubmited taking free resources, until
