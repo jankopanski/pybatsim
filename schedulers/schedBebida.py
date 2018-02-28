@@ -90,6 +90,7 @@ class SchedBebida(BatsimScheduler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.to_be_removed_resources = {}
+        self.load_balanced_jobs = set()
 
     def onSimulationBegins(self):
         self.free_resources = ProcSet(*[res_id for res_id in
@@ -197,6 +198,8 @@ class SchedBebida(BatsimScheduler):
                 break
         if len(to_be_killed) > 0:
             self.bs.kill_jobs(to_be_killed)
+            # mark those jobs in order to resubmit them without penalty
+            self.load_balanced_jobs.update({job.id for job in to_be_killed})
 
     def onJobsKilled(self, jobs):
         # First notify that the resources are removed
@@ -216,7 +219,10 @@ class SchedBebida(BatsimScheduler):
         # get killed jobs progress and resubmit what's left of the jobs
         for old_job in jobs:
             progress = old_job.progress
-            if "current_task_index" in progress:
+            if "current_task_index" not in progress:
+                new_job = old_job
+            else:
+                # WARNING only work for simple sequence job without sub sequence
                 curr_task = progress["current_task_index"]
                 # get profile to resubmit current and following sequential
                 # tasks
@@ -228,7 +234,34 @@ class SchedBebida(BatsimScheduler):
                         new_job_seq_size,
                         old_job_seq_size))
 
-                if (new_job_seq_size == old_job_seq_size):
+                if old_job.id in self.load_balanced_jobs:
+                    # clean the set
+                    self.load_balanced_jobs.remove(old_job.id)
+
+                    # Create a new job with a profile that corespond to the work that left
+                    new_job = copy.deepcopy(old_job)
+                    curr_task_progress = progress["current_task"]["progress"]
+                    new_job.profile = old_job.profile + "#" + str(curr_task) + "#" + str(curr_task_progress)
+                    new_job.profile_dict["seq"] = old_job.profile_dict["seq"][curr_task:]
+
+                    # Now let's modify the current profile to reflect progress
+                    curr_task_profile = progress["current_task"]["profile"]
+                    assert curr_task_profile["type"] == "msg_par_hg_tot", "Only msg_par_hg_tot profile are supported right now"
+                    for key, value in curr_task_profile.items():
+                        if isinstance(value, (int, float)):
+                            curr_task_profile[key] = value * (1 - curr_task_progress)
+                    parent_task_profile = progress["current_task"]["profile_name"].split("#")[0]
+                    curr_task_profile_name =  parent_task_profile + "#" + str(curr_task_progress)
+
+
+                    new_job.profile_dict["seq"][0] = curr_task_profile_name
+
+                    # submit the new internal current task profile
+                    self.bs.submit_profiles(
+                            new_job.id.split("!")[0],
+                            {curr_task_profile_name: curr_task_profile})
+
+                elif (new_job_seq_size == old_job_seq_size):
                     # no modification to do: resubmit the same job
                     new_job = old_job
                 else:
