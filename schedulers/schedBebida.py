@@ -23,11 +23,15 @@ from procset import ProcSet, ProcInt
 import logging
 import copy
 
+def sort_by_id(jobs):
+    return sorted(jobs, key=lambda j: int(j.id.split('!')[1].split('#')[0]))
+
 
 class SchedBebida(BatsimScheduler):
 
     def filter_jobs_by_state(self, state):
-        return [job for job in self.bs.jobs.values() if job.job_state == state]
+        return sort_by_id([job for job in self.bs.jobs.values() if
+            job.job_state == state])
 
     def running_jobs(self):
         return self.filter_jobs_by_state(Job.State.RUNNING)
