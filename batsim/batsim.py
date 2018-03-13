@@ -187,7 +187,7 @@ class Batsim(object):
             })
             self.nb_jobs_rejected += 1
 
-    def change_job_state(self, job, state, kill_reason=""):
+    def change_job_state(self, job, state):
         """Change the state of a job."""
         self._events_to_send.append({
             "timestamp": self.time(),
@@ -195,7 +195,6 @@ class Batsim(object):
             "data": {
                     "job_id": job.id,
                     "job_state": state.name,
-                    "kill_reason": kill_reason
             }
         })
         self.jobs_manually_changed.add(job)
@@ -487,7 +486,6 @@ class Batsim(object):
                     j.job_state = Job.State[event["data"]["job_state"]]
                 except KeyError:
                     j.job_state = Job.State.UNKNOWN
-                j.kill_reason = event["data"]["kill_reason"]
                 j.return_code = event["data"]["return_code"]
 
                 self.scheduler.onJobCompletion(j)
@@ -630,7 +628,6 @@ class Job(object):
         self.profile = profile
         self.finish_time = None  # will be set on completion by batsim
         self.job_state = Job.State.UNKNOWN
-        self.kill_reason = None
         self.return_code = None
         self.progress = None
         self.json_dict = json_dict
@@ -641,10 +638,10 @@ class Job(object):
     def __repr__(self):
         return(
             ("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} "
-                "state:{5} kill_reason:{6} ret:{7} alloc:{8}>\n").format(
+                "state:{5} ret:{6} alloc:{7}>\n").format(
             self.id, self.submit_time, self.requested_resources,
             self.requested_time, self.profile,
-            self.job_state, self.kill_reason,
+            self.job_state,
             self.return_code, self.allocation))
 
     @staticmethod
