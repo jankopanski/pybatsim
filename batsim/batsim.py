@@ -440,8 +440,13 @@ class Batsim(object):
                     self.redis = DataStorage(redis_prefix, redis_hostname,
                                              redis_port)
 
+                # Retro compatibility for old Batsim API > 1.0 < 3.0
+                if "resources_data" in event_data:
+                    res_key = "resources_data"
+                else:
+                    res_key = "compute_resources"
                 self.resources = {
-                        res["id"]: res for res in event_data["resources_data"]}
+                        res["id"]: res for res in event_data[res_key]}
 
                 self.hpst = event_data.get("hpst_host", None)
                 self.lcst = event_data.get("lcst_host", None)
