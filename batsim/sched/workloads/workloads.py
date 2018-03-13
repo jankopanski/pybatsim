@@ -40,7 +40,6 @@ class JobDescription:
     :param kwargs: Additional fields which will be set in the json data and sent to Batsim.
 
     """
-
     def __init__(
             self,
             res,
@@ -206,7 +205,7 @@ class JobDescription:
         assert self.profile.name, "Job.profile has no name"
         assert self.res is not None, "Job.res was not set"
         assert self.subtime is None or self.subtime >= 0, "Job.subtime was not set"
-        assert self.walltime is not None and self.walltime >= 0, "Job.walltime was not set"
+        assert self.walltime is not None and self.walltime >= 0 or self.walltime == -1, "Job.walltime was not set"
 
         scheduler.info(
             "Submitting job description (workload_name={workload_name}, job={job}, profile={profile_name})",

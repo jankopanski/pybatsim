@@ -135,7 +135,8 @@ def launch_scheduler(scheduler,
               ", submitted:", bs.nb_jobs_submitted,
               ", changed:", len(bs.jobs_manually_changed),
               ", timeout:", bs.nb_jobs_timeout,
-              ", success:", bs.nb_jobs_completed)
+              ", success", bs.nb_jobs_successful,
+              ", complete:", bs.nb_jobs_completed)
 
         if bs.nb_jobs_received != (
                 bs.nb_jobs_scheduled + bs.nb_jobs_rejected +
