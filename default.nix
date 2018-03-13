@@ -11,9 +11,11 @@ buildPythonPackage rec {
       redis
       pandas
       docopt
-      # for testing
+      # for testing and debug
       coverage
       pytest
+      ipython
+      ipdb
       # for doc generation
       sphinx
     ] ++ [ batsim ];

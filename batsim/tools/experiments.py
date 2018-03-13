@@ -240,7 +240,12 @@ def prepare_scheduler_cl(options, verbose):
         else:
             assert False, "Unknown interpreter"
         sched_cl += interpreter
-        sched_cl.append("launcher.py")
+        launcher_path = "launcher.py"
+        if 'srcdir' in options["scheduler"]:
+            launcher_path = os.path.join(
+                options["scheduler"].get(
+                    "srcdir", "."), launcher_path)
+        sched_cl.append(launcher_path)
     else:
         sched_cl.append("pybatsim")
 

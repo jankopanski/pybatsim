@@ -12,12 +12,14 @@ requirements = [
     "pyzmq",
     "redis",
     "pandas",
-    "docopt==0.6.2"
+    "docopt==0.6.2",
+    "procset",
 ]
 
 setup_requirements = [
     "coverage",
-    "autopep8"
+    "autopep8",
+    "ipdb"
 ]
 
 

@@ -104,9 +104,6 @@ class JobModelData:
         # (Not relevant to workloads)
         self.think_time = None
 
-        # PyBatsim profile object to use
-        self.profile = None
-
         # Additional comment field
         self.comment = None
 
@@ -157,12 +154,15 @@ class JobModelData:
     def copy_job(self):
         return copy.deepcopy(self)
 
-    def submit(self, model, workload):
+    def submit(self, model, random, parameters, workload):
         assert None not in [
             self.submit_time,
             self.requested_time,
             self.requested_processors,
         ], "Job misses required fields: " + str(self)
+
+        profile = model.configure_profile(random, parameters, self)
+        assert profile is not None
 
         kwargs = {}
         for field in (self.fields_to_export +
@@ -172,16 +172,6 @@ class JobModelData:
                     kwargs[field] = self.__dict__[field]
             except KeyError:
                 pass
-
-        completed = self.completed if self.completed is not None else True
-
-        profile = self.profile
-        if profile is None:
-            profile = (
-                Profiles.Delay(
-                    self.run_time or increment_float(
-                        self.requested_time, -0.00000000001, True),
-                    ret=0 if completed else 1))
 
         workload.new_job(id=self.job_number,
                          subtime=self.submit_time,
@@ -242,6 +232,15 @@ class WorkloadModel:
 
         return kwargs
 
+    def configure_profile(self, random, parameters, job):
+        completed = job.completed if job.completed is not None else True
+
+        return (
+            Profiles.Delay(
+                job.run_time or increment_float(
+                    job.requested_time, -0.00000000001, True),
+                ret=0 if completed else 1))
+
     @property
     def default_parameters(self):
         return {
@@ -297,7 +296,7 @@ class WorkloadModel:
         for job in jobs:
             if verbose >= 2:
                 print("Generating job: {}".format(job), file=sys.stderr)
-            job.submit(self, workload)
+            job.submit(self, r, parameters, workload)
 
         if verbose >= 1:
             print("Finalising workload...", file=sys.stderr)

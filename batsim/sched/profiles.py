@@ -132,6 +132,7 @@ class Profiles(metaclass=ABCMeta):
             cls.Delay,
             cls.Parallel,
             cls.ParallelHomogeneous,
+            cls.ParallelHomogeneousTotal,
             cls.Smpi,
             cls.Sequence,
             cls.ParallelPFS,
@@ -192,8 +193,7 @@ class Profiles(metaclass=ABCMeta):
 
         @classmethod
         def from_dict(cls, dct, name=None):
-            return cls(nbres=dct["nb_res"],
-                       cpu=dct["cpu"],
+            return cls(cpu=dct["cpu"],
                        com=dct["com"],
                        ret=dct.get("ret", 0),
                        name=name)
@@ -201,7 +201,6 @@ class Profiles(metaclass=ABCMeta):
         def to_dict(self, embed_references=False):
             return {
                 "type": self.type,
-                "nb_res": self.nbres,
                 "cpu": self.cpu,
                 "com": self.com,
                 "ret": self.ret,
@@ -231,6 +230,12 @@ class Profiles(metaclass=ABCMeta):
                 "com": self.com,
                 "ret": self.ret,
             }
+
+    class ParallelHomogeneousTotal(ParallelHomogeneous):
+        """Implementation of the MsgParallelHomogeneousTotal profile."""
+
+        type = "msg_par_hg_tot"
+
 
     class Smpi(Profile):
         """Implementation of the Smpi profile."""
@@ -322,7 +327,7 @@ class Profiles(metaclass=ABCMeta):
             return {
                 "type": self.type,
                 "size": self.size,
-                "direction": self.direction.name,
+                "direction": self.direction.name.lower(),
                 "host": self.host.name,
                 "ret": self.ret,
             }
@@ -354,7 +359,7 @@ class Profiles(metaclass=ABCMeta):
             return {
                 "type": self.type,
                 "size": self.size,
-                "direction": self.direction.name,
+                "direction": self.direction.name.lower(),
                 "ret": self.ret,
             }
 

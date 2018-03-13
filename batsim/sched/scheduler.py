@@ -83,13 +83,13 @@ class BaseBatsimScheduler(BatsimScheduler):
         for job in jobs:
             jobobj = self._jobmap[job.id]
             del self._jobmap[job.id]
-            jobobjs.append(job)
+            jobobj.progress = job.progress
+            jobobjs.append(jobobj)
 
         self._scheduler.info("The following jobs were killed: ({jobs})",
                              jobs=jobobjs, type="jobs_killed_received")
 
-        for job in jobobjs:
-            job._do_complete_job()
+        jobobj._do_complete_job()
 
         self._scheduler.on_jobs_killed(jobobjs)
         self._scheduler._do_schedule()
@@ -194,6 +194,21 @@ class BaseBatsimScheduler(BatsimScheduler):
         reply = BatsimReply(consumed_energy=consumed_energy)
         self._scheduler.on_report_energy_consumed(reply)
         self._scheduler._do_schedule(reply)
+
+    def onAddResources(self, resources):
+        self._scheduler._update_time()
+        self._scheduler.info(
+            "Received add Resources message: {resources}",
+            resources=resources,
+            type="add_resources_received")
+        self._scheduler.on_add_resources(resources)
+
+    def onRemoveResources(self, resources):
+        self._scheduler.info(
+            "Received remove Resources message: {resources}",
+            resources=resources,
+            type="remove_resources_received")
+        self._scheduler.on_remove_resources(resources)
 
 
 class Scheduler(metaclass=ABCMeta):
@@ -395,10 +410,9 @@ class Scheduler(metaclass=ABCMeta):
 
     def debug(self, msg, **kwargs):
         """Writes a debug message to the logging facility."""
-        self._logger.debug(self._format_log_msg(msg, **kwargs))
-        event = self._format_event_msg(1, msg, **kwargs)
-
         if self._log_debug_events:
+            self._logger.debug(self._format_log_msg(msg, **kwargs))
+            event = self._format_event_msg(1, msg, **kwargs)
             self._event_logger.info(event)
 
     def info(self, msg, **kwargs):
@@ -586,6 +600,20 @@ class Scheduler(metaclass=ABCMeta):
         """Hook similar to the low-level API.
 
         :param consumed_energy: the consumed energy (higher-level reply object)
+        """
+        pass
+
+    def on_add_resources(self, resources):
+        """Hook similar to the low-level API.
+
+        :param resources: a procset of resources
+        """
+        pass
+
+    def on_remove_resources(self, resources):
+        """Hook similar to the low-level API.
+
+        :param resources: a procset of resources
         """
         pass
 

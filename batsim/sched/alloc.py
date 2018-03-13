@@ -41,6 +41,7 @@ class Allocation:
                 walltime = job.requested_time
 
         self._walltime = walltime
+        self._estimated_end_time = None
 
         if isinstance(resources, Resource):
             self.add_resource(resources)
@@ -81,12 +82,15 @@ class Allocation:
         assert not self.allocated and not self.previously_allocated, "Allocation is in invalid state"
         assert self._end_time is None or new_time < self.estimated_end_time, "An allocation can not start after its end time"
         self._start_time = new_time
+        self._estimated_end_time = None
 
     @property
     def estimated_end_time(self):
         """The estimated end time of this allocation (either explicit or based on the walltime)."""
-        return self._end_time or (
-            self.start_time + (self.walltime or float("Inf")))
+        if self._estimated_end_time is None:
+            self._estimated_end_time = self.end_time or (
+                self.start_time + (self.walltime or float("Inf")))
+        return self._estimated_end_time
 
     @property
     def end_time(self):
@@ -103,6 +107,7 @@ class Allocation:
         assert not self.allocated and not self.previously_allocated, "Allocation is in invalid state"
         assert new_time > 0, "The walltime has to be > 0"
         self._walltime = new_time
+        self._estimated_end_time = None
 
     @property
     def allocated_resources(self):
@@ -309,6 +314,7 @@ class Allocation:
             r._do_free_allocation(self)
 
         self._end_time = self._scheduler.time
+        self._estimated_end_time = None
         self._allocated = False
         self._previously_allocated = True
 

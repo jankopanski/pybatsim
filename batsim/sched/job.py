@@ -379,6 +379,14 @@ class Job:
                 result.append(dep)
         return ListView(result)
 
+    @property
+    def progress(self):
+        return self._batsim_job.progress
+
+    @progress.setter
+    def progress(self, value):
+        self._batsim_job.progress = value
+
     def free(self):
         """Free the current allocation of this job."""
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
@@ -549,10 +557,9 @@ class Job:
         alloc = []
         for res in self.allocation.allocated_resources:
             if res.num_active != 1:
-                scheduler.fatal(
+                self._scheduler.fatal(
                     "Scheduled resource {res} was already part of a Batsim allocation",
-                    res=res,
-                    type="resource_already_allocated")
+                    res=res, type="resource_already_allocated")
             alloc.append(res.id)
 
         self._scheduler.debug(
@@ -599,9 +606,10 @@ class Job:
         data = self.to_json_dict()
 
         return (
-            "<Job {}; queue:{} sub:{} reqtime:{} res:{} prof:{} start:{} fin:{} stat:{} killreason:{} ret:{} comment:{}>"
+            "<Job {}; number:{} queue:{} sub:{} reqtime:{} res:{} prof:{} start:{} fin:{} stat:{} killreason:{} ret:{} comment:{}>"
             .format(
-                data["id"], data["queue_number"], data["submit_time"], data["requested_time"],
+                data["id"], data["number"], data["queue_number"],
+                data["submit_time"], data["requested_time"],
                 data["requested_resources"], data["profile"],
                 data["start_time"],
                 data["finish_time"], data["state"],
@@ -683,6 +691,16 @@ class Jobs(ObserveList):
     def __init__(self, *args, **kwargs):
         self._job_map = {}
         super().__init__(*args, **kwargs)
+
+    def __eq__(self, other):
+        if type(other) is not Jobs:
+            return False
+        if len(self._job_map) != len(other._job_map):
+            return False
+        return all(
+            [me.id == him.id
+             for me, him
+             in zip(self._job_map.values(), other._job_map.values())])
 
     @property
     def runnable(self):

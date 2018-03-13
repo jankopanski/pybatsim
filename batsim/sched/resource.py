@@ -126,7 +126,11 @@ class Resource:
         """Returns a list containing only the resource (for compatibility with the `Resources` class)."""
         return [self]
 
-    def find_first_time_to_fit_job(self, job, time=None):
+    def find_first_time_to_fit_job(
+            self,
+            job,
+            time=None,
+            future_reservation=False):
         """Finds the first time after which the job can start.
 
         :param job: the job to find a time slot for
@@ -283,22 +287,33 @@ class ComputeResource(Resource):
         self._old_pstate = None
         self._pstate_update_in_progress = False
 
-    def find_first_time_to_fit_job(self, job, time=None):
-        return self.find_first_time_to_fit_walltime(job.requested_time, time)
+    def find_first_time_to_fit_job(
+            self,
+            job,
+            time=None,
+            future_reservation=False):
+        return self.find_first_time_to_fit_walltime(job.requested_time, time,
+                                                    future_reservation)
 
-    def find_first_time_to_fit_walltime(self, requested_walltime, time=None):
+    def find_first_time_to_fit_walltime(self, requested_walltime, time=None,
+                                        future_reservation=False):
         """Finds the first time after which the requested walltime is available for a job start.
 
         :param requested_walltime: the size of the requested time slot
 
         :param time: the starting time after which a time slot is needed
+
+        :param future_reservation: if future_reservation is set to True, it must not be
+        guaranteed that the resource is already freed by Batsim at the given time.
         """
+        present_time = self._scheduler.time
         if time is None:
-            time = self._scheduler.time
+            time = present_time
+        start_time = time
         time_updated = True
         while time_updated:
-            in_present = time == self._scheduler.time
             time_updated = False
+
             # Search the earliest time when a slot for an allocation is
             # available
             for alloc in self._allocations:
@@ -309,28 +324,50 @@ class ComputeResource(Resource):
                 # of jobs getting killed after their walltime). This is due to
                 # the implementation of killing jobs inside Batsim which is
                 # implemented by using a new killer process.
-                end_time = alloc.end_time if in_present else alloc.estimated_end_time
-                if end_time is None:
+
+                if alloc.end_time is None:
                     end_time = float("Inf")
+                else:
+                    end_time = alloc.estimated_end_time
+
+                if alloc.start_time <= time and end_time == float(
+                        "Inf") and not future_reservation and time <= present_time:
+                    return None
+
                 if alloc.start_time <= time and end_time >= time:
-                    time = increment_float(
+                    new_time = increment_float(
                         alloc.estimated_end_time,
                         Resource.TIME_DELTA,
                         until_changed=True)
-                    time_updated = True
+                    if new_time < start_time:
+                        new_time = start_time
+                    if new_time > time:
+                        time_updated = True
+                        time = new_time
+                        break
             # Check whether or not the full requested walltime fits into the
             # slot, otherwise move the slot at the end of the found conflicting
             # allocation and then repeat the loop.
-            estimated_end_time = time + requested_walltime
-            for alloc in self._allocations:
-                if alloc.start_time > time and alloc.start_time < (
-                        estimated_end_time + Resource.TIME_DELTA):
-                    time = increment_float(
-                        alloc.estimated_end_time,
-                        Resource.TIME_DELTA,
-                        until_changed=True)
-                    estimated_end_time = time + requested_walltime
-                    time_updated = True
+            if not time_updated:
+                estimated_end_time = increment_float(time, requested_walltime,
+                                                     until_changed=True)
+                estimated_end_time = increment_float(estimated_end_time,
+                                                     Resource.TIME_DELTA,
+                                                     until_changed=True)
+                for alloc in self._allocations:
+                    if alloc.start_time > time and alloc.start_time < (
+                            estimated_end_time):
+                        new_time = increment_float(
+                            alloc.estimated_end_time,
+                            Resource.TIME_DELTA,
+                            until_changed=True)
+                        if new_time < start_time:
+                            new_time = start_time
+                        if new_time > time:
+                            time_updated = True
+                            time = new_time
+                            estimated_end_time = time + requested_walltime
+                            break
         return time
 
     @property
@@ -413,24 +450,24 @@ class Resources(ObserveList):
         """The list of all special resources (managed by the scheduler logic)."""
         return self.filter(special=True)
 
-    def __getitem__(self, items):
+    def __getitem__(self, item):
         """Returns either a slice of resources or returns a resource based on a given resource id."""
-        if isinstance(items, slice):
-            return self.create(self.all[items])
+        if isinstance(item, slice):
+            return self.create(self.all[item])
         else:
-            return self._resource_map[items]
+            return self._resource_map[item]
 
-    def __delitem__(self, index):
+    def __delitem__(self, item):
         """Deletes a resource with the given resource id."""
-        resource = self._resource_map[items]
+        resource = self._resource_map[item]
         self.remove(resource)
 
     def _element_new(self, resource):
-        if resource.id:
+        if resource.id is not None:
             self._resource_map[resource.id] = resource
 
     def _element_del(self, resource):
-        if resource.id:
+        if resource.id is not None:
             del self._resource_map[resource.id]
 
     def find_first_time_and_resources_to_fit_walltime(
@@ -439,7 +476,8 @@ class Resources(ObserveList):
             time,
             min_matches=None,
             max_matches=None,
-            filter=None):
+            filter=None,
+            future_reservation=False):
         """Find sufficient resources and the earlierst start time to fit a job and its resource requirements.
 
         :param requested_walltime: the walltime which should fit in the allocation
@@ -461,11 +499,12 @@ class Resources(ObserveList):
                 sufficient_resources_found = False
                 found_resources = []
                 earliest_time_available = None
-                time_changed = False
 
                 for r in res:
                     new_time = r.find_first_time_to_fit_job(
-                        job, time)
+                        job, time, future_reservation)
+                    if new_time is None:
+                        continue
                     if new_time == time:
                         found_resources.append(r)
                         if min_matches is None or len(
@@ -488,12 +527,24 @@ class Resources(ObserveList):
                         if found_resources and (
                                 min_matches is None or len(found_resources) >= min_matches):
                             break
-                        else:
+                        elif earliest_time_available is not None:
                             time = earliest_time_available
+                        else:
+                            return None, None
                     else:
                         break
                 elif earliest_time_available:
-                    time = earliest_time_available
+                    if time != earliest_time_available:
+                        time = earliest_time_available
+                    else:
+                        return None, None
+                else:
+                    if max_matches is not None:
+                        found_resources = found_resources[:max_matches]
+                    if min_matches is not None and len(
+                            found_resources) < min_matches:
+                        found_resources = []
+                    return time, found_resources
 
             found_length = len(found_resources)
 
@@ -509,47 +560,93 @@ class Resources(ObserveList):
 
         while True:
             result = set()
+            times_found = set()
+            s_found_all = []
+            is_valid = True
+
             new_time, found_res = do_find(job,
                                           time,
                                           self._data,
                                           min_matches,
                                           max_matches,
                                           filter)
-            s_found_all = []
-            new_time2 = new_time
+
+            if new_time is None:
+                return None, None
+
+            if not found_res:
+                is_valid = False
+
+            if new_time < time:
+                job._scheduler.fatal(
+                    "Found time is before the current time: old={time_old}, new={time_new}",
+                    time_old=time, time_new=new_time,
+                    type="find_resource_failed_time_old")
+            times_found.add(new_time)
 
             for h in job._scheduler.get_find_resource_handlers:
                 reqs = h(job._scheduler, job)
                 for r in reqs:
                     new_time2, s_found = do_find(job,
-                                                 new_time2,
+                                                 new_time,
                                                  r.resources,
                                                  r.min,
                                                  r.max,
                                                  r.filter)
+                    if new_time2 is None:
+                        return None, None
+
+                    if not s_found:
+                        is_valid = False
+
+                    if new_time2 < new_time:
+                        job._scheduler.fatal(
+                            "Found time is before the current time: old={time_old}, new={time_new}",
+                            time_old=new_time, time_new=new_time2,
+                            type="find_resource_failed_time_old2")
                     s_found_all += s_found
-            if new_time == new_time2:
+                    times_found.add(new_time2)
+                    if new_time2 != new_time:
+                        break
+            if len(times_found) == 1:
+                if not is_valid:
+                    return None, None
+
                 return new_time, self.create(set(found_res + s_found_all))
             else:
-                time = max(new_time, new_time2)
+                new_time = max(times_found)
+                if time == new_time:
+                    job._scheduler.fatal(
+                        "Finding new resource failed. Time has not changed: old={time_old}, new={time_new}",
+                        time_old=time, time_new=list(times_found),
+                        type="find_resource_failed_time_not_changed")
+                time = new_time
 
     def find_with_earliest_start_time(
             self, job, allow_future_allocations=False,
-            filter=None):
+            filter=None, time=None):
         """Find sufficient resources and the earlierst start time for a given job.
 
         :param job: the job for which the start times and resources should be found
 
         :param allow_future_allocations: whether or not allocations starting after
-                                         the current simulation time are allowed
+                                         the current simulation time are allowed. If false only resources are returned which are guaranteed to be free in the present time.
 
         :param filter: the filter to be applied when a set of resources was found
         """
-        start_time, found_resources = self.find_first_time_and_resources_to_fit_walltime(job, max(
-            job._scheduler.time, job.submit_time), job.requested_resources, job.requested_resources, filter)
+        if time is None:
+            time = job._scheduler.time
 
-        if not allow_future_allocations and start_time != job._scheduler.time:
-            found_resources = self.create()
+        start_time, found_resources = self.find_first_time_and_resources_to_fit_walltime(job, max(
+            time, job.submit_time), job.requested_resources, job.requested_resources, filter,
+            allow_future_allocations)
+
+        if not allow_future_allocations:
+            if start_time is None:
+                start_time = time
+                found_resources = self.create()
+            elif start_time != time:
+                found_resources = self.create()
 
         return start_time, found_resources
 
