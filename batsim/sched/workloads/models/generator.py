@@ -114,7 +114,7 @@ class JobModelData:
         self.deps = None
 
         # Update fields with values in parameters
-        self.__dict__.update(kwargs)
+        self.update(**kwargs)
 
     def process(self, random):
         keys = [k for k, _ in self.__dict__.items()]
@@ -153,6 +153,10 @@ class JobModelData:
 
     def copy_job(self):
         return copy.deepcopy(self)
+
+    def update(self, **kwargs):
+        self.__dict__.update(kwargs)
+        return self
 
     def submit(self, model, random, parameters, workload):
         assert None not in [
@@ -233,13 +237,16 @@ class WorkloadModel:
         return kwargs
 
     def configure_profile(self, random, parameters, job):
-        completed = job.completed if job.completed is not None else True
+        try:
+            return job.profile
+        except AttributeError:
+            completed = job.completed if job.completed is not None else True
 
-        return (
-            Profiles.Delay(
-                job.run_time or increment_float(
-                    job.requested_time, -0.00000000001, True),
-                ret=0 if completed else 1))
+            return (
+                Profiles.Delay(
+                    job.run_time or increment_float(
+                        job.requested_time, -0.00000000001, True),
+                    ret=0 if completed else 1))
 
     @property
     def default_parameters(self):

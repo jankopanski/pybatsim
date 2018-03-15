@@ -65,6 +65,9 @@ class JobDescription:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
+    def clone(self):
+        return copy.deepcopy(self)
+
     @property
     def workload(self):
         """The `WorkloadDescription` if assigned. This is required in order to submit

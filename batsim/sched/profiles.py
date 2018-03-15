@@ -318,8 +318,8 @@ class Profiles(metaclass=ABCMeta):
         @classmethod
         def from_dict(cls, dct, name=None):
             return cls(size=dct["size"],
-                       direction=cls.Direction[dct["direction"]],
-                       host=cls.Host[dct["host"]],
+                       direction=cls.Direction[dct["direction"].upper()],
+                       host=cls.Host[dct["host"].upper()],
                        ret=dct.get("ret", 0),
                        name=name)
 
@@ -351,7 +351,7 @@ class Profiles(metaclass=ABCMeta):
         @classmethod
         def from_dict(cls, dct, name=None):
             return cls(size=dct["size"],
-                       direction=cls.Direction[dct["repeat"]],
+                       direction=cls.Direction[dct["direction"].upper()],
                        ret=dct.get("ret", 0),
                        name=name)
 

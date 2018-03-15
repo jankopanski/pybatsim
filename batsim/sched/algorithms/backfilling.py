@@ -143,8 +143,8 @@ def backfilling_sched(
                  respect_deps=respect_deps,
                  handle_scheduled_func=handle_scheduled_func)
 
-    # Do backfilling if there are still runnable jobs and free resources.
-    if len(jobs.runnable) > reservation_depth:
+    # Do backfilling if there are still open jobs.
+    if len(jobs.open) > 0:
         do_backfilling(scheduler, reservation_depth, jobs=jobs,
                        resources=resources, resources_filter=resources_filter,
                        check_func=backfilling_check_func,
