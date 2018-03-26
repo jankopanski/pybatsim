@@ -594,7 +594,7 @@ class Job:
         data = self.to_json_dict()
 
         return (
-            "<Job {}; number:{} queue:{} sub:{} reqtime:{} res:{} prof:{} start:{} fin:{} stat:{} killreason:{} ret:{} comment:{}>"
+            "<Job {}; number:{} queue:{} sub:{} reqtime:{} res:{} prof:{} start:{} fin:{} stat:{} ret:{} comment:{}>"
             .format(
                 data["id"], data["number"], data["queue_number"],
                 data["submit_time"], data["requested_time"],
