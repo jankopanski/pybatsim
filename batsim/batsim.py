@@ -157,12 +157,13 @@ class Batsim(object):
             )
             self.nb_jobs_scheduled += 1
 
-    def execute_jobs(self, jobs):
+    def execute_jobs(self, jobs, io_jobs=None):
         """ args:jobs: list of jobs to execute (job.allocation MUST be set) """
 
         for job in jobs:
             assert job.allocation is not None
-            self._events_to_send.append({
+
+            message = {
                 "timestamp": self.time(),
                 "type": "EXECUTE_JOB",
                 "data": {
@@ -170,7 +171,10 @@ class Batsim(object):
                         "alloc": str(job.allocation)
                 }
             }
-            )
+            if io_jobs is not None and job.id in io_jobs:
+                message["data"]["additional_io_job"] = io_jobs[job.id]
+
+            self._events_to_send.append(message)
             self.nb_jobs_scheduled += 1
 
 
@@ -446,6 +450,12 @@ class Batsim(object):
                     res_key = "compute_resources"
                 self.resources = {
                         res["id"]: res for res in event_data[res_key]}
+                self.storage = {
+                        res["id"]: res for res in event_data["storage_resources"]}
+
+                self.profiles = event_data["profiles"]
+
+                self.workloads = event_data["workloads"]
 
                 self.hpst = event_data.get("hpst_host", None)
                 self.lcst = event_data.get("lcst_host", None)
@@ -643,6 +653,10 @@ class Job(object):
             self.requested_time, self.profile,
             self.job_state,
             self.return_code, self.allocation))
+
+    @property
+    def workload(self):
+        return self.id.split(Batsim.WORKLOAD_JOB_SEPARATOR)[0]
 
     @staticmethod
     def from_json_string(json_str):
