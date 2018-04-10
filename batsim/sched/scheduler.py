@@ -446,7 +446,7 @@ class Scheduler(metaclass=ABCMeta):
         If the _pre_init method is overridden the super method should be called with:
         `super()._pre_init()`
         """
-        for r in self._batsim.resources:
+        for r in self._batsim.resources.values():
             self._resources.add(ComputeResource(self,
                                                 id=r["id"],
                                                 name=r["name"],

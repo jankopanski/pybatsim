@@ -1,20 +1,35 @@
 """
-    schedBebida
-    ~~~~~~~~~
+schedBebida
+~~~~~~~~~
 
-    This scheduler is the implementation of the BigData scheduler for the
-    Bebida on batsim project.
+This scheduler is the implementation of the BigData scheduler for the
+Bebida on batsim project.
 
-    It is a Simple fcfs algoritihm.
+It is a Simple fcfs algoritihm.
 
-    It take into account preemption by respounding to Add/Remove resource
-    events. It kills the jobs that are allocated to removed resources. It also
-    kill some jobs in the queue in order to re-schedule them on a larger set of
-    resources.
+It take into account preemption by respounding to Add/Remove resource
+events. It kills the jobs that are allocated to removed resources. It also
+kill some jobs in the queue in order to re-schedule them on a larger set of
+resources.
 
-    The Batsim job profile "msg_hg_tot" is MANDATORY for this mechanism to work.
-    Also, the batsim option  "job_submission":{"forward_profiles":true} is mandatory
+The Batsim job profile "msg_hg_tot" or a sequence of that kind of jobs are
+MANDATORY for this mechanism to work.
 
+Also, the folowing batsim configuration is mandatory:
+```json
+{
+    "job_submission": {
+        "forward_profiles": false,
+        "from_scheduler": {
+          "enabled": false,
+          "acknowledge": true
+        }
+    },
+    "job_kill": {
+        "forward_profiles": false
+    }
+}
+```
 """
 
 from batsim.batsim import BatsimScheduler, Job
@@ -245,6 +260,10 @@ class SchedBebida(BatsimScheduler):
                     new_job.profile_dict["seq"] = old_job.profile_dict["seq"][curr_task:]
 
                     # Now let's modify the current profile to reflect progress
+                    assert "profile" in progress["current_task"], ('The profile'
+                            ' is not forwarded in the job progress: set'
+                            ' {"job_kill": {"forward_profiles": true}} in the '
+                            'batsim config')
                     curr_task_profile = progress["current_task"]["profile"]
                     assert curr_task_profile["type"] == "msg_par_hg_tot", "Only msg_par_hg_tot profile are supported right now"
                     for key, value in curr_task_profile.items():

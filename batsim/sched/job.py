@@ -322,17 +322,6 @@ class Job:
         return self._batsim_job.job_state
 
     @property
-    def kill_reason(self):
-        """The kill reason (if any exists) of this job as known by Batsim."""
-        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
-        return self._batsim_job.kill_reason
-
-    @kill_reason.setter
-    def kill_reason(self, value):
-        assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
-        self._batsim_job.kill_reason = value
-
-    @property
     def return_code(self):
         """The return code of this job as known by Batsim."""
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
@@ -580,13 +569,13 @@ class Job:
         self._start_time = self._scheduler.time
         self._jobs_list.update_element(self)
 
-    def change_state(self, state, kill_reason="", return_code=None):
+    def change_state(self, state, return_code=None):
         """Change the state of a job. This is only needed in rare cases where the real job
         should not be executed but instead the state should be set manually.
         """
         assert self._batsim_job, "Batsim job is not set => job was not correctly initialised"
         self._scheduler._batsim.change_job_state(
-            self._batsim_job, state, kill_reason)
+            self._batsim_job, state)
         self._changed_state = state
 
         if state == Job.State.RUNNING:
@@ -597,7 +586,6 @@ class Job:
                        Job.State.COMPLETED_WALLTIME_REACHED,
                        Job.State.COMPLETED_KILLED]:
             self._batsim_job.finish_time = self._scheduler.time
-            self._batsim_job.kill_reason = kill_reason
             self._batsim_job.return_code = (
                 return_code or 0 if state == Job.State.COMPLETED_SUCCESSFULLY else 1)
         self._jobs_list.update_element(self)
@@ -606,14 +594,13 @@ class Job:
         data = self.to_json_dict()
 
         return (
-            "<Job {}; number:{} queue:{} sub:{} reqtime:{} res:{} prof:{} start:{} fin:{} stat:{} killreason:{} ret:{} comment:{}>"
+            "<Job {}; number:{} queue:{} sub:{} reqtime:{} res:{} prof:{} start:{} fin:{} stat:{} ret:{} comment:{}>"
             .format(
                 data["id"], data["number"], data["queue_number"],
                 data["submit_time"], data["requested_time"],
                 data["requested_resources"], data["profile"],
                 data["start_time"],
                 data["finish_time"], data["state"],
-                data["kill_reason"],
                 data["return_code"],
                 data["comment"]))
 
@@ -661,7 +648,6 @@ class Job:
             "finish_time": self.finish_time,
             "state": state,
             "success": True if self.success else False,
-            "kill_reason": self.kill_reason,
             "return_code": self.return_code,
             "comment": self.comment
         }
