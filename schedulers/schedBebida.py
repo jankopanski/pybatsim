@@ -133,7 +133,11 @@ class SchedBebida(BatsimScheduler):
         self.to_be_removed_resources = {}
         self.load_balanced_jobs = set()
         # TODO use CLI options
-        self.variant = "pfs"
+        #self.variant = "pfs"
+        if "variant" not in self.options:
+            self.variant = "no-io"
+        else:
+            self.variant = self.options["variant"]
 
     def onSimulationBegins(self):
         self.free_resources = ProcSet(*[res_id for res_id in
@@ -351,8 +355,13 @@ class SchedBebida(BatsimScheduler):
             if len(self.free_resources & self.available_resources) == 0:
                 break
 
+            if self.variant == "no-io":
+                # Allocate resources
+                self.allocate_first_fit_in_best_effort(job)
+                to_execute.append(job)
+
             # Manage IO
-            if self.variant == "pfs":
+            elif self.variant == "pfs":
                 # Allocate resources
                 self.allocate_first_fit_in_best_effort(job)
                 to_execute.append(job)
