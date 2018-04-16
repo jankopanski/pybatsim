@@ -423,6 +423,8 @@ class Batsim(object):
 
         finished_received = False
 
+        simu_begins_or_ends = False
+
         for event in msg["events"]:
             event_type = event["type"]
             event_data = event.get("data", {})
@@ -459,6 +461,7 @@ class Batsim(object):
 
                 self.hpst = event_data.get("hpst_host", None)
                 self.lcst = event_data.get("lcst_host", None)
+                simu_begins_or_ends = True
                 self.scheduler.onSimulationBegins()
 
             elif event_type == "SIMULATION_ENDS":
@@ -466,6 +469,7 @@ class Batsim(object):
                 self.running_simulation = False
                 self.logger.info("All jobs have been submitted and completed!")
                 finished_received = True
+                simu_begins_or_ends = True
                 self.scheduler.onSimulationEnds()
             elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
@@ -530,8 +534,7 @@ class Batsim(object):
                 consumed_energy = event_data["consumed_energy"]
                 self.scheduler.onReportEnergyConsumed(consumed_energy)
             elif event_type == 'REQUESTED_CALL':
-                self.scheduler.onNOP()
-                # TODO: separate NOP / REQUESTED_CALL (here and in the algos)
+                self.scheduler.onRequestedCall()
             elif event_type == 'ADD_RESOURCES':
                 self.scheduler.onAddResources(event_data["resources"])
             elif event_type == 'REMOVE_RESOURCES':
@@ -539,7 +542,8 @@ class Batsim(object):
             else:
                 raise Exception("Unknow event type {}".format(event_type))
 
-        self.scheduler.onNoMoreEvents()
+        if not simu_begins_or_ends:
+            self.scheduler.onNoMoreEvents()
 
         if self.handle_dynamic_notify and not finished_received:
             if (self.nb_jobs_completed == self.nb_jobs_received != 0):
@@ -703,7 +707,7 @@ class BatsimScheduler(object):
             "[PYBATSIM]: Batsim is not responding (maybe deadlocked)")
 
     def onNOP(self):
-        raise NotImplementedError()
+        pass
 
     def onJobSubmission(self, job):
         raise NotImplementedError()
@@ -727,6 +731,9 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onRemoveResources(self, to_remove):
+        raise NotImplementedError()
+
+    def onRequestedCall(self):
         raise NotImplementedError()
 
     def onNoMoreEvents(self):

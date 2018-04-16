@@ -204,11 +204,19 @@ class BaseBatsimScheduler(BatsimScheduler):
         self._scheduler.on_add_resources(resources)
 
     def onRemoveResources(self, resources):
+        # TODO Shouldn't be an update_time call here too?
         self._scheduler.info(
             "Received remove Resources message: {resources}",
             resources=resources,
             type="remove_resources_received")
         self._scheduler.on_remove_resources(resources)
+
+    def onRequestedCall(self)
+        self._scheduler._update_time()
+        self._scheduler.info(
+            "Received Requested Call message",
+            type="requested_call_received")
+        self._scheduler.on_requested_call()
 
 
 class Scheduler(metaclass=ABCMeta):
@@ -615,6 +623,10 @@ class Scheduler(metaclass=ABCMeta):
 
         :param resources: a procset of resources
         """
+        pass
+
+    def on_requested_call(self):
+        """Hook similar to the low-level API."""
         pass
 
     def on_event(self, event):
