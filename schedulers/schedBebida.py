@@ -42,6 +42,32 @@ def sort_by_id(jobs):
     return sorted(jobs, key=lambda j: int(j.id.split('!')[1].split('#')[0]))
 
 
+def generate_pfs_io_profile(profile_dict, job_alloc, io_alloc, pfs_id):
+    # Generating comm matrix
+    bytes_to_read = profile_dict["io_reads"] / len(job_alloc)
+    bytes_to_write = profile_dict["io_writes"] / len(job_alloc)
+    comm_matrix = []
+    for col, machine_id_col in enumerate(io_alloc):
+        for row, machine_id_row in enumerate(io_alloc):
+            if row == col or (
+                    pfs_id != machine_id_row and
+                    pfs_id != machine_id_col):
+                comm_matrix.append(0)
+            elif machine_id_row == pfs_id:
+                # Reads to pfs
+                comm_matrix.append(bytes_to_read)
+            elif machine_id_col == pfs_id:
+                # Reads to pfs
+                comm_matrix.append(bytes_to_write)
+
+    io_profile = {
+        "type": "msg_par",
+        "cpu": [0] * len(io_alloc),
+        "com": comm_matrix
+    }
+    return io_profile
+
+
 class SchedBebida(BatsimScheduler):
 
     def filter_jobs_by_state(self, state):
@@ -64,7 +90,7 @@ class SchedBebida(BatsimScheduler):
         return None if no resources at all are available.
         """
         self.logger.info("Try to allocate Job: {}".format(job.id))
-        assert(job.allocation is None ,
+        assert job.allocation is None , (
                "Job allocation should be None and not {}".format(job.allocation))
 
         nb_found_resources = 0
@@ -106,12 +132,30 @@ class SchedBebida(BatsimScheduler):
         super().__init__(*args, **kwargs)
         self.to_be_removed_resources = {}
         self.load_balanced_jobs = set()
+        # TODO use CLI options
+        #self.variant = "pfs"
+        if "variant" not in self.options:
+            self.variant = "no-io"
+        else:
+            self.variant = self.options["variant"]
 
     def onSimulationBegins(self):
         self.free_resources = ProcSet(*[res_id for res_id in
             self.bs.resources.keys()])
         self.nb_total_resources = len(self.free_resources)
         self.available_resources = copy.deepcopy(self.free_resources)
+
+        if self.variant == "pfs":
+            assert len(self.bs.storage) >= 1, (
+                "At least on storage node is necessary for the 'pfs' variant")
+            # WARN: This implies that at exactlly one storage is defined
+            self.pfs_id = [key for key,value in self.bs.storage.items() if
+                    "role" in value["properties"] and
+                    value["properties"]["role"] == "storage"][0]
+
+        elif self.variant == "dfs":
+            self.disks = ProcSet(*[res_id for res_id in self.bs.storage.keys()])
+            # TODO check if all the nodes have a storage attached
 
         assert self.bs.batconf["job_submission"]["forward_profiles"] == True, (
                 "Forward profile is mandatory for resubmit to work")
@@ -305,13 +349,66 @@ class SchedBebida(BatsimScheduler):
             len(to_schedule_jobs)))
 
         self.logger.debug("jobs to be scheduled: \n{}".format(to_schedule_jobs))
+
+        io_jobs = {}
         for job in to_schedule_jobs:
             if len(self.free_resources & self.available_resources) == 0:
                 break
-            self.allocate_first_fit_in_best_effort(job)
-            to_execute.append(job)
 
-        self.bs.execute_jobs(to_execute)
+            if self.variant == "no-io":
+                # Allocate resources
+                self.allocate_first_fit_in_best_effort(job)
+                to_execute.append(job)
+
+            # Manage IO
+            elif self.variant == "pfs":
+                # Allocate resources
+                self.allocate_first_fit_in_best_effort(job)
+                to_execute.append(job)
+
+                alloc = job.allocation | ProcSet(ProcInt(self.pfs_id, self.pfs_id))
+
+                # Manage Sequence job
+                if job.profile_dict["type"] == "composed":
+                    io_profiles = {}
+                    # Generate profile sequence
+                    for profile_name in job.profile_dict["seq"]:
+                        profile = self.bs.profiles[job.workload][profile_name]
+                        io_profiles[profile_name + "_io"] = generate_pfs_io_profile(
+                                profile,
+                                job.allocation,
+                                alloc,
+                                self.pfs_id)
+                    # submit these profiles
+                    self.bs.submit_profiles(job.workload, io_profiles)
+
+                    # Create io job
+                    io_job = {
+                      "alloc": str(alloc),
+                      "profile_name": job.id + "_io",
+                      "profile": {
+                        "type": "composed",
+                        "seq": list(io_profiles.keys())
+                      }
+                    }
+
+                else:
+                    io_job = {
+                      "alloc": str(alloc),
+                      "profile_name": job.id + "_io",
+                      "profile": generate_pfs_io_profile(job.profile_dict,
+                                job.allocation,
+                                alloc,
+                                self.pfs_id)
+                    }
+
+                io_jobs[job.id] = io_job
+
+            if self.variant == "dfs":
+                # TODO Implement DFS model here...
+                pass
+
+        self.bs.execute_jobs(to_execute, io_jobs)
         for job in to_execute:
             job.job_state = Job.State.RUNNING
         self.logger.info("Finished scheduling jobs, nb jobs scheduled: {}".format(

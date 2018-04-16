@@ -1,23 +1,26 @@
 with import <nixpkgs> {};
 with pkgs.python36Packages;
-with import (fetchTarball "https://gitlab.inria.fr/vreis/datamove-nix/repository/master/archive.tar.gz") {};
+with import (fetchTarball "https://gitlab.inria.fr/vreis/datamove-nix/repository/master/archive.tar.gz") {
+  pkgs = (import <nixpkgs> {});
+};
 
 buildPythonPackage rec {
-  name = "pybatsim";
-  src = ./batsim;
+  name = "pybatsim-local";
+  src = ./.;
+  doCheck = false;
   propagatedBuildInputs = with python36Packages; [
       sortedcontainers
       pyzmq
       redis
       pandas
       docopt
-      # for testing
+      # for testing and debug
       coverage
       pytest
-      # for dev
-      mypy
+      ipython
+      ipdb
       # for doc generation
       sphinx
-    ] ++ [ batsim ];
+    ];
 
-  };
+}
