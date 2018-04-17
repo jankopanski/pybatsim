@@ -260,7 +260,8 @@ class Batsim(object):
             msg["data"]["profile"] = profile
 
         self._events_to_send.append(msg)
-        self.nb_jobs_submitted += 1
+        if not self.ack_dynamic_notify:
+            self.nb_jobs_submitted += 1
 
         self.has_dynamic_job_submissions = True
 
@@ -463,6 +464,7 @@ class Batsim(object):
                 self.batconf = event_data["config"]
                 self.time_sharing = event_data["allow_time_sharing"]
                 self.handle_dynamic_notify = self.batconf["job_submission"]["from_scheduler"]["enabled"]
+                self.ack_dynamic_notify = self.batconf["job_submission"]["from_scheduler"]["acknowledge"]
 
                 self.redis_enabled = self.batconf["redis"]["enabled"]
                 redis_hostname = self.batconf["redis"]["hostname"]
@@ -582,7 +584,7 @@ class Batsim(object):
             self.scheduler.onNoMoreEvents()
 
         if self.handle_dynamic_notify and not finished_received:
-            if (not self.has_dynamic_job_submissions and self.nb_jobs_completed == self.nb_jobs_received):
+            if (not self.has_dynamic_job_submissions and self.nb_jobs_completed == (self.nb_jobs_received + self.nb_jobs_submitted) ):
                 # All the received and submited jobs are completed or killed
                 self.notify_submission_finished()
             else:

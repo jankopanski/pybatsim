@@ -1,4 +1,4 @@
-from batsim.batsim import BatsimScheduler, Batsim
+from batsim.batsim import BatsimScheduler, Batsim, Job
 
 import sys
 import os
@@ -27,7 +27,6 @@ class ClemSched(BatsimScheduler):
 
         prof = {"small": {'type': 'msg_par_hg','cpu': 60e8,'com': 0}}
         self.bs.submit_profiles("dyn", prof)
-        self.bs.request_air_temperature_all()
 
     def scheduleJobs(self):
         if len(self.openJobs) > 0:
@@ -47,7 +46,8 @@ class ClemSched(BatsimScheduler):
     def onJobCompletion(self, job):
         self.idle = True
 
-        print("\nJob_finished:", job.id,self.bs.air_temperatures, "\n")
+        print(self.bs.time(), "Job_finished:", job.id)
+        self.bs.request_processor_temperature_all()
 
         self.trySubmitSmall()
 
@@ -58,22 +58,27 @@ class ClemSched(BatsimScheduler):
     def onRequestedCall(self):
         self.trySubmitSmall()
 
-    def onAnswerAirTemperatureAll(self, air_temperature_all):
-        print("AAA\n\n", air_temperature_all)
-        print("\n\n")
+    def onAnswerProcessorTemperatureAll(self, proc_temperature_all):
+        print(self.bs.time(), "Proc", proc_temperature_all)
+        print(self.bs.time(), "Air", self.bs.air_temperatures, "\n")
 
         
     def trySubmitSmall(self):
-        if self.bs.air_temperatures[1] < 22:
+        if self.bs.air_temperatures["1"] < 25:
             if self.flag1:
-                self.bs.submit_job(id=("dyn!" + str(self.idSub)), res=2, walltime=-1, profile_name="small")
+                jid = "dyn!" + str(self.idSub)
+                self.bs.submit_job(id=jid, res=2, walltime=-1, profile_name="small")
                 self.idSub += 1
+                '''if self.idle:
+                    self.idle = False
+                    job = Job(jid, 0, -1, 2, "", "", "")
+                    self.bs.start_jobs_continuous([(job, (0,1))])'''
             else:
                 self.bs.wake_me_up_at(self.bs.time()+60.0)
         else:
             self.flag1 = False
 
-        if self.idSub > 133:
+        if self.idSub > 109:
             self.flag1 = False
             self.flag2 = False
             #self.bs.notify_submission_finished()
