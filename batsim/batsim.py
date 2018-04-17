@@ -63,7 +63,7 @@ class Batsim(object):
 
         self.jobs_manually_changed = set()
 
-        self.has_dynamic_job_submissions = False
+        self.has_dynamic_job_submissions = True # The value True is to avoid sending a "submission_finished" notify in the answer of "simulation_begins"
 
         self.network.bind()
         self.event_publisher.bind()
@@ -439,6 +439,10 @@ class Batsim(object):
 
         self._current_time = msg["now"]
 
+        if "air_temperatures" in msg:
+            self.air_temperatures = msg["air_temperatures"]
+            #print(self.air_temperatures)
+
         if msg["events"] is []:
             # No events in the message
             self.scheduler.onNOP()
@@ -572,13 +576,13 @@ class Batsim(object):
             elif event_type == 'REMOVE_RESOURCES':
                 self.scheduler.onRemoveResources(event_data["resources"])
             else:
-                raise Exception("Unknow event type {}".format(event_type))
+                raise Exception("Unknown event type {}".format(event_type))
 
         if not simu_begins_or_ends:
             self.scheduler.onNoMoreEvents()
 
         if self.handle_dynamic_notify and not finished_received:
-            if (self.nb_jobs_completed == self.nb_jobs_received != 0):
+            if (not self.has_dynamic_job_submissions and self.nb_jobs_completed == self.nb_jobs_received):
                 # All the received and submited jobs are completed or killed
                 self.notify_submission_finished()
             else:
@@ -590,8 +594,6 @@ class Batsim(object):
             # sort msgs by timestamp
             self._events_to_send = sorted(
                 self._events_to_send, key=lambda event: event['timestamp'])
-
-            #print("------[{time}] Nb events: {nb}".format(time=self.time(), nb=len(self._events_to_send)))
 
         new_msg = {
             "now": self._current_time,
