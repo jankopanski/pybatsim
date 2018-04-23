@@ -24,9 +24,10 @@ class ClemSched(BatsimScheduler):
         self.nbResources = self.bs.nb_res
         self.idle = True
 
+        self.bs.wake_me_up_at(4000)
 
-        prof = {"small": {'type': 'msg_par_hg','cpu': 60e8,'com': 0}}
-        self.bs.submit_profiles("dyn", prof)
+        #prof = {"small": {'type': 'msg_par_hg','cpu': 60e8,'com': 0}}
+        #self.bs.submit_profiles("dyn", prof)
 
     def scheduleJobs(self):
         if len(self.openJobs) > 0:
@@ -41,26 +42,49 @@ class ClemSched(BatsimScheduler):
 
 
     def onJobSubmission(self, job):
-        self.openJobs.append(job)
+        #self.openJobs.append(job)
+        print(self.bs.time(), "Job_received:", job.id)
+        #self.bs.request_processor_temperature_all()
+
+        #self.bs.start_jobs_continuous([(job, (0,2))])
+        if (job.id).split('!')[-1] == "1":
+            self.bs.start_jobs_continuous([(job, (0,1))])
+
+        if (job.id).split('!')[-1] == "2":
+            self.bs.start_jobs_continuous([(job, (2,2))])
+
+        if (job.id).split('!')[-1] == "3":
+            self.bs.start_jobs_continuous([(job, (2,2))])
+
 
     def onJobCompletion(self, job):
-        self.idle = True
+        #self.idle = True
 
         print(self.bs.time(), "Job_finished:", job.id)
-        self.bs.request_processor_temperature_all()
+        #self.bs.request_processor_temperature_all()
 
-        self.trySubmitSmall()
+        #self.trySubmitSmall()
 
     def onNoMoreEvents(self):
-        if self.idle:
-            self.scheduleJobs()
+        pass
+        #if self.idle:
+        #    self.scheduleJobs()
+        #if self.flag1:
+        #    self.bs.notify_submission_continue()
 
     def onRequestedCall(self):
-        self.trySubmitSmall()
+        print("REQUESTED CALL")
+        #self.bs.request_processor_temperature_all()
+        #self.trySubmitSmall()
+        self.flag1 = False
+        #self.bs.notify_submission_finished()
 
     def onAnswerProcessorTemperatureAll(self, proc_temperature_all):
         print(self.bs.time(), "Proc", proc_temperature_all)
         print(self.bs.time(), "Air", self.bs.air_temperatures, "\n")
+
+        #if not self.flag1:
+        #    self.bs.notify_submission_finished()
 
         
     def trySubmitSmall(self):

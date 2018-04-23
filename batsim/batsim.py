@@ -63,8 +63,6 @@ class Batsim(object):
 
         self.jobs_manually_changed = set()
 
-        self.has_dynamic_job_submissions = True # The value True is to avoid sending a "submission_finished" notify in the answer of "simulation_begins"
-
         self.network.bind()
         self.event_publisher.bind()
 
@@ -263,8 +261,6 @@ class Batsim(object):
         if not self.ack_dynamic_notify:
             self.nb_jobs_submitted += 1
 
-        self.has_dynamic_job_submissions = True
-
         # Create the job here
         self.jobs[id] = Job.from_json_dict(job_dict, profile_dict=profile)
         self.jobs[id].job_state = Job.State.SUBMITTED
@@ -452,8 +448,6 @@ class Batsim(object):
 
         finished_received = False
 
-        simu_begins_or_ends = False
-
         for event in msg["events"]:
             event_type = event["type"]
             event_data = event.get("data", {})
@@ -465,6 +459,9 @@ class Batsim(object):
                 self.time_sharing = event_data["allow_time_sharing"]
                 self.handle_dynamic_notify = self.batconf["job_submission"]["from_scheduler"]["enabled"]
                 self.ack_dynamic_notify = self.batconf["job_submission"]["from_scheduler"]["acknowledge"]
+
+                if self.handle_dynamic_notify:
+                    print("Dynamic notification of jobs is ENABLED. The scheduler must send a NOTIFY event of type 'submission_finished' to let Batsim end the simulation.")
 
                 self.redis_enabled = self.batconf["redis"]["enabled"]
                 redis_hostname = self.batconf["redis"]["hostname"]
@@ -491,7 +488,6 @@ class Batsim(object):
 
                 self.hpst = event_data.get("hpst_host", None)
                 self.lcst = event_data.get("lcst_host", None)
-                simu_begins_or_ends = True
                 self.scheduler.onSimulationBegins()
 
             elif event_type == "SIMULATION_ENDS":
@@ -499,7 +495,6 @@ class Batsim(object):
                 self.running_simulation = False
                 self.logger.info("All jobs have been submitted and completed!")
                 finished_received = True
-                simu_begins_or_ends = True
                 self.scheduler.onSimulationEnds()
             elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
@@ -580,17 +575,7 @@ class Batsim(object):
             else:
                 raise Exception("Unknown event type {}".format(event_type))
 
-        if not simu_begins_or_ends:
-            self.scheduler.onNoMoreEvents()
-
-        if self.handle_dynamic_notify and not finished_received:
-            if (not self.has_dynamic_job_submissions and self.nb_jobs_completed == (self.nb_jobs_received + self.nb_jobs_submitted) ):
-                # All the received and submited jobs are completed or killed
-                self.notify_submission_finished()
-            else:
-                #self.notify_submission_continue()
-                # Some jobs just have been dynamically submitted
-                self.has_dynamic_job_submissions = False
+        self.scheduler.onNoMoreEvents()
 
         if len(self._events_to_send) > 0:
             # sort msgs by timestamp
@@ -608,8 +593,8 @@ class Batsim(object):
         if finished_received:
             self.network.close()
             self.event_publisher.close()
-            if self.handle_dynamic_notify:
-                self.notify_submission_finished()
+            #if self.handle_dynamic_notify:
+            #    self.notify_submission_finished()
 
         return not finished_received
 
