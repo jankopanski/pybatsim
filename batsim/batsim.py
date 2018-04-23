@@ -437,11 +437,6 @@ class Batsim(object):
 
         if "air_temperatures" in msg:
             self.air_temperatures = msg["air_temperatures"]
-            #print(self.air_temperatures)
-
-        if msg["events"] is []:
-            # No events in the message
-            self.scheduler.onNOP()
 
         self._events_to_send = []
 
@@ -724,9 +719,6 @@ class BatsimScheduler(object):
     def onDeadlock(self):
         raise ValueError(
             "[PYBATSIM]: Batsim is not responding (maybe deadlocked)")
-
-    def onNOP(self):
-        pass
 
     def onJobSubmission(self, job):
         raise NotImplementedError()

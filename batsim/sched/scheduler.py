@@ -65,14 +65,6 @@ class BaseBatsimScheduler(BatsimScheduler):
             type="deadlock")
         self._scheduler.on_deadlock()
 
-    def onNOP(self):
-        self._scheduler._update_time()
-        self._scheduler.debug(
-            "decision process received NOP",
-            type="nop_received")
-        self._scheduler.on_nop()
-        self._scheduler._do_schedule()
-
     def onJobsKilled(self, jobs):
         self._scheduler._update_time()
         self._scheduler.debug(

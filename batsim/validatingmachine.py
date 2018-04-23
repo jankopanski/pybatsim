@@ -38,9 +38,6 @@ class ValidatingMachine(BatsimScheduler):
     def onSimulationEnds(self):
         self.scheduler.onSimulationEnds()
 
-    def onNOP(self):
-        self.scheduler.onNOP()
-
     def onDeadlock(self):
         self.scheduler.onDeadlock()
 
