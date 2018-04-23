@@ -63,8 +63,6 @@ class Batsim(object):
 
         self.jobs_manually_changed = set()
 
-        self.has_dynamic_job_submissions = False
-
         self.network.bind()
         self.event_publisher.bind()
 
@@ -262,8 +260,6 @@ class Batsim(object):
         self._events_to_send.append(msg)
         self.nb_jobs_submitted += 1
 
-        self.has_dynamic_job_submissions = True
-
         # Create the job here
         self.jobs[id] = Job.from_json_dict(job_dict, profile_dict=profile)
         self.jobs[id].job_state = Job.State.SUBMITTED
@@ -310,7 +306,8 @@ class Batsim(object):
             job = Job.from_json_dict(json_dict, profile_dict)
         return job
 
-    def request_consumed_energy(self):
+
+    def request_consumed_energy(self): #TODO CHANGE NAME 
         self._events_to_send.append(
             {
                 "timestamp": self.time(),
@@ -320,6 +317,29 @@ class Batsim(object):
                 }
             }
         )
+
+    def request_air_temperature_all(self):
+        self._events_to_send.append(
+            {
+                "timestamp": self.time(),
+                "type": "QUERY",
+                "data": {
+                    "requests": {"air_temperature_all": {}}
+                }
+            }
+        )
+
+    def request_processor_temperature_all(self):
+        self._events_to_send.append(
+            {
+                "timestamp": self.time(),
+                "type": "QUERY",
+                "data": {
+                    "requests": {"processor_temperature_all": {}}
+                }
+            }
+        )
+
 
     def notify_resources_added(self, resources):
         self._events_to_send.append(
@@ -344,7 +364,7 @@ class Batsim(object):
         )
 
     def set_job_metadata(self, job_id, metadata):
-        # Consume some time to be sur that the job was created before the
+        # Consume some time to be sure that the job was created before the
         # metadata is set
 
         self.jobs[job_id].metadata = metadata
@@ -377,7 +397,7 @@ class Batsim(object):
                 metadata["parent_job"] = job.id
             metadata["nb_resubmit"] = metadata["nb_resubmit"] + 1
 
-        # Keep the curent workload and add a resubmit number
+        # Keep the current workload and add a resubmit number
         splitted_id = job.id.split(Batsim.ATTEMPT_JOB_SEPARATOR)
         if len(splitted_id) == 0:
             new_job_name = job.id
@@ -415,9 +435,8 @@ class Batsim(object):
 
         self._current_time = msg["now"]
 
-        if msg["events"] is []:
-            # No events in the message
-            self.scheduler.onNOP()
+        if "air_temperatures" in msg:
+            self.air_temperatures = msg["air_temperatures"]
 
         self._events_to_send = []
 
@@ -432,7 +451,10 @@ class Batsim(object):
                 self.nb_res = event_data["nb_resources"]
                 self.batconf = event_data["config"]
                 self.time_sharing = event_data["allow_time_sharing"]
-                self.handle_dynamic_notify = self.batconf["job_submission"]["from_scheduler"]["enabled"]
+                self.dynamic_job_submission_enabled = self.batconf["job_submission"]["from_scheduler"]["enabled"]
+
+                if self.dynamic_job_submission_enabled:
+                    self.logger.warning("Dynamic submission of jobs is ENABLED. The scheduler must send a NOTIFY event of type 'submission_finished' to let Batsim end the simulation.")
 
                 self.redis_enabled = self.batconf["redis"]["enabled"]
                 redis_hostname = self.batconf["redis"]["hostname"]
@@ -527,28 +549,26 @@ class Batsim(object):
                     self.scheduler.onMachinePStateChanged(
                         nodeInterval, event_data["state"])
             elif event_type == "ANSWER":
-                consumed_energy = event_data["consumed_energy"]
-                self.scheduler.onReportEnergyConsumed(consumed_energy)
+                if "consumed_energy" in event_data:
+                    consumed_energy = event_data["consumed_energy"]
+                    self.scheduler.onReportEnergyConsumed(consumed_energy)
+                elif "processor_temperature_all" in event_data:
+                    proc_temperature_all = event_data["processor_temperature_all"]
+                    self.scheduler.onAnswerProcessorTemperatureAll(proc_temperature_all)
+                elif "air_temperature_all" in event_data:
+                    air_temperature_all = event_data["air_temperature_all"]
+                    self.scheduler.onAnswerAirTemperatureAll(air_temperature_all)
+              
             elif event_type == 'REQUESTED_CALL':
-                self.scheduler.onNOP()
-                # TODO: separate NOP / REQUESTED_CALL (here and in the algos)
+                self.scheduler.onRequestedCall()
             elif event_type == 'ADD_RESOURCES':
                 self.scheduler.onAddResources(event_data["resources"])
             elif event_type == 'REMOVE_RESOURCES':
                 self.scheduler.onRemoveResources(event_data["resources"])
             else:
-                raise Exception("Unknow event type {}".format(event_type))
+                raise Exception("Unknown event type {}".format(event_type))
 
         self.scheduler.onNoMoreEvents()
-
-        if self.handle_dynamic_notify and not finished_received:
-            if (self.nb_jobs_completed == self.nb_jobs_received != 0):
-                # All the received and submited jobs are completed or killed
-                self.notify_submission_finished()
-            else:
-                #self.notify_submission_continue()
-                # Some jobs just have been dynamically submitted
-                self.has_dynamic_job_submissions = False
 
         if len(self._events_to_send) > 0:
             # sort msgs by timestamp
@@ -566,8 +586,6 @@ class Batsim(object):
         if finished_received:
             self.network.close()
             self.event_publisher.close()
-            if self.handle_dynamic_notify:
-                self.notify_submission_finished()
 
         return not finished_received
 
@@ -702,9 +720,6 @@ class BatsimScheduler(object):
         raise ValueError(
             "[PYBATSIM]: Batsim is not responding (maybe deadlocked)")
 
-    def onNOP(self):
-        raise NotImplementedError()
-
     def onJobSubmission(self, job):
         raise NotImplementedError()
 
@@ -723,10 +738,19 @@ class BatsimScheduler(object):
     def onReportEnergyConsumed(self, consumed_energy):
         raise NotImplementedError()
 
+    def onAnswerProcessorTemperatureAll(self, proc_temperature_all):
+        raise NotImplementedError()
+
+    def onAnswerAirTemperatureAll(self, air_temperature_all):
+        raise NotImplementedError()
+
     def onAddResources(self, to_add):
         raise NotImplementedError()
 
     def onRemoveResources(self, to_remove):
+        raise NotImplementedError()
+
+    def onRequestedCall(self):
         raise NotImplementedError()
 
     def onNoMoreEvents(self):

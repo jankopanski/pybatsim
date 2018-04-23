@@ -38,9 +38,6 @@ class ValidatingMachine(BatsimScheduler):
     def onSimulationEnds(self):
         self.scheduler.onSimulationEnds()
 
-    def onNOP(self):
-        self.scheduler.onNOP()
-
     def onDeadlock(self):
         self.scheduler.onDeadlock()
 
@@ -65,6 +62,9 @@ class ValidatingMachine(BatsimScheduler):
 
     def onReportEnergyConsumed(self, consumed_energy):
         self.scheduler.onReportEnergyConsumed(consumed_energy)
+
+    def onRequestedCall(self):
+        self.scheduler.onRequestedCall()
 
     def start_jobs_continuous(self, allocs):
         for (job, (first_res, last_res)) in allocs:
