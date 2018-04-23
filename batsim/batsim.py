@@ -258,8 +258,7 @@ class Batsim(object):
             msg["data"]["profile"] = profile
 
         self._events_to_send.append(msg)
-        if not self.ack_dynamic_notify:
-            self.nb_jobs_submitted += 1
+        self.nb_jobs_submitted += 1
 
         # Create the job here
         self.jobs[id] = Job.from_json_dict(job_dict, profile_dict=profile)
@@ -457,11 +456,10 @@ class Batsim(object):
                 self.nb_res = event_data["nb_resources"]
                 self.batconf = event_data["config"]
                 self.time_sharing = event_data["allow_time_sharing"]
-                self.handle_dynamic_notify = self.batconf["job_submission"]["from_scheduler"]["enabled"]
-                self.ack_dynamic_notify = self.batconf["job_submission"]["from_scheduler"]["acknowledge"]
+                self.dynamic_job_submission_enabled = self.batconf["job_submission"]["from_scheduler"]["enabled"]
 
-                if self.handle_dynamic_notify:
-                    print("Dynamic notification of jobs is ENABLED. The scheduler must send a NOTIFY event of type 'submission_finished' to let Batsim end the simulation.")
+                if self.dynamic_job_submission_enabled:
+                    self.logger.warning("Dynamic submission of jobs is ENABLED. The scheduler must send a NOTIFY event of type 'submission_finished' to let Batsim end the simulation.")
 
                 self.redis_enabled = self.batconf["redis"]["enabled"]
                 redis_hostname = self.batconf["redis"]["hostname"]
@@ -593,8 +591,6 @@ class Batsim(object):
         if finished_received:
             self.network.close()
             self.event_publisher.close()
-            #if self.handle_dynamic_notify:
-            #    self.notify_submission_finished()
 
         return not finished_received
 
