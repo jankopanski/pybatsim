@@ -165,7 +165,7 @@ def run_workload_script(options, verbose):
         if is_executable(script):
             return do_run_script(["./" + script] + args)
         elif script.endswith(".py"):
-            return do_run_script(["python", script] + args)
+            return do_run_script(["python3", script] + args)
         else:
             raise ValueError(
                 "Workload script {} is not executable but also does not seem to be a python script.".format(script))
@@ -232,11 +232,11 @@ def prepare_scheduler_cl(options, verbose):
     sched_cl = []
     if 'interpreter' in options["scheduler"]:
         if options["scheduler"]["interpreter"] == "coverage":
-            interpreter = ["python", "-m", "coverage", "run", "-a"]
+            interpreter = ["python3", "-m", "coverage", "run", "-a"]
         elif options["scheduler"]["interpreter"] == "pypy":
             interpreter = ["pypy", "-OOO"]
         elif options["scheduler"]["interpreter"] == "profile":
-            interpreter = ["python", "-m", "cProfile", "-o", "simul.cprof"]
+            interpreter = ["python3", "-m", "cProfile", "-o", "simul.cprof"]
         else:
             assert False, "Unknown interpreter"
         sched_cl += interpreter
