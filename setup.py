@@ -19,7 +19,8 @@ requirements = [
 setup_requirements = [
     "coverage",
     "autopep8",
-    "ipdb"
+    "ipdb",
+    "docopt"
 ]
 
 
