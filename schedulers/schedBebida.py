@@ -57,8 +57,81 @@ def generate_pfs_io_profile(profile_dict, job_alloc, io_alloc, pfs_id):
                 # Reads to pfs
                 comm_matrix.append(bytes_to_read)
             elif machine_id_col == pfs_id:
-                # Reads to pfs
+                # Writes to pfs
                 comm_matrix.append(bytes_to_write)
+
+    io_profile = {
+        "type": "msg_par",
+        "cpu": [0] * len(io_alloc),
+        "com": comm_matrix
+    }
+    return io_profile
+
+
+def nth(iterable, n):
+    return next(islice(iterable, n, None))
+
+
+def index_of(alloc, host_id):
+    """ Return the index of the given host id in the given alloc """
+    for index, host in enumerate(alloc):
+        if host == host_id:
+            return index
+    raise ("Host id not found in the allocation")
+
+
+def generate_dfs_io_profile(profile_dict, job_alloc, io_alloc,
+        block_location_list, block_size, replication_factor=3):
+    """
+    Every element of the block_location_list is a host that detain a block to
+    read.
+    """
+    # Generates blocks read list from block location: Manage the case where
+    # dataset input size is different from the IO reads due to partial reads of
+    # the dataset
+    nb_blocks_to_read = (profile_dict["io_reads"] / block_size) + 1
+    if nb_blocks_to_read == len(block_location_list):
+        blocks_to_read_list = block_location_list
+    elif nb_blocks_to_read < block_location_list:
+        # Get a shuffle list to mix local and remote
+        blocks_to_read_list = random.sample(block_location_list, nb_blocks_to_read)
+    else:
+        assert False, ("This stage is reading more data than the size of the "
+                       "input dataset!")
+
+    comm_matrix = [0] * len(io_alloc) * len(io_alloc)
+
+    # FIXME this is not reading locally but inside the job allocation => need a
+    # host / disk mapping
+    #
+    # Fill in reads in the matrix
+    host_that_read_index = 0
+    for block_loc in blocks_to_read_list:
+        col = nth(job_alloc, host_that_read_index)
+        row = index_of(io_alloc, block_loc)
+        comm_matrix[(row * len(io_alloc)) + col] += block_size
+
+        # Round robin trough the hosts
+        host_that_read_index = (host_that_read_index + 1) % len(job_alloc)
+
+    # TODO Generates writes block list
+    nb_blocks_to_write = (profile_dict["io_writes"] / block_size) + 1
+
+    # Fill in writes in the matrix
+    host_that_write_index = 0
+    for _ in range(nb_blocks_to_write):
+        col = index_of(io_alloc,
+                get_local_disk_host_id(nth(job_alloc, host_that_write_index)))
+        row = host_that_write_index
+
+        # fill the matrix
+        comm_matrix[(row * len(io_alloc)) + col] += block_size
+
+        # TODO manage the replication
+        # (local -> racklocal_i) + (racklocal_i -> other_i)^N-2
+
+        # Round robin trough the hosts
+        host_that_write_index = (host_that_write_index + 1) % len(job_alloc)
 
     io_profile = {
         "type": "msg_par",
@@ -156,6 +229,37 @@ class SchedBebida(BatsimScheduler):
         elif self.variant == "dfs":
             self.disks = ProcSet(*[res_id for res_id in self.bs.storage.keys()])
             # TODO check if all the nodes have a storage attached
+
+            # size of the DFS block
+            if "dfs_block_size_in_MB" not in self.options:
+                self.block_size_in_MB = 64
+            else:
+                self.block_size_in_MB = self.options["block_size_in_MB"]
+            self.logger.info("Block size in MB for the DFS: {}".format(
+                self.block_size_in_MB))
+
+            ## Locality default values are taken from Bebida experiments
+            ## observed locality. For more details See:
+            ## https://gitlab.inria.fr/mmercier/bebida/blob/master/experiments/run_bebida/bebida_results_analysis.ipynb
+
+            # Level of locality
+            if "node_locality_in_percent" not in self.options:
+                self.node_locality_in_percent = 70
+            else:
+                self.node_locality_in_percent = self.options["node_locality_in_percent"]
+
+            # Level of locality variation (uniform)
+            if "node_locality_variation_in_percent" not in self.options:
+                self.node_locality_variation_in_percent = 10
+            else:
+                self.node_locality_variation_in_percent = self.options["node_locality_variation_in_percent"]
+
+            self.logger.info("Node locality is set to: {}% +- {}%".format(
+                self.node_locality_in_percent,
+                self.node_locality_variation_in_percent))
+
+            # Fix the seed to have reproducible DFS behavior
+            random.seed(0)
 
         assert self.bs.batconf["job_submission"]["forward_profiles"] == True, (
                 "Forward profile is mandatory for resubmit to work")
@@ -405,8 +509,71 @@ class SchedBebida(BatsimScheduler):
                 io_jobs[job.id] = io_job
 
             if self.variant == "dfs":
-                # TODO Implement DFS model here...
-                pass
+                # Get input size and split by block size
+                nb_blocks_to_read = ((profile_dict["input_size_in_GB"] * 1024)  /
+                        self.block_size_in_MB) + 1
+
+                # Allocate resources
+                self.allocate_first_fit_in_best_effort(job)
+                to_execute.append(job)
+
+                # randomly pick some nodes where the blocks are while taking
+                # into account locality percentage
+                job_locality = self.node_locality_in_percent + random.uniform(
+                        - self.node_locality_variation_in_percent,
+                        self.node_locality_variation_in_percent)
+
+                nb_blocks_to_read_local = nb_blocks_to_read * job_locality / 100
+                nb_blocks_to_read_remote = nb_blocks_to_read - nb_blocks_to_read_local
+
+                block_location_list = random.shuffle([
+                        random.choice(job.allocation) for _
+                        in range(nb_blocks_to_read_local)] + [
+                        random.choice(self.bs.resources.keys()) for _
+                        in range(nb_blocks_to_read_remote)])
+
+                io_alloc = job.allocation | ProcSet(*block_location_list)
+
+                # Manage Sequence job
+                if job.profile_dict["type"] == "composed":
+                    # TODO split IO quantity between stages
+                    io_profiles = {}
+                    # Generate profile sequence
+                    for profile_name in job.profile_dict["seq"]:
+                        profile = self.bs.profiles[job.workload][profile_name]
+                        io_profiles[profile_name + "_io"] = generate_dfs_io_profile(
+                                profile,
+                                job.allocation,
+                                io_alloc,
+                                block_location_list,
+                                self.block_size)
+                    # submit these profiles
+                    self.bs.submit_profiles(job.workload, io_profiles)
+
+                    # Create io job
+                    io_job = {
+                      "alloc": str(alloc),
+                      "profile_name": job.id + "_io",
+                      "profile": {
+                        "type": "composed",
+                        "seq": list(io_profiles.keys())
+                      }
+                    }
+
+                else:
+                    io_job = {
+                      "alloc": str(alloc),
+                      "profile_name": job.id + "_io",
+                      "profile": generate_dfs_io_profile(
+                                job.profile_dict,
+                                job.allocation,
+                                io_alloc,
+                                block_location_list,
+                                self.block_size)
+                    }
+
+                io_jobs[job.id] = io_job
+
 
         self.bs.execute_jobs(to_execute, io_jobs)
         for job in to_execute:
