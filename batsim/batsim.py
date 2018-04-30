@@ -449,6 +449,11 @@ class Batsim(object):
                 assert not self.running_simulation, "A simulation is already running (is more than one instance of Batsim active?!)"
                 self.running_simulation = True
                 self.nb_res = event_data["nb_resources"]
+                self.nb_cres = event_data["nb_compute_resources"]
+                self.nb_sres = event_data["nb_storage_resources"]
+                self.cres = event_data["compute_resources"]
+                self.sres = event_data["storage_resources"]
+                self.machines = {"compute": self.cres, "storage": self.sres}
                 self.batconf = event_data["config"]
                 self.time_sharing = event_data["allow_time_sharing"]
                 self.dynamic_job_submission_enabled = self.batconf["job_submission"]["from_scheduler"]["enabled"]
@@ -479,8 +484,6 @@ class Batsim(object):
 
                 self.workloads = event_data["workloads"]
 
-                self.hpst = event_data.get("hpst_host", None)
-                self.lcst = event_data.get("lcst_host", None)
                 self.scheduler.onSimulationBegins()
 
             elif event_type == "SIMULATION_ENDS":

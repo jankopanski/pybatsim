@@ -271,26 +271,14 @@ class Scheduler(metaclass=ABCMeta):
         return self._events
 
     @property
+    def machines(self):
+        """The registered machines in Batsim."""
+        return self._machines
+
+    @property
     def dynamic_workload(self):
         """The workload of dynamic job submissions of this scheduler."""
         return self._dynamic_workload
-
-    @property
-    def hpst(self):
-        """The hpst (high-performance storage tier) host managed by Batsim."""
-        return self._hpst
-
-    @property
-    def lcst(self):
-        """The lcst (large-capacity storage tier) host managed by Batsim."""
-        return self._lcst
-
-    @property
-    def pfs(self):
-        """The pfs (parallel file system) host managed by Batsim. This is an alias
-        to the host of the large-capacity storage tier.
-        """
-        return self.lcst
 
     @property
     def options(self):
@@ -459,8 +447,7 @@ class Scheduler(metaclass=ABCMeta):
                 self.resources),
             type="resources_registered")
 
-        self._hpst = DictWrapper(self._batsim.hpst)
-        self._lcst = DictWrapper(self._batsim.lcst)
+        self._machines = DictWrapper(self._batsim.machines)
 
     def on_init(self):
         """The init method called during the start-up phase of the scheduler."""

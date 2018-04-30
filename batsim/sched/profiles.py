@@ -296,39 +296,30 @@ class Profiles(metaclass=ABCMeta):
     class ParallelPFS(Profile):
         """Implementation of the MsgParallelHomogeneousPFSMultipleTiers profile."""
 
-        type = "msg_par_hg_pfs_tiers"
+        type = "msg_par_hg_pfs"
 
-        class Direction(Enum):
-            TO_STORAGE = 1
-            FROM_STORAGE = 2
-
-        class Host(Enum):
-            HPST = 1
-            LCST = 2
-
-        def __init__(self, size,
-                     direction=Direction.TO_STORAGE,
-                     host=Host.LCST,
+        def __init__(self, size_read, size_write,
+                     storage="pfs",
                      **kwargs):
             super().__init__(**kwargs)
-            self.size = size
-            self.direction = direction
-            self.host = host
+            self.size_read = size_read
+            self.size_write = size_write
+            self.storage = storage
 
         @classmethod
         def from_dict(cls, dct, name=None):
-            return cls(size=dct["size"],
-                       direction=cls.Direction[dct["direction"].upper()],
-                       host=cls.Host[dct["host"].upper()],
+            return cls(size_read=dct["bytes_to_read"],
+                       size_write=dct["bytes_to_write"],
+                       storage=dct["storage"],
                        ret=dct.get("ret", 0),
                        name=name)
 
         def to_dict(self, embed_references=False):
             return {
                 "type": self.type,
-                "size": self.size,
-                "direction": self.direction.name.lower(),
-                "host": self.host.name,
+                "bytes_to_read": self.size_read,
+                "bytes_to_write_write": self.size_write,
+                "storage": self.storage,
                 "ret": self.ret,
             }
 
