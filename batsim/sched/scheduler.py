@@ -203,7 +203,7 @@ class BaseBatsimScheduler(BatsimScheduler):
             type="remove_resources_received")
         self._scheduler.on_remove_resources(resources)
 
-    def onRequestedCall(self)
+    def onRequestedCall(self):
         self._scheduler._update_time()
         self._scheduler.info(
             "Received Requested Call message",
