@@ -37,6 +37,9 @@ from batsim.batsim import BatsimScheduler, Job
 from procset import ProcSet, ProcInt
 import logging
 import copy
+import random
+import math
+from itertools import islice
 
 def sort_by_id(jobs):
     return sorted(jobs, key=lambda j: int(j.id.split('!')[1].split('#')[0]))
@@ -72,6 +75,19 @@ def nth(iterable, n):
     return next(islice(iterable, n, None))
 
 
+def get_local_disk(host_id, compute_resources, storage_resources):
+    """
+    WARNING: The local disk resource name MUST be prefixed by the host
+    resource name
+    TODO: do a static map
+    """
+    for res_id, compute in compute_resources.items():
+        if res_id == host_id:
+            for storage_id, storage in storage_resources.items():
+                if compute["name"] in storage["name"]:
+                    return storage_id
+    raise("Local storage associated to host {} was not found")
+
 def index_of(alloc, host_id):
     """ Return the index of the given host id in the given alloc """
     for index, host in enumerate(alloc):
@@ -80,24 +96,27 @@ def index_of(alloc, host_id):
     raise ("Host id not found in the allocation")
 
 
-def generate_dfs_io_profile(profile_dict, job_alloc, io_alloc,
-        block_location_list, block_size, replication_factor=3):
+def generate_dfs_io_profile(
+        profile_dict,
+        job_alloc,
+        io_alloc,
+        remote_block_location_list,
+        block_size,
+        locality,
+        compute_resources,
+        storage_resources,
+        replication_factor=3):
     """
-    Every element of the block_location_list is a host that detain a block to
+    Every element of the remote_block_location_list is a host that detain a block to
     read.
     """
     # Generates blocks read list from block location: Manage the case where
     # dataset input size is different from the IO reads due to partial reads of
     # the dataset
-    nb_blocks_to_read = (profile_dict["io_reads"] / block_size) + 1
-    if nb_blocks_to_read == len(block_location_list):
-        blocks_to_read_list = block_location_list
-    elif nb_blocks_to_read < block_location_list:
-        # Get a shuffle list to mix local and remote
-        blocks_to_read_list = random.sample(block_location_list, nb_blocks_to_read)
-    else:
-        assert False, ("This stage is reading more data than the size of the "
-                       "input dataset!")
+    nb_blocks_to_read = math.ceil(profile_dict["io_reads"] / block_size)
+
+    nb_blocks_to_read_local = math.ceil(nb_blocks_to_read * locality / 100)
+    nb_blocks_to_read_remote = nb_blocks_to_read - nb_blocks_to_read_local
 
     comm_matrix = [0] * len(io_alloc) * len(io_alloc)
 
@@ -106,29 +125,48 @@ def generate_dfs_io_profile(profile_dict, job_alloc, io_alloc,
     #
     # Fill in reads in the matrix
     host_that_read_index = 0
-    for block_loc in blocks_to_read_list:
-        col = nth(job_alloc, host_that_read_index)
-        row = index_of(io_alloc, block_loc)
+    for _ in range(nb_blocks_to_read):
+        col = host_that_read_index
+
+        if nb_blocks_to_read_local > 0:
+            row = index_of(io_alloc,
+                    get_local_disk(nth(job_alloc, host_that_read_index),
+                        compute_resources, storage_resources))
+            nb_blocks_to_read_local = nb_blocks_to_read_local - 1
+        else:
+            row = index_of(io_alloc,
+                    remote_block_location_list[nb_blocks_to_read_remote])
+            nb_blocks_to_read_remote = nb_blocks_to_read_remote - 1
+
         comm_matrix[(row * len(io_alloc)) + col] += block_size
 
         # Round robin trough the hosts
         host_that_read_index = (host_that_read_index + 1) % len(job_alloc)
 
-    # TODO Generates writes block list
+
+    # Generates writes block list
     nb_blocks_to_write = (profile_dict["io_writes"] / block_size) + 1
 
     # Fill in writes in the matrix
     host_that_write_index = 0
     for _ in range(nb_blocks_to_write):
         col = index_of(io_alloc,
-                get_local_disk_host_id(nth(job_alloc, host_that_write_index)))
+                get_local_disk(nth(job_alloc, host_that_write_index),
+                        compute_resources, storage_resources))
         row = host_that_write_index
 
         # fill the matrix
         comm_matrix[(row * len(io_alloc)) + col] += block_size
 
-        # TODO manage the replication
+        # manage the replication
         # (local -> racklocal_i) + (racklocal_i -> other_i)^N-2
+        for _ in range(replication_factor):
+            col = row
+            # WARNING: disks for replica writes are randomly pick in io_alloc
+            # not on the whole cluster
+            # NOTE: We can also manage write location here (under HPC node or
+            # not)
+            row = random.choice(io_alloc)
 
         # Round robin trough the hosts
         host_that_write_index = (host_that_write_index + 1) % len(job_alloc)
@@ -227,7 +265,8 @@ class SchedBebida(BatsimScheduler):
                     value["properties"]["role"] == "storage"][0]
 
         elif self.variant == "dfs":
-            self.disks = ProcSet(*[res_id for res_id in self.bs.storage.keys()])
+            self.disks = ProcSet(*[res_id for res_id in
+                self.bs.storage_resources.keys()])
             # TODO check if all the nodes have a storage attached
 
             # size of the DFS block
@@ -508,10 +547,10 @@ class SchedBebida(BatsimScheduler):
 
                 io_jobs[job.id] = io_job
 
-            if self.variant == "dfs":
+            elif self.variant == "dfs":
                 # Get input size and split by block size
-                nb_blocks_to_read = ((profile_dict["input_size_in_GB"] * 1024)  /
-                        self.block_size_in_MB) + 1
+                nb_blocks_to_read = math.ceil((job.profile_dict["input_size_in_GB"] * 1024)  /
+                        self.block_size_in_MB)
 
                 # Allocate resources
                 self.allocate_first_fit_in_best_effort(job)
@@ -523,16 +562,15 @@ class SchedBebida(BatsimScheduler):
                         - self.node_locality_variation_in_percent,
                         self.node_locality_variation_in_percent)
 
-                nb_blocks_to_read_local = nb_blocks_to_read * job_locality / 100
+                nb_blocks_to_read_local = math.ceil(nb_blocks_to_read *
+                        job_locality / 100)
                 nb_blocks_to_read_remote = nb_blocks_to_read - nb_blocks_to_read_local
 
-                block_location_list = random.shuffle([
-                        random.choice(job.allocation) for _
-                        in range(nb_blocks_to_read_local)] + [
-                        random.choice(self.bs.resources.keys()) for _
-                        in range(nb_blocks_to_read_remote)])
+                remote_block_location_list = [
+                        random.choice(list(self.bs.storage_resources.keys())) for _
+                        in range(nb_blocks_to_read_remote)]
 
-                io_alloc = job.allocation | ProcSet(*block_location_list)
+                io_alloc = job.allocation | ProcSet(*remote_block_location_list)
 
                 # Manage Sequence job
                 if job.profile_dict["type"] == "composed":
@@ -545,8 +583,11 @@ class SchedBebida(BatsimScheduler):
                                 profile,
                                 job.allocation,
                                 io_alloc,
-                                block_location_list,
-                                self.block_size)
+                                remote_block_location_list,
+                                self.block_size_in_MB,
+                                job_locality,
+                                self.bs.resources,
+                                self.bs.storage_resources)
                     # submit these profiles
                     self.bs.submit_profiles(job.workload, io_profiles)
 
@@ -568,8 +609,12 @@ class SchedBebida(BatsimScheduler):
                                 job.profile_dict,
                                 job.allocation,
                                 io_alloc,
-                                block_location_list,
-                                self.block_size)
+                                nb_blocks_to_read_local,
+                                remote_block_location_list,
+                                self.block_size_in_MB,
+                                job_locality,
+                                self.bs.resources,
+                                self.bs.storage_resources)
                     }
 
                 io_jobs[job.id] = io_job
