@@ -448,12 +448,12 @@ class Batsim(object):
             if event_type == "SIMULATION_BEGINS":
                 assert not self.running_simulation, "A simulation is already running (is more than one instance of Batsim active?!)"
                 self.running_simulation = True
-                self.nb_res = event_data["nb_resources"]
-                self.nb_cres = event_data["nb_compute_resources"]
-                self.nb_sres = event_data["nb_storage_resources"]
-                self.cres = event_data["compute_resources"]
-                self.sres = event_data["storage_resources"]
-                self.machines = {"compute": self.cres, "storage": self.sres}
+                self.nb_ressources = event_data["nb_resources"]
+                self.nb_compute_resources = event_data["nb_compute_resources"]
+                self.nb_storage_resources = event_data["nb_storage_resources"]
+                compute_resources = event_data["compute_resources"]
+                storage_resources = event_data["storage_resources"]
+                self.machines = {"compute": compute_resources, "storage": storage_resources}
                 self.batconf = event_data["config"]
                 self.time_sharing = event_data["allow_time_sharing"]
                 self.dynamic_job_submission_enabled = self.batconf["job_submission"]["from_scheduler"]["enabled"]
@@ -477,7 +477,7 @@ class Batsim(object):
                     res_key = "compute_resources"
                 self.resources = {
                         res["id"]: res for res in event_data[res_key]}
-                self.storage = {
+                self.storage_resources = {
                         res["id"]: res for res in event_data["storage_resources"]}
 
                 self.profiles = event_data["profiles"]
