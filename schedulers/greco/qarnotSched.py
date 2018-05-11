@@ -16,7 +16,7 @@ class QarnotSched(BatsimScheduler):
 
     def onAfterBatsimInit(self):
         self.openJobs = []
-        self.nbResources = self.bs.nb_res
+        self.nbResources = self.bs.nb_resources
         self.idle = True
         
     def scheduleJobs(self):

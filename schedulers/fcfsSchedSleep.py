@@ -56,13 +56,13 @@ class FcfsSchedSleep(BatsimScheduler):
         self.open_jobs = []
 
         self.computing_machines = SortedSet()
-        self.idle_machines = SortedSet(range(self.bs.nb_res))
+        self.idle_machines = SortedSet(range(self.bs.nb_resources))
         self.sleeping_machines = SortedSet()
         self.switching_ON_machines = SortedSet()
         self.switching_OFF_machines = SortedSet()
 
         self.machines_states = {
-            int(i): State.Idle.value for i in range(self.bs.nb_res)}
+            int(i): State.Idle.value for i in range(self.bs.nb_resources)}
         print("machines_states", self.machines_states)
 
     def scheduleJobs(self):
@@ -85,7 +85,7 @@ class FcfsSchedSleep(BatsimScheduler):
             job = self.open_jobs[0]
             nb_res_req = job.requested_resources
 
-            if nb_res_req > self.bs.nb_res:  # Job too big -> rejection
+            if nb_res_req > self.bs.nb_resources:  # Job too big -> rejection
                 sys.exit("Rejection unimplemented")
 
             # Job fits now -> allocation
@@ -102,7 +102,7 @@ class FcfsSchedSleep(BatsimScheduler):
             else:  # Job can fit on the machine, but not now
                 loop = False
                 print("############ Job does not fit now ############")
-                nb_not_computing_machines = self.bs.nb_res - \
+                nb_not_computing_machines = self.bs.nb_resources - \
                     len(self.computing_machines)
                 print("nb_res_req = ", nb_res_req)
                 print("nb_not_computing_machines = ",

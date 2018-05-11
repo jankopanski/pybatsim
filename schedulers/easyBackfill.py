@@ -243,7 +243,7 @@ class EasyBackfill(BatsimScheduler):
         self.options = options
 
     def onAfterBatsimInit(self):
-        self.listFreeSpace = FreeSpaceContainer(self.bs.nb_res)
+        self.listFreeSpace = FreeSpaceContainer(self.bs.nb_resources)
 
         self.listRunningJob = SortedListWithKey(
             key=lambda job: job.estimate_finish_time)
@@ -455,6 +455,6 @@ class EasyBackfill(BatsimScheduler):
     def assert_listFreeSpace_listRunningJob(self):
         len_fp = sum(l.res for l in self.listFreeSpace.generator())
         len_rj = sum(j.requested_resources for j in self.listRunningJob)
-        assert len_fp + len_rj == self.bs.nb_res, "INCOHERENT freespaces:" + \
+        assert len_fp + len_rj == self.bs.nb_resources, "INCOHERENT freespaces:" + \
             str(len_fp) + " jobs:" + str(len_rj) + \
-            " tot:" + str(self.bs.nb_res)
+            " tot:" + str(self.bs.nb_resources)

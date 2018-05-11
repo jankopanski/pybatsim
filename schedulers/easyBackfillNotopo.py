@@ -13,14 +13,14 @@ class EasyBackfillNotopo(BatsimScheduler):
         self.options = options
 
     def onAfterBatsimInit(self):
-        self.cpu_snapshot = CpuSnapshot(self.bs.nb_res, False)
+        self.cpu_snapshot = CpuSnapshot(self.bs.nb_resources, False)
         self.unscheduled_jobs = []
 
         self.jobs_res = {}
 
         self.sched_delay = 5.0
 
-        self.availableResources = SortedSet(range(self.bs.nb_res))
+        self.availableResources = SortedSet(range(self.bs.nb_resources))
         self.previousAllocations = dict()
 
     def onJobSubmission(self, just_submitted_job):

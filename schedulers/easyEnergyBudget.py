@@ -65,7 +65,7 @@ class EasyEnergyBudget(EasyBackfill):
 
         if self.opportunist_shutdown:
             self.nodes_states = IntervalOfStates(
-                0, self.bs.nb_res - 1, State.SwitchedON)
+                0, self.bs.nb_resources - 1, State.SwitchedON)
             for i in State:
                 for j in State:
                     self.nodes_states.registerCallback(
@@ -193,7 +193,7 @@ class EasyEnergyBudget(EasyBackfill):
         free_procs = float(listFreeSpace.free_processors - addUsedProc)
         assert free_procs >= 0.0, str(
             addUsedProc) + " / " + str(listFreeSpace.free_processors)
-        used_procs = float(self.bs.nb_res - free_procs)
+        used_procs = float(self.bs.nb_resources - free_procs)
         assert used_procs >= 0.0
 
         power = used_procs * self.power_compute + free_procs * self.power_idle
@@ -331,7 +331,7 @@ class EasyEnergyBudget(EasyBackfill):
         # the job if it end just before budget_end
         start_job_before_end_budget = self.budget_end - job.requested_time
         power_idle_save = self.powercap - \
-            float(self.bs.nb_res) * self.power_idle
+            float(self.bs.nb_resources) * self.power_idle
 
         can_start = True
         if start_job_before_end_budget < previous_current_time:

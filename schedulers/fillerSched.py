@@ -21,7 +21,7 @@ class FillerSched(BatsimScheduler):
         self.sched_delay = 0.005
 
         self.openJobs = set()
-        self.availableResources = SortedSet(range(self.bs.nb_res))
+        self.availableResources = SortedSet(range(self.bs.nb_resources))
         self.previousAllocations = dict()
 
 

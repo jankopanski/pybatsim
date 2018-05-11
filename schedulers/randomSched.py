@@ -9,7 +9,7 @@ class RandomSched(BatsimScheduler):
         self.options = options
 
     def onAfterBatsimInit(self):
-        self.res = [x for x in range(self.bs.nb_res)]
+        self.res = [x for x in range(self.bs.nb_resources)]
         self.jobs_res = {}
         self.openJobs = set()
         self.sched_delay = 0

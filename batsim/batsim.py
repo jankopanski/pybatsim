@@ -448,7 +448,7 @@ class Batsim(object):
             if event_type == "SIMULATION_BEGINS":
                 assert not self.running_simulation, "A simulation is already running (is more than one instance of Batsim active?!)"
                 self.running_simulation = True
-                self.nb_ressources = event_data["nb_resources"]
+                self.nb_resources = event_data["nb_resources"]
                 self.nb_compute_resources = event_data["nb_compute_resources"]
                 self.nb_storage_resources = event_data["nb_storage_resources"]
                 compute_resources = event_data["compute_resources"]

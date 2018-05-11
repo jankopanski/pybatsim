@@ -21,7 +21,7 @@ class ClemSched(BatsimScheduler):
     def onSimulationBegins(self):
 
         self.openJobs = []
-        self.nbResources = self.bs.nb_res
+        self.nbResources = self.bs.nb_resources
         self.idle = True
 
         self.bs.wake_me_up_at(4000)
