@@ -437,6 +437,8 @@ class Batsim(object):
 
         if "air_temperatures" in msg:
             self.air_temperatures = msg["air_temperatures"]
+        if "processor_temperatures" in msg:
+            self.proc_temperatures = msg["processor_temperatures"]
 
         self._events_to_send = []
 
