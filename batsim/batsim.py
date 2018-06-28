@@ -444,6 +444,8 @@ class Batsim(object):
 
         finished_received = False
 
+        self.scheduler.onBeforeEvents()
+
         for event in msg["events"]:
             event_type = event["type"]
             event_data = event.get("data", {})
@@ -757,6 +759,9 @@ class BatsimScheduler(object):
 
     def onRequestedCall(self):
         raise NotImplementedError()
+
+    def onBeforeEvents(self):
+        pass
 
     def onNoMoreEvents(self):
         pass
