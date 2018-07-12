@@ -346,6 +346,11 @@ class SchedBebida(BatsimScheduler):
                                ))
         self.logger.debug("\nJOBS: \n{}".format(self.bs.jobs))
 
+        if (self.bs.nb_jobs_scheduled == self.bs.nb_jobs_completed
+                and self.bs.nb_jobs_received > 0
+                and len(self.submitted_jobs()) == len(self.running_jobs()) == 0):
+            self.bs.notify_submission_finished()
+
     def onRemoveResources(self, resources):
         self.available_resources = self.available_resources - ProcSet.from_str(resources)
 
