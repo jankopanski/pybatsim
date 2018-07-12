@@ -561,7 +561,6 @@ class Batsim(object):
                 elif "air_temperature_all" in event_data:
                     air_temperature_all = event_data["air_temperature_all"]
                     self.scheduler.onAnswerAirTemperatureAll(air_temperature_all)
-              
             elif event_type == 'REQUESTED_CALL':
                 self.scheduler.onRequestedCall()
             elif event_type == 'ADD_RESOURCES':
