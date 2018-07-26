@@ -53,6 +53,7 @@ class QBoxSched(BatsimScheduler):
         pass
 
     def onJobSubmission(self, job):
+        print("+++ QBox temp diff", self.temperatureDiffs)
         (index, heating) = self.getMaxHeating()
 
         if index == -1: #No QRads needs heating, reject the job. (TODO in the future the job will be added in a waiting queue)

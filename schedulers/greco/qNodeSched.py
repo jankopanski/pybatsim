@@ -69,7 +69,7 @@ class QNodeSched(BatsimScheduler):
 
 
     def onSimulationBegins(self):
-        #self.bs.logger.setLevel(logging.ERROR)
+        self.bs.logger.setLevel(logging.ERROR)
         self.received_begin = True
         for qb in self.dict_qboxes.values():
             qb.onSimulationBegins()
@@ -121,6 +121,7 @@ class QNodeSched(BatsimScheduler):
         # In the future, send the job to another qbox.
         del self.jobs_mapping[job.id]
         self.bs.reject_jobs([job])
+        #TODO KEEP THE JOB IN THE WAITING QUEUE, OR GIVE IT TO ANOTHER QRAD, but it cannot just be rejected to the user (aka Batsim here)
 
     # Internal function returning the QBox that needs most heating
     def getMaxHeatingReq(self):
@@ -136,6 +137,7 @@ class QNodeSched(BatsimScheduler):
 
     # Internal function that dispatches jobs in the waiting queue on QBoxes that needs most heating
     def tryAndSubmitJobs(self):
+        print("--- QNode heating requirements:", self.heat_requirements)
         flag = True
         while flag:
             (index, heating) = self.getMaxHeatingReq()
