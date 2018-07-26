@@ -267,7 +267,7 @@ class Batsim(object):
         return id
 
     def set_resource_state(self, resources, state):
-        """ args:resources: is a list of resource numbers or intervals as strings (e.g. "1-5").
+        """ args:resources: is a list of resource numbers or intervals as strings (e.g., "1-5").
             args:state: is a state identifier configured in the platform specification.
         """
 
@@ -279,6 +279,20 @@ class Batsim(object):
                     "state": str(state)
             }
         })
+
+    def set_outside_temperature(self, resources, temperature):
+        """ args:resources: is a list of resource numbers or intervals as strings (e.g., "1 3-5")
+            args:temperature: is the outside temperature to be set for all given resources
+        """
+        self._events_to_send.append({
+            "timestamp": self.time(),
+            "type": "SET_OUTSIDE_TEMPERATURE",
+            "data": {
+                    "resources": " ".join([str(r) for r in resources]),
+                    "temperature": temperature
+            }
+        })
+
 
     def start_jobs_interval_set_strings(self, jobs, res):
         """ args:res: is a jobID:interval_set_string dict """
