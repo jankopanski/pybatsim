@@ -585,6 +585,8 @@ class Batsim(object):
                 self.scheduler.onAddResources(event_data["resources"])
             elif event_type == 'REMOVE_RESOURCES':
                 self.scheduler.onRemoveResources(event_data["resources"])
+            elif event_type == "NO_MORE_STATIC_SUBMITTERS":
+                self.scheduler.onNoMoreJobsInWorkloads()
             else:
                 raise Exception("Unknown event type {}".format(event_type))
 
@@ -772,6 +774,9 @@ class BatsimScheduler(object):
 
     def onRequestedCall(self):
         raise NotImplementedError()
+
+    def onNoMoreJobsInWorkloads(self):
+        pass
 
     def onBeforeEvents(self):
         pass
