@@ -267,7 +267,7 @@ class Batsim(object):
         return id
 
     def set_resource_state(self, resources, state):
-        """ args:resources: is a list of resource numbers or intervals as strings (e.g. "1-5").
+        """ args:resources: is a list of resource numbers or intervals as strings (e.g., "1-5").
             args:state: is a state identifier configured in the platform specification.
         """
 
@@ -442,6 +442,8 @@ class Batsim(object):
 
         finished_received = False
 
+        self.scheduler.onBeforeEvents()
+
         for event in msg["events"]:
             event_type = event["type"]
             event_data = event.get("data", {})
@@ -567,6 +569,8 @@ class Batsim(object):
                 self.scheduler.onAddResources(event_data["resources"])
             elif event_type == 'REMOVE_RESOURCES':
                 self.scheduler.onRemoveResources(event_data["resources"])
+            elif event_type == "NO_MORE_STATIC_SUBMITTERS":
+                self.scheduler.onNoMoreJobsInWorkloads()
             else:
                 raise Exception("Unknown event type {}".format(event_type))
 
@@ -754,6 +758,12 @@ class BatsimScheduler(object):
 
     def onRequestedCall(self):
         raise NotImplementedError()
+
+    def onNoMoreJobsInWorkloads(self):
+        pass
+
+    def onBeforeEvents(self):
+        pass
 
     def onNoMoreEvents(self):
         pass
