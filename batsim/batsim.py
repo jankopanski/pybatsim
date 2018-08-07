@@ -585,8 +585,10 @@ class Batsim(object):
                 self.scheduler.onAddResources(event_data["resources"])
             elif event_type == 'REMOVE_RESOURCES':
                 self.scheduler.onRemoveResources(event_data["resources"])
-            elif event_type == "NO_MORE_STATIC_SUBMITTERS":
-                self.scheduler.onNoMoreJobsInWorkloads()
+            elif event_type == "NOTIFY":
+                notify_type = event_data["type"]
+                if notify_type == "no_more_static_job_to_submit":
+                    self.scheduler.onNoMoreJobsInWorkloads()
             else:
                 raise Exception("Unknown event type {}".format(event_type))
 
