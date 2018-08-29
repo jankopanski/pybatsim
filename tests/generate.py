@@ -416,7 +416,7 @@ def main(args):
     energy = False
     sched = False
 
-    workloads_basedir = "../../workload_profiles"
+    workloads_basedir = "../../workloads"
     platforms_basedir = "../../platforms"
     batsim_bin = None
     batsim_args = []
