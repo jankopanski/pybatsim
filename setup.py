@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import sys
 import subprocess
@@ -106,12 +106,19 @@ class FormatCommand(UserCommand):
             self.path)
 
 
+# To change the version, set it in this file:
+# ./batsim/__init__.py
+version = {}
+with open("./batsim/__init__.py") as fp:
+    exec(fp.read(), version)
+# later on we use: version['__version__']
+
 setup(
     name='pybatsim',
     author="Michael Mercier",
     author_email="michael.mercier@inria.fr",
-    version=2.0,
     url='https://gitlab.inria.fr/batsim/pybatsim',
+    version=version['__version__'],
     packages=find_packages(),
     install_requires=requirements,
     setup_requires=setup_requirements,
