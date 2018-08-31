@@ -3,6 +3,7 @@ from schedulers.intervalContainer import *
 import math
 
 from enum import Enum
+from procset import ProcInt
 
 
 class State(Enum):
@@ -187,7 +188,11 @@ class EasyEnergyBudget(EasyBackfill):
                 self.nodes_states.changeState(
                     s, e, State.WantingToStartJob, (self, (j, (s, e))))
         else:
-            self.bs.start_jobs_continuous(allocs)
+            jobs = []
+            for (job, (first_res, last_res)) in allocs:
+                job.allocation = ProcInt(first_res, last_res)
+                jobs.append(job)
+            self.bs.execute_jobs(jobs)
 
     def power_consumed(self, listFreeSpace, addUsedProc=0):
         free_procs = float(listFreeSpace.free_processors - addUsedProc)
@@ -520,7 +525,12 @@ def nodes_states_WantingToStartJob_SwitchedON(self, start, end, fromState, toSta
                 j, j.requested_time + j.start_time)
     for a in allocs_to_start:
         del self.waiting_allocs[a[0]]
-    self.bs.start_jobs_continuous(allocs_to_start)
+    jobs = []
+    for (job, (first_res, last_res)) in allocs_to_start:
+        job.allocation = ProcInt(first_res, last_res)
+        jobs.append(job)
+    self.bs.execute_jobs(jobs)
+
 
 
 def nodes_states_WantingToStartJob_SwitchedOFF(self, start, end, fromState, toState):

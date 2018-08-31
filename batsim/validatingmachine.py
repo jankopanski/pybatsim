@@ -1,5 +1,6 @@
 from batsim.batsim import BatsimScheduler
 from sortedcontainers import SortedSet
+from procset import ProcSet, ProcInt
 
 
 class ValidatingMachine(BatsimScheduler):
@@ -67,6 +68,7 @@ class ValidatingMachine(BatsimScheduler):
         self.scheduler.onRequestedCall()
 
     def start_jobs_continuous(self, allocs):
+        jobs = []
         for (job, (first_res, last_res)) in allocs:
             self.previousAllocations[job.id] = range(first_res, last_res + 1)
             try:
@@ -84,7 +86,10 @@ class ValidatingMachine(BatsimScheduler):
                         "Resource {} was not available (available: {})".format(
                             r, list(
                                 self.availableResources)))
-        self.bs_start_jobs_continuous(allocs)
+            job.allocation = ProcInt(first_res, last_res)
+            jobs.append(job)
+
+        self.bs.execute_jobs(jobs)
 
     def start_jobs(self, jobs, res):
         for j in jobs:
@@ -103,4 +108,5 @@ class ValidatingMachine(BatsimScheduler):
                         "Resource {} was not available (available: {})".format(
                             r, list(
                                 self.availableResources)))
-        self.bs_start_jobs(jobs, res)
+            job.allocation = ProcSet(*res[job.id])
+        self.bs.execute_jobs(jobs)

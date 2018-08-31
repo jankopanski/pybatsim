@@ -120,27 +120,7 @@ class Batsim(object):
             }
         })
 
-    def start_jobs_continuous(self, allocs):
-        """
-        allocs should have the following format:
-        [ (job, (first res, last res)), (job, (first res, last res)), ...]
-        """
-
-        if len(allocs) == 0:
-            return
-
-        for (job, (first_res, last_res)) in allocs:
-            self._events_to_send.append({
-                "timestamp": self.time(),
-                "type": "EXECUTE_JOB",
-                "data": {
-                        "job_id": job.id,
-                        "alloc": "{}-{}".format(first_res, last_res)
-                }
-            }
-            )
-            self.nb_jobs_scheduled += 1
-
+    ''' THIS FUNCTION IS DEPRECATED '''
     def start_jobs(self, jobs, res):
         """ args:res: is list of int (resources ids) """
         for job in jobs:

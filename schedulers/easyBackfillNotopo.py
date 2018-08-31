@@ -1,7 +1,7 @@
 from batsim.batsim import BatsimScheduler
 from schedulers.common_pyss_adaptator import CpuSnapshot
 from sortedcontainers import SortedSet
-
+from procset import ProcSet
 
 class EasyBackfillNotopo(BatsimScheduler):
     """
@@ -15,8 +15,6 @@ class EasyBackfillNotopo(BatsimScheduler):
     def onAfterBatsimInit(self):
         self.cpu_snapshot = CpuSnapshot(self.bs.nb_resources, False)
         self.unscheduled_jobs = []
-
-        self.jobs_res = {}
 
         self.sched_delay = 5.0
 
@@ -63,12 +61,12 @@ class EasyBackfillNotopo(BatsimScheduler):
             for job in scheduledJobs:
                 job.start_time = current_time  # just to be sure
                 res = self.availableResources[:job.requested_resources]
-                self.jobs_res[job.id] = res
+                job.allocation = ProcSet(*res)
                 self.previousAllocations[job.id] = res
                 for r in res:
                     self.availableResources.remove(r)
 
-            self.bs.start_jobs(scheduledJobs, self.jobs_res)
+            self.bs.execute_jobs(scheduledJobs)
 
     def _schedule_head_of_list(self, current_time):
         tosched = []
