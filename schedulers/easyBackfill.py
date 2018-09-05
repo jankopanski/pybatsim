@@ -6,7 +6,7 @@ This scheduler consider job as rectangle.
 from batsim.batsim import BatsimScheduler
 
 from sortedcontainers import SortedListWithKey
-from procset import ProcInt
+from procset import ProcSet
 
 
 INFINITY = float('inf')
@@ -286,7 +286,7 @@ class EasyBackfill(BatsimScheduler):
         if len(allocs) > 0:
             jobs = []
             for (job, (first_res, last_res)) in allocs:
-                job.allocation = ProcInt(first_res, last_res)
+                job.allocation = ProcSet((first_res, last_res))
                 jobs.append(job)
             self.bs.execute_jobs(jobs)
 

@@ -136,11 +136,11 @@ class Batsim(object):
             self.nb_jobs_scheduled += 1
 
     def execute_jobs(self, jobs, io_jobs=None):
-        """ args:jobs: list of jobs to execute (job.allocation MUST be set) """
+        """ args:jobs: list of jobs to execute 
+            job.allocation MUST be not None and should be a non-empty ProcSet"""
 
         for job in jobs:
             assert job.allocation is not None
-
             message = {
                 "timestamp": self.time(),
                 "type": "EXECUTE_JOB",

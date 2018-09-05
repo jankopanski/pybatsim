@@ -3,7 +3,7 @@ from schedulers.intervalContainer import *
 import math
 
 from enum import Enum
-from procset import ProcInt
+from procset import ProcSet
 
 
 class State(Enum):
@@ -190,7 +190,7 @@ class EasyEnergyBudget(EasyBackfill):
         else:
             jobs = []
             for (job, (first_res, last_res)) in allocs:
-                job.allocation = ProcInt(first_res, last_res)
+                job.allocation = ProcSet((first_res, last_res))
                 jobs.append(job)
             self.bs.execute_jobs(jobs)
 
@@ -527,7 +527,7 @@ def nodes_states_WantingToStartJob_SwitchedON(self, start, end, fromState, toSta
         del self.waiting_allocs[a[0]]
     jobs = []
     for (job, (first_res, last_res)) in allocs_to_start:
-        job.allocation = ProcInt(first_res, last_res)
+        job.allocation = ProcSet((first_res, last_res))
         jobs.append(job)
     self.bs.execute_jobs(jobs)
 

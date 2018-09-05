@@ -1,6 +1,6 @@
 from batsim.batsim import BatsimScheduler
 from sortedcontainers import SortedSet
-from procset import ProcSet, ProcInt
+from procset import ProcSet
 
 
 class ValidatingMachine(BatsimScheduler):
@@ -86,7 +86,7 @@ class ValidatingMachine(BatsimScheduler):
                         "Resource {} was not available (available: {})".format(
                             r, list(
                                 self.availableResources)))
-            job.allocation = ProcInt(first_res, last_res)
+            job.allocation = ProcSet((first_res, last_res))
             jobs.append(job)
 
         self.bs.execute_jobs(jobs)
