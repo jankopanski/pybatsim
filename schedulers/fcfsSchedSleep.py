@@ -20,6 +20,7 @@ from batsim.batsim import BatsimScheduler
 import sys
 from sortedcontainers import SortedSet
 from enum import Enum
+from procset import ProcSet
 
 
 class PState(Enum):
@@ -47,7 +48,6 @@ class FcfsSchedSleep(BatsimScheduler):
     def onAfterBatsimInit(self):
         self.nb_completed_jobs = 0
 
-        self.jobs_res = {}
         self.jobs_completed = []
         self.jobs_waiting = []
 
@@ -68,7 +68,6 @@ class FcfsSchedSleep(BatsimScheduler):
     def scheduleJobs(self):
         print('\n\n\n\n')
         print('open_jobs = ', self.open_jobs)
-        print('jobs_res = ', self.jobs_res)
 
         print('computingM = ', self.computing_machines)
         print('idleM = ', self.idle_machines)
@@ -90,8 +89,8 @@ class FcfsSchedSleep(BatsimScheduler):
 
             # Job fits now -> allocation
             elif nb_res_req <= len(self.idle_machines):
-                res = self.idle_machines[:nb_res_req]
-                self.jobs_res[job.id] = res
+                res = ProcSet(*self.idle_machines[:nb_res_req])
+                job.allocation = res
                 scheduled_jobs.append(job)
                 for r in res:  # Machines' states update
                     self.idle_machines.remove(r)
@@ -145,15 +144,16 @@ class FcfsSchedSleep(BatsimScheduler):
         self.bs.consume_time(self.sched_delay)
 
         # send to uds
-        self.bs.start_jobs(scheduled_jobs, self.jobs_res)
-        self.bs.change_pstates(pstates_to_change)
+        self.bs.execute_jobs(scheduled_jobs)
+        for (val, (r1,r2)) in pstates_to_change:
+            self.bs.set_resource_state([r1], val)
 
     def onJobSubmission(self, job):
         self.open_jobs.append(job)
         self.scheduleJobs()
 
     def onJobCompletion(self, job):
-        for res in self.jobs_res[job.id]:
+        for res in job.allocation:
             self.idle_machines.add(res)
             self.computing_machines.remove(res)
             self.machines_states[res] = State.Idle.value

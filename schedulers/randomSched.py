@@ -1,7 +1,7 @@
 from batsim.batsim import BatsimScheduler
 
 from random import sample
-
+from procset import ProcSet
 
 class RandomSched(BatsimScheduler):
 
@@ -17,11 +17,10 @@ class RandomSched(BatsimScheduler):
     def scheduleJobs(self):
         scheduledJobs = []
 
+        # Iterating over all open jobs
         for job in self.openJobs:
             res = sample(self.res, job.requested_resources)
-
-        # Iterating over all open jobs
-        for job in set(self.openJobs):
+            job.allocation = ProcSet(*res)
             self.jobs_res[job.id] = res
             scheduledJobs.append(job)
 
@@ -33,7 +32,7 @@ class RandomSched(BatsimScheduler):
 
         # send to uds
         if len(scheduledJobs) > 0:
-            self.bs.start_jobs(scheduledJobs, self.jobs_res)
+            self.bs.execute_jobs(scheduledJobs)
 
     def onJobSubmission(self, job):
         self.openJobs.add(job)
