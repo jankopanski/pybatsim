@@ -7,7 +7,7 @@ import os.path
 import json
 import copy
 
-
+'''
 def generate_energy(
         workloads_basedir,
         platforms_basedir,
@@ -94,7 +94,7 @@ def generate_energy(
         },
         "scheduler": copy.deepcopy(s)
     } for s in schedulers for w in workloads_to_use]
-
+'''
 
 def generate_basic(
         workloads_basedir,
@@ -151,7 +151,7 @@ def generate_sched_static(
         options):
     schedulers = []
 
-    schedulers += [
+    ''' Problems in parent_job status
         {
             "name_expe": "sched_delayProfilesAsTasks",
             "name": "schedDelayProfilesAsTasks",
@@ -159,8 +159,11 @@ def generate_sched_static(
             "protection": True,
             "interpreter": "coverage",
             "options": {
-            }
+            },
+            "dynamic": True
         },
+    '''
+    schedulers += [
         {
             "name_expe": "sched_fillerSched",
             "name": "schedFiller",
@@ -168,7 +171,8 @@ def generate_sched_static(
             "protection": True,
             "interpreter": "coverage",
             "options": {
-            }
+            },
+            "dynamic":False
         },
         {
             "name_expe": "sched_backfilling",
@@ -177,7 +181,8 @@ def generate_sched_static(
             "protection": True,
             "interpreter": "coverage",
             "options": {
-            }
+            },
+            "dynamic":False
         },
     ]
 
@@ -208,7 +213,7 @@ def generate_sched_static(
                 "job_submission": {
                     "forward_profiles": True,
                     "from_scheduler": {
-                        "enabled": True,
+                        "enabled": s["dynamic"],
                         "acknowledge": True
                     }
                 }
@@ -282,7 +287,7 @@ def generate_sched_script(
                 "job_submission": {
                     "forward_profiles": True,
                     "from_scheduler": {
-                        "enabled": True,
+                        "enabled": False,
                         "acknowledge": True
                     }
                 }
@@ -367,12 +372,13 @@ def generate_sched(
         batsim_bin,
         batsim_args,
         options)
+    ''' Pyhton is not finding the path to batsim.sched.workloads
     generate_sched_script(
         workloads_basedir,
         platforms_basedir,
         batsim_bin,
         batsim_args,
-        options)
+        options)'''
     generate_sched_dynamic(
         workloads_basedir,
         platforms_basedir,
@@ -449,13 +455,14 @@ def main(args):
             batsim_args,
             options)
 
+    ''' easyEnergyBudget scheduler is no longer maintained
     if energy:
         generate_energy(
             workloads_basedir,
             platforms_basedir,
             batsim_bin,
             batsim_args,
-            options)
+            options)'''
 
     if sched:
         generate_sched(
