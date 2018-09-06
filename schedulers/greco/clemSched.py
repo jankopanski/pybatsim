@@ -4,6 +4,7 @@ import sys
 import os
 import logging
 from sortedcontainers import SortedSet
+from procset import ProcSet
 
 
 class ClemSched(BatsimScheduler):
@@ -41,9 +42,9 @@ class ClemSched(BatsimScheduler):
         if len(self.openJobs) > 0:
             job = self.openJobs.pop(0)
             if job.requested_resources <= self.nbResources:
-                toSchedule = [(job, (0, job.requested_resources-1))]
+                job.allocation = ProcSet((0,job.requested_resources-1))
                 self.idle = False
-                self.bs.start_jobs_continuous(toSchedule)
+                self.bs.execute_jobs([job])
             else:
                 self.bs.reject_jobs([job])
 

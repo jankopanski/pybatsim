@@ -60,7 +60,8 @@ class QBoxSched(BatsimScheduler):
             print("-------\n",self.temperatureDiffs, "\n")
             self.qnode.onQBoxRejectJob(job, self.qbox_id)
         else:
-            self.bs.start_jobs_continuous([(job, (index, index))])
+            job.allocation = ProcSet(index)
+            self.bs.execute_jobs([job])
             self.idleResource[index] = False
             self.processingJobs[job.id] = index
             if heating > 1.5: #if heating more than 1.5 degrees required, set machine to full speed
