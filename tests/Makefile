@@ -32,7 +32,7 @@ gantts_okular: $(GANTTS_OUT)
 	python3 ../../../../evalys/evalys/gantt.py $* $*/gantt.png
 
 generate:
-	python3 generate.py
+	python3 generate.py $(BATSIMBIN) $(WORKLOADSDIR) $(PLATFORMSDIR)
 
 clean:
 	rm tests/*/out_jobs.csv
