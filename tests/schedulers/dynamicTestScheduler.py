@@ -38,6 +38,7 @@ class DynamicTestScheduler(Scheduler):
             ])]))
 
         w.submit(self)
+        self.notify_submission_finished()
 
     def schedule(self):
         return filler_sched(self,

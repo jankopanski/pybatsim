@@ -46,10 +46,31 @@ class UserCommand(Command):
 class TestCommand(UserCommand):
 
     description = 'Run tests'
-    user_options = []
+    user_options = [
+        ('batsim-bin=', None, 'Path/to/batsim'),
+        ('workloads-basedir=', None, 'Path/to/batsim/workloads'),
+        ('platforms-basedir=', None, 'Path/to/batsim/platforms')
+    ]
+
+    def initialize_options(self):
+        self.batsim_bin = None
+        self.workloads_basedir = None
+        self.platforms_basedir = None
+
+    def finalize_options(self):
+        self.args = []
+        if self.batsim_bin is not None:
+            self.args.append('BATSIMBIN=--batsim-bin=' + str(self.batsim_bin))
+        if self.workloads_basedir is not None:
+            self.args.append('WORKLOADSDIR=--workloads-basedir=' + str(self.workloads_basedir))
+        if self.platforms_basedir is not None:
+            self.args.append('PLATFORMSDIR=--platforms-basedir=' + str(self.platforms_basedir))
 
     def run(self):
-        self.run_external_command("make", cwd="tests")
+        if len(self.args) > 0:
+            self.run_external_command("make", *self.args ,cwd="tests")
+        else:
+            self.run_external_command("make", cwd="tests")
 
 
 class DocCommand(UserCommand):

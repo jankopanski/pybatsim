@@ -2,7 +2,7 @@ from batsim.batsim import BatsimScheduler, Batsim
 
 import sys
 import os
-from procset import ProcSet, ProcInt
+from procset import ProcSet
 from itertools import islice
 
 
@@ -20,7 +20,7 @@ class FillerSched(BatsimScheduler):
         self.sched_delay = 0.005
 
         self.openJobs = set()
-        self.availableResources = ProcSet(ProcInt(0,self.bs.nb_compute_resources-1))
+        self.availableResources = ProcSet((0,self.bs.nb_compute_resources-1))
 
 
     def scheduleJobs(self):
@@ -34,6 +34,7 @@ class FillerSched(BatsimScheduler):
             nb_res_req = job.requested_resources
 
             if nb_res_req <= len(self.availableResources):
+                # Retrieve the *nb_res_req* first availables resources
                 job_alloc = ProcSet(*islice(self.availableResources, nb_res_req))
                 job.allocation = job_alloc
                 scheduledJobs.append(job)

@@ -102,13 +102,13 @@ class JobDescription:
         assert not self.submitted, "Job was already submitted and can not be modified"
         has_workload = bool(self.workload)
 
-        if has_workload:
-            self.workload.remove_job(self)
+        #if has_workload:
+        #    self.workload.remove_job(self)
 
         self._id = id
 
-        if has_workload:
-            self.workload.add_job(self)
+        #if has_workload:
+        #    self.workload.add_job(self)
 
     @property
     def res(self):
@@ -224,11 +224,10 @@ class JobDescription:
                                for p in self._additional_profiles}
 
         scheduler._batsim.submit_job(
-            self.id,
+            str(self.id),
             self.res,
             self.walltime,
-            self.profile.name,
-            self.workload.name,
+            self.workload.name+'!'+self.profile.name,
             self.subtime,
             self.profile.to_dict())
         scheduler._batsim.submit_profiles(
@@ -389,6 +388,9 @@ class WorkloadDescription:
         elif job.id > self._last_job_id:
             self._last_job_id = job.id + 1
 
+        jid = job._workload.name + '!' + str(job.id)
+        job.id = jid
+
         self._jobmap[job.id] = job
 
     def remove_job(self, job):
@@ -396,7 +398,7 @@ class WorkloadDescription:
 
         :param job: The `JobDescription`.
         """
-        assert not job.self.submitted, "Job was already submitted and can not be removed from the workload"
+        assert not job.submitted, "Job was already submitted and can not be removed from the workload"
         self._jobs.remove(job)
         job._workload = None
 
