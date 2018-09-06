@@ -22,18 +22,20 @@ class ValidatingMachine(BatsimScheduler):
         self.scheduler.onAfterBatsimInit()
 
     def onSimulationBegins(self):
-        self.nb_res = self.bs.nb_res
+        self.nb_res = self.bs.nb_compute_resources
         self.availableResources = SortedSet(range(self.nb_res))
         self.jobs_waiting = []
         self.previousAllocations = dict()
 
-        # intercept job start
-        self.bs_start_jobs_continuous = self.bs.start_jobs_continuous
-        self.bs.start_jobs_continuous = self.start_jobs_continuous
-        self.bs_start_jobs = self.bs.start_jobs
-        self.bs.start_jobs = self.start_jobs
+        # save real job start function
+        self.real_start_jobs = self.bs.start_jobs
+        self.real_execute_jobs = self.bs.execute_jobs
 
+        # intercept job start
         self.scheduler.bs = self.bs
+        self.scheduler.bs.start_jobs = self.start_jobs_valid
+        self.scheduler.bs.execute_jobs = self.execute_jobs_valid
+        
         self.scheduler.onSimulationBegins()
 
     def onSimulationEnds(self):
@@ -67,31 +69,8 @@ class ValidatingMachine(BatsimScheduler):
     def onRequestedCall(self):
         self.scheduler.onRequestedCall()
 
-    def start_jobs_continuous(self, allocs):
-        jobs = []
-        for (job, (first_res, last_res)) in allocs:
-            self.previousAllocations[job.id] = range(first_res, last_res + 1)
-            try:
-                self.jobs_waiting.remove(job)
-            except KeyError:
-                raise ValueError(
-                    "Job {} was not waiting (waiting: {})".format(
-                        job, [
-                            j2.id for j2 in self.jobs_waiting]))
-            for r in range(first_res, last_res + 1):
-                try:
-                    self.availableResources.remove(r)
-                except KeyError:
-                    raise ValueError(
-                        "Resource {} was not available (available: {})".format(
-                            r, list(
-                                self.availableResources)))
-            job.allocation = ProcSet((first_res, last_res))
-            jobs.append(job)
 
-        self.bs.execute_jobs(jobs)
-
-    def start_jobs(self, jobs, res):
+    def start_jobs_valid(self, jobs, res):
         for j in jobs:
             try:
                 self.jobs_waiting.remove(j)
@@ -108,5 +87,24 @@ class ValidatingMachine(BatsimScheduler):
                         "Resource {} was not available (available: {})".format(
                             r, list(
                                 self.availableResources)))
-            job.allocation = ProcSet(*res[job.id])
-        self.bs.execute_jobs(jobs)
+            j.allocation = ProcSet(*res[j.id])
+        self.real_execute_jobs(jobs)
+
+    def execute_jobs_valid(self, jobs, io_jobs=None):
+        for j in jobs:
+            try:
+                self.jobs_waiting.remove(j)
+            except KeyError:
+                raise ValueError(
+                    "Job {} was not waiting (waiting: {})".format(
+                        j, [j2.id for j2 in self.jobs_waiting]))
+            self.previousAllocations[j.id] = j.allocation
+            for r in j.allocation:
+                try:
+                    self.availableResources.remove(r)
+                except KeyError:
+                    raise ValueError(
+                        "Resource {} was not available (available: {})".format(
+                            r, list(
+                                self.availableResources)))
+        self.real_execute_jobs(jobs, io_jobs)
