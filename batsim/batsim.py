@@ -206,6 +206,9 @@ class Batsim(object):
                 }
             }
             self._events_to_send.append(msg)
+            self.logger.debug("Submitting profile: {}".format(msg["data"]))
+            # Register profile
+            self.profiles[workload_name][profile_name] = profile
 
     def submit_job(
             self,
