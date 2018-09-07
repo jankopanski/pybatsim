@@ -478,9 +478,15 @@ class Batsim(object):
                 killed_jobs = []
                 for jid in event_data["job_ids"]:
                     j = self.jobs[jid]
-                    j.progress = event_data["job_progress"][jid]
-                    killed_jobs.append(j)
-                self.scheduler.onJobsKilled(killed_jobs)
+                    # The job_progress can only be empty if the has completed
+                    # between the order of killing and the killing itself.
+                    # So in that case just dont put it in the killed jobs
+                    # because it was already mark as complete.
+                    if len(event_data["job_progress"]) != 0:
+                        j.progress = event_data["job_progress"][jid]
+                        killed_jobs.append(j)
+                if len(killed_jobs) != 0:
+                    self.scheduler.onJobsKilled(killed_jobs)
             elif event_type == "JOB_COMPLETED":
                 job_id = event_data["job_id"]
                 j = self.jobs[job_id]
