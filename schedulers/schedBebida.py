@@ -75,25 +75,24 @@ def nth(iterable, n):
     return next(islice(iterable, n, None))
 
 
-def get_local_disk(host_id, compute_resources, storage_resources):
+def fill_storage_map(compute_resources, storage_resources):
     """
     WARNING: The local disk resource name MUST be prefixed by the host
     resource name
-    TODO: do a static map
     """
+    storage_map = {}
     for res_id, compute in compute_resources.items():
-        if res_id == host_id:
-            for storage_id, storage in storage_resources.items():
-                if compute["name"] in storage["name"]:
-                    return storage_id
-    raise("Local storage associated to host {} was not found")
+        for storage_id, storage in storage_resources.items():
+            if compute["name"] in storage["name"]:
+                storage_map[res_id] = storage_id
+    return storage_map
 
 def index_of(alloc, host_id):
     """ Return the index of the given host id in the given alloc """
     for index, host in enumerate(alloc):
         if host == host_id:
             return index
-    raise ("Host id not found in the allocation")
+    raise Exception("Host id not found in the allocation")
 
 
 def generate_dfs_io_profile(
@@ -101,19 +100,20 @@ def generate_dfs_io_profile(
         job_alloc,
         io_alloc,
         remote_block_location_list,
-        block_size,
+        block_size_in_MB,
         locality,
-        compute_resources,
-        storage_resources,
+        storage_map,
         replication_factor=3):
     """
     Every element of the remote_block_location_list is a host that detain a block to
     read.
     """
+    block_size_in_Bytes = block_size_in_MB * 1024 * 1024
     # Generates blocks read list from block location: Manage the case where
-    # dataset input size is different from the IO reads due to partial reads of
-    # the dataset
-    nb_blocks_to_read = math.ceil(profile_dict["io_reads"] / block_size)
+    # dataset input size is different from the IO reads due to partial or
+    # multiple reads of the dataset
+    nb_blocks_to_read = int(
+            math.ceil(profile_dict["io_reads"] / block_size_in_Bytes))
 
     nb_blocks_to_read_local = math.ceil(nb_blocks_to_read * locality / 100)
     nb_blocks_to_read_remote = nb_blocks_to_read - nb_blocks_to_read_local
@@ -129,34 +129,36 @@ def generate_dfs_io_profile(
         col = host_that_read_index
 
         if nb_blocks_to_read_local > 0:
+            # FIXME: only pick local reads if the host AND its disk is involved
+            # in the io_alloc
             row = index_of(io_alloc,
-                    get_local_disk(nth(job_alloc, host_that_read_index),
-                        compute_resources, storage_resources))
+                    storage_map[nth(job_alloc, host_that_read_index)])
             nb_blocks_to_read_local = nb_blocks_to_read_local - 1
         else:
             row = index_of(io_alloc,
-                    remote_block_location_list[nb_blocks_to_read_remote])
+                    remote_block_location_list[nb_blocks_to_read_remote %
+                        len(remote_block_location_list)])
             nb_blocks_to_read_remote = nb_blocks_to_read_remote - 1
 
-        comm_matrix[(row * len(io_alloc)) + col] += block_size
+        comm_matrix[(row * len(io_alloc)) + col] += block_size_in_Bytes
 
         # Round robin trough the hosts
         host_that_read_index = (host_that_read_index + 1) % len(job_alloc)
 
 
     # Generates writes block list
-    nb_blocks_to_write = (profile_dict["io_writes"] / block_size) + 1
+    nb_blocks_to_write = int(
+            (profile_dict["io_writes"] / block_size_in_Bytes) + 1)
 
     # Fill in writes in the matrix
     host_that_write_index = 0
     for _ in range(nb_blocks_to_write):
         col = index_of(io_alloc,
-                get_local_disk(nth(job_alloc, host_that_write_index),
-                        compute_resources, storage_resources))
+                storage_map[nth(job_alloc, host_that_write_index)])
         row = host_that_write_index
 
         # fill the matrix
-        comm_matrix[(row * len(io_alloc)) + col] += block_size
+        comm_matrix[(row * len(io_alloc)) + col] += block_size_in_Bytes
 
         # manage the replication
         # (local -> racklocal_i) + (racklocal_i -> other_i)^N-2
@@ -166,7 +168,7 @@ def generate_dfs_io_profile(
             # not on the whole cluster
             # NOTE: We can also manage write location here (under HPC node or
             # not)
-            row = random.choice(io_alloc)
+            row = random.choice(list(io_alloc))
 
         # Round robin trough the hosts
         host_that_write_index = (host_that_write_index + 1) % len(job_alloc)
@@ -265,13 +267,16 @@ class SchedBebida(BatsimScheduler):
                     value["properties"]["role"] == "storage"][0]
 
         elif self.variant == "dfs":
-            self.disks = ProcSet(*[res_id for res_id in
-                self.bs.storage_resources.keys()])
-            # TODO check if all the nodes have a storage attached
+            self.storage_map = fill_storage_map(self.bs.resources,
+                    self.bs.storage_resources)
+
+            # check if all the nodes have a storage attached
+            assert all([res in self.storage_map for res in
+                self.bs.resources])
 
             # size of the DFS block
             if "dfs_block_size_in_MB" not in self.options:
-                self.block_size_in_MB = 64
+                self.block_size_in_MB = 128
             else:
                 self.block_size_in_MB = self.options["block_size_in_MB"]
             self.logger.info("Block size in MB for the DFS: {}".format(
@@ -446,33 +451,37 @@ class SchedBebida(BatsimScheduler):
                     self.load_balanced_jobs.remove(old_job.id)
 
                     # Create a new job with a profile that corespond to the work that left
-                    new_job = copy.deepcopy(old_job)
                     curr_task_progress = progress["current_task"]["progress"]
-                    new_job.profile = old_job.profile + "#" + str(curr_task) + "#" + str(curr_task_progress)
-                    new_job.profile_dict["seq"] = old_job.profile_dict["seq"][curr_task:]
+                    if curr_task_progress == 0 and curr_task == 0:
+                        # No need to create a new profile
+                        new_job = old_job
+                    else:
+                        new_job = copy.deepcopy(old_job)
+                        new_job.profile = old_job.profile + "#" + str(curr_task) + "#" + str(curr_task_progress)
+                        new_job.profile_dict["seq"] = old_job.profile_dict["seq"][curr_task:]
 
-                    # Now let's modify the current profile to reflect progress
-                    assert "profile" in progress["current_task"], ('The profile'
-                            ' is not forwarded in the job progress: set'
-                            ' {"job_kill": {"forward_profiles": true}} in the '
-                            'batsim config')
-                    curr_task_profile = progress["current_task"]["profile"]
-                    assert curr_task_profile["type"] == "msg_par_hg_tot", "Only msg_par_hg_tot profile are supported right now"
-                    for key, value in curr_task_profile.items():
-                        if isinstance(value, (int, float)):
-                            curr_task_profile[key] = value * (1 - curr_task_progress)
-                    parent_task_profile = progress["current_task"]["profile_name"].split("#")[0]
-                    curr_task_profile_name =  parent_task_profile + "#" + str(curr_task_progress)
+                        # Now let's modify the current profile to reflect progress
+                        assert "profile" in progress["current_task"], ('The profile'
+                                ' is not forwarded in the job progress: set'
+                                ' {"job_kill": {"forward_profiles": true}} in the '
+                                'batsim config')
+                        curr_task_profile = progress["current_task"]["profile"]
+                        assert curr_task_profile["type"] == "msg_par_hg_tot", "Only msg_par_hg_tot profile are supported right now"
+                        for key, value in curr_task_profile.items():
+                            if isinstance(value, (int, float)):
+                                curr_task_profile[key] = value * (1 - curr_task_progress)
+                        parent_task_profile = progress["current_task"]["profile_name"].split("#")[0]
+                        curr_task_profile_name =  parent_task_profile + "#" + str(curr_task_progress)
 
+                        new_job.profile_dict["seq"][0] = curr_task_profile_name
 
-                    new_job.profile_dict["seq"][0] = curr_task_profile_name
-
-                    # submit the new internal current task profile
-                    self.bs.submit_profiles(
-                            new_job.id.split("!")[0],
-                            {curr_task_profile_name: curr_task_profile})
+                        # submit the new internal current task profile
+                        self.bs.submit_profiles(
+                                new_job.id.split("!")[0],
+                                {curr_task_profile_name: curr_task_profile})
 
                 elif (new_job_seq_size == old_job_seq_size):
+                    # FIXME does it takes into account current task progress?
                     # no modification to do: resubmit the same job
                     new_job = old_job
                 else:
@@ -503,6 +512,7 @@ class SchedBebida(BatsimScheduler):
             if len(self.free_resources & self.available_resources) == 0:
                 break
 
+            self.logger.debug(f'Scheduling variant: {self.variant}')
             if self.variant == "no-io":
                 # Allocate resources
                 self.allocate_first_fit_in_best_effort(job)
@@ -571,6 +581,8 @@ class SchedBebida(BatsimScheduler):
                         job_locality / 100)
                 nb_blocks_to_read_remote = nb_blocks_to_read - nb_blocks_to_read_local
 
+                assert nb_blocks_to_read_remote + nb_blocks_to_read_local == nb_blocks_to_read
+
                 remote_block_location_list = [
                         random.choice(list(self.bs.storage_resources.keys())) for _
                         in range(nb_blocks_to_read_remote)]
@@ -591,14 +603,13 @@ class SchedBebida(BatsimScheduler):
                                 remote_block_location_list,
                                 self.block_size_in_MB,
                                 job_locality,
-                                self.bs.resources,
-                                self.bs.storage_resources)
+                                self.storage_map)
                     # submit these profiles
                     self.bs.submit_profiles(job.workload, io_profiles)
 
                     # Create io job
                     io_job = {
-                      "alloc": str(alloc),
+                      "alloc": str(io_alloc),
                       "profile_name": job.id + "_io",
                       "profile": {
                         "type": "composed",
