@@ -41,6 +41,7 @@ import random
 import math
 from itertools import islice
 
+
 def sort_by_id(jobs):
     return sorted(jobs, key=lambda j: int(j.id.split('!')[1].split('#')[0]))
 
@@ -87,12 +88,28 @@ def fill_storage_map(compute_resources, storage_resources):
                 storage_map[res_id] = storage_id
     return storage_map
 
+
 def index_of(alloc, host_id):
     """ Return the index of the given host id in the given alloc """
     for index, host in enumerate(alloc):
         if host == host_id:
             return index
     raise Exception("Host id not found in the allocation")
+
+
+def local_disk_in_alloc(host_id, alloc, storage_map):
+    """ Return true if the host_id has is local disk in the alloc """
+    disk_id = storage_map[host_id]
+    return disk_id in alloc
+
+
+def new_io_profile_name(base_job_profile, io_profiles):
+    new_name = base_job_profile + "_io#0"
+    counter = 0
+    while new_name in io_profiles:
+        new_name = new_name.rsplit('#')[0] + '#' + str(counter)
+        counter = counter + 1
+    return new_name
 
 
 def generate_dfs_io_profile(
@@ -120,20 +137,21 @@ def generate_dfs_io_profile(
 
     comm_matrix = [0] * len(io_alloc) * len(io_alloc)
 
-    # FIXME this is not reading locally but inside the job allocation => need a
-    # host / disk mapping
-    #
     # Fill in reads in the matrix
     host_that_read_index = 0
     for _ in range(nb_blocks_to_read):
         col = host_that_read_index
+        host_id = nth(job_alloc, host_that_read_index)
 
-        if nb_blocks_to_read_local > 0:
-            # FIXME: only pick local reads if the host AND its disk is involved
-            # in the io_alloc
-            row = index_of(io_alloc,
-                    storage_map[nth(job_alloc, host_that_read_index)])
+        # Only pick local reads if the host AND its disk is involved
+        # in the io_alloc
+        if (nb_blocks_to_read_local > 0 and
+                local_disk_in_alloc(host_id, io_alloc, storage_map)):
+
+            row = index_of(io_alloc, storage_map[host_id])
             nb_blocks_to_read_local = nb_blocks_to_read_local - 1
+
+        # This is a remote read
         else:
             row = index_of(io_alloc,
                     remote_block_location_list[nb_blocks_to_read_remote %
@@ -152,9 +170,15 @@ def generate_dfs_io_profile(
 
     # Fill in writes in the matrix
     host_that_write_index = 0
-    for _ in range(nb_blocks_to_write):
-        col = index_of(io_alloc,
-                storage_map[nth(job_alloc, host_that_write_index)])
+    for _ in reversed(range(nb_blocks_to_write)):
+
+        host_id = nth(job_alloc, host_that_write_index)
+        # Only use hosts AND its disk is involved in the io_alloc
+        while (not local_disk_in_alloc(host_id, io_alloc, storage_map)):
+            host_that_write_index = (host_that_write_index + 1) % len(job_alloc)
+            host_id = nth(job_alloc, host_that_write_index)
+
+        col = index_of(io_alloc, storage_map[host_id])
         row = host_that_write_index
 
         # fill the matrix
@@ -309,9 +333,10 @@ class SchedBebida(BatsimScheduler):
                 "Forward profile is mandatory for resubmit to work")
 
     def onJobSubmission(self, job):
-        assert "type" in job.profile_dict, "Forward profile is mandatory"
-        assert (job.profile_dict["type"] == "msg_par_hg_tot" or
-                job.profile_dict["type"] == "composed")
+        profile_dict = self.bs.profiles[job.workload][job.profile]
+        assert "type" in profile_dict, "Forward profile is mandatory"
+        assert (profile_dict["type"] == "msg_par_hg_tot" or
+                profile_dict["type"] == "composed")
 
     def onJobCompletion(self, job):
         # If it is a job killed, resources where already where already removed
@@ -345,15 +370,15 @@ class SchedBebida(BatsimScheduler):
                            "SCHEDULED JOBS = {}\n"
                            "COMPLETED JOBS = {}"
                            ).format(
-                               self.bs.nb_jobs_received,
+                               self.bs.nb_jobs_submitted,
                                self.bs.nb_jobs_scheduled,
                                self.bs.nb_jobs_completed,
                                ))
         self.logger.debug("\nJOBS: \n{}".format(self.bs.jobs))
 
         if (self.bs.nb_jobs_scheduled == self.bs.nb_jobs_completed
-                and self.bs.nb_jobs_received > 0
-                and len(self.submitted_jobs()) == len(self.running_jobs()) == 0):
+                and self.bs.no_more_static_jobs
+                and self.bs.nb_jobs_submitted == len(self.running_jobs()) == 0):
             self.bs.notify_submission_finished()
 
     def onRemoveResources(self, resources):
@@ -478,7 +503,8 @@ class SchedBebida(BatsimScheduler):
                         # submit the new internal current task profile
                         self.bs.submit_profiles(
                                 new_job.id.split("!")[0],
-                                {curr_task_profile_name: curr_task_profile})
+                                {curr_task_profile_name: curr_task_profile,
+                                 new_job.profile: new_job.profile_dict})
 
                 elif (new_job_seq_size == old_job_seq_size):
                     # FIXME does it takes into account current task progress?
@@ -512,6 +538,8 @@ class SchedBebida(BatsimScheduler):
             if len(self.free_resources & self.available_resources) == 0:
                 break
 
+            all_profiles = self.bs.profiles[job.workload]
+
             self.logger.debug(f'Scheduling variant: {self.variant}')
             if self.variant == "no-io":
                 # Allocate resources
@@ -531,19 +559,23 @@ class SchedBebida(BatsimScheduler):
                     io_profiles = {}
                     # Generate profile sequence
                     for profile_name in job.profile_dict["seq"]:
-                        profile = self.bs.profiles[job.workload][profile_name]
-                        io_profiles[profile_name + "_io"] = generate_pfs_io_profile(
+                        profile = all_profiles[profile_name]
+                        new_profile_name = new_io_profile_name(profile_name,
+                                list(all_profiles.keys()) +
+                                list(io_profiles.keys()))
+                        io_profiles[new_profile_name] = generate_pfs_io_profile(
                                 profile,
                                 job.allocation,
                                 alloc,
                                 self.pfs_id)
                     # submit these profiles
+                    assert len(io_profiles) == len(job.profile_dict["seq"])
                     self.bs.submit_profiles(job.workload, io_profiles)
 
                     # Create io job
                     io_job = {
                       "alloc": str(alloc),
-                      "profile_name": job.id + "_io",
+                      "profile_name": new_io_profile_name(job.id, all_profiles),
                       "profile": {
                         "type": "composed",
                         "seq": list(io_profiles.keys())
@@ -553,7 +585,7 @@ class SchedBebida(BatsimScheduler):
                 else:
                     io_job = {
                       "alloc": str(alloc),
-                      "profile_name": job.id + "_io",
+                      "profile_name": new_io_profile_name(job.id, all_profiles),
                       "profile": generate_pfs_io_profile(job.profile_dict,
                                 job.allocation,
                                 alloc,
@@ -596,7 +628,12 @@ class SchedBebida(BatsimScheduler):
                     # Generate profile sequence
                     for profile_name in job.profile_dict["seq"]:
                         profile = self.bs.profiles[job.workload][profile_name]
-                        io_profiles[profile_name + "_io"] = generate_dfs_io_profile(
+                        io_profile_name = new_io_profile_name(job.id,
+                                list(all_profiles.keys()) +
+                                list(io_profiles.keys()))
+                        self.logger.debug("Creating new profile: " +
+                                io_profile_name)
+                        io_profiles[io_profile_name] = generate_dfs_io_profile(
                                 profile,
                                 job.allocation,
                                 io_alloc,
@@ -610,7 +647,8 @@ class SchedBebida(BatsimScheduler):
                     # Create io job
                     io_job = {
                       "alloc": str(io_alloc),
-                      "profile_name": job.id + "_io",
+                      "profile_name": new_io_profile_name(job.id + "_seq_",
+                          self.bs.profiles[job.workload]),
                       "profile": {
                         "type": "composed",
                         "seq": list(io_profiles.keys())
@@ -620,7 +658,7 @@ class SchedBebida(BatsimScheduler):
                 else:
                     io_job = {
                       "alloc": str(alloc),
-                      "profile_name": job.id + "_io",
+                      "profile_name": new_io_profile_name(job.id, all_profiles),
                       "profile": generate_dfs_io_profile(
                                 job.profile_dict,
                                 job.allocation,
