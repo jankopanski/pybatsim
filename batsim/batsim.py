@@ -56,12 +56,15 @@ class Batsim(object):
         self.nb_jobs_killed = 0
         self.nb_jobs_rejected = 0
         self.nb_jobs_scheduled = 0
+        self.nb_jobs_in_submission = 0
         self.nb_jobs_completed = 0
         self.nb_jobs_successful = 0
         self.nb_jobs_failed = 0
         self.nb_jobs_timeout = 0
 
         self.jobs_manually_changed = set()
+
+        self.no_more_static_jobs = False
 
         self.network.bind()
         self.event_publisher.bind()
@@ -120,7 +123,6 @@ class Batsim(object):
             }
         })
 
-    ''' THIS FUNCTION IS DEPRECATED '''
     def start_jobs(self, jobs, res):
         """ args:res: is list of int (resources ids) """
         for job in jobs:
@@ -136,7 +138,7 @@ class Batsim(object):
             self.nb_jobs_scheduled += 1
 
     def execute_jobs(self, jobs, io_jobs=None):
-        """ args:jobs: list of jobs to execute 
+        """ args:jobs: list of jobs to execute
             job.allocation MUST be not None and should be a non-empty ProcSet"""
 
         for job in jobs:
@@ -216,8 +218,7 @@ class Batsim(object):
             res,
             walltime,
             profile_name,
-            subtime=None,
-            profile=None):
+            subtime=None):
 
         if subtime is None:
             subtime = self.time()
@@ -236,16 +237,10 @@ class Batsim(object):
                 "job": job_dict,
             }
         }
-        if profile is not None:
-            assert isinstance(profile, dict)
-            msg["data"]["profile"] = profile
-
         self._events_to_send.append(msg)
-        self.nb_jobs_submitted += 1
-
-        # Create the job here
-        self.jobs[id] = Job.from_json_dict(job_dict, profile_dict=profile)
-        self.jobs[id].job_state = Job.State.SUBMITTED
+        self.jobs[id] = Job.from_json_dict(job_dict)
+        self.jobs[id].job_state = Job.State.IN_SUBMISSON
+        self.nb_jobs_in_submission = self.nb_jobs_in_submission + 1
 
         return id
 
@@ -263,18 +258,20 @@ class Batsim(object):
             }
         })
 
-
-    def get_job(self, event):
+    def get_job_and_profile(self, event):
         if self.redis_enabled:
-            job = self.redis.get_job(event["data"]["job_id"])
+            return self.redis.get_job_and_profile(event["data"]["job_id"])
+
         else:
             json_dict = event["data"]["job"]
-            try:
-                profile_dict = event["data"]["profile"]
-            except KeyError:
-                profile_dict = {}
-            job = Job.from_json_dict(json_dict, profile_dict)
-        return job
+            job = Job.from_json_dict(json_dict)
+
+            if "profile" in event["data"]:
+                profile = event["data"]["profile"]
+            else:
+                profile = {}
+
+        return job, profile
 
 
     def request_consumed_energy(self): #TODO CHANGE NAME 
@@ -337,7 +334,6 @@ class Batsim(object):
         # Consume some time to be sure that the job was created before the
         # metadata is set
 
-        self.jobs[job_id].metadata = metadata
         self._events_to_send.append(
             {
                 "timestamp": self.time(),
@@ -355,8 +351,6 @@ class Batsim(object):
         workload is "resubmit=N" where N is the number of resubmission.
         The job metadata is fill with a dict that contains the original job
         full id in "parent_job" and the number of resubmission in "nb_resumit".
-
-        Warning: The profile_dict of the given job must be filled
         """
 
         if job.metadata is None:
@@ -380,11 +374,13 @@ class Batsim(object):
                 new_job_name,
                 job.requested_resources,
                 job.requested_time,
-                job.profile,
-                profile=job.profile_dict)
+                job.profile)
 
         # log in job metadata parent job and nb resubmit
         self.set_job_metadata(new_job_id, metadata)
+        job.metadata = metadata
+        # Also store the job
+        self.jobs[new_job_id] = job
 
     def do_next_event(self):
         return self._read_bat_msg()
@@ -467,8 +463,16 @@ class Batsim(object):
             elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
                 job_id = event_data["job_id"]
-                job = self.get_job(event)
+                job, profile = self.get_job_and_profile(event)
                 job.job_state = Job.State.SUBMITTED
+                self.nb_jobs_submitted += 1
+
+                # Store profile if not already present
+                if job.profile not in self.profiles[job.workload]:
+                    self.profiles[job.workload][job.profile] = profile
+
+                # Keep a pointer in the job structure
+                job.profile_dict = self.profiles[job.workload][job.profile]
 
                 # don't override dynamic job
                 if job_id not in self.jobs:
@@ -589,7 +593,7 @@ class DataStorage(object):
             k=real_key)
         return value
 
-    def get_job(self, job_id):
+    def get_job_and_profile(self, job_id):
         job_key = 'job_{job_id}'.format(job_id=job_id)
         job_str = self.get(job_key).decode('utf-8')
         job = Job.from_json_string(job_str)
@@ -598,9 +602,9 @@ class DataStorage(object):
             workload_id=job_id.split(Batsim.WORKLOAD_JOB_SEPARATOR)[0],
             profile_id=job.profile)
         profile_str = self.get(profile_key).decode('utf-8')
-        job.profile_dict = json.loads(profile_str)
+        profile = json.loads(profile_str)
 
-        return job
+        return job, profile
 
     def set_job(self, job_id, subtime, walltime, res):
         real_key = '{iprefix}:{ukey}'.format(iprefix=self.prefix,
@@ -614,7 +618,7 @@ class Job(object):
 
     class State(Enum):
         UNKNOWN = -1
-        NOT_SUBMITTED = 0
+        IN_SUBMISSON = 0
         SUBMITTED = 1
         RUNNING = 2
         COMPLETED_SUCCESSFULLY = 3
@@ -631,8 +635,7 @@ class Job(object):
             walltime,
             res,
             profile,
-            json_dict,
-            profile_dict):
+            json_dict):
         self.id = id
         self.submit_time = subtime
         self.requested_time = walltime
@@ -643,7 +646,7 @@ class Job(object):
         self.return_code = None
         self.progress = None
         self.json_dict = json_dict
-        self.profile_dict = profile_dict
+        self.profile_dict = None
         self.allocation = None
         self.metadata = None
 
@@ -666,14 +669,13 @@ class Job(object):
         return Job.from_json_dict(json_dict)
 
     @staticmethod
-    def from_json_dict(json_dict, profile_dict=None):
+    def from_json_dict(json_dict):
         return Job(json_dict["id"],
                    json_dict["subtime"],
                    json_dict.get("walltime", -1),
                    json_dict["res"],
                    json_dict["profile"],
-                   json_dict,
-                   profile_dict)
+                   json_dict)
     # def __eq__(self, other):
         # return self.id == other.id
     # def __ne__(self, other):
@@ -738,7 +740,7 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onNoMoreJobsInWorkloads(self):
-        pass
+        self.no_more_static_jobs = True
 
     def onBeforeEvents(self):
         pass
