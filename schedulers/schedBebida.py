@@ -285,10 +285,10 @@ class SchedBebida(BatsimScheduler):
         self.available_resources = copy.deepcopy(self.free_resources)
 
         if self.variant == "pfs":
-            assert len(self.bs.storage) >= 1, (
-                "At least on storage node is necessary for the 'pfs' variant")
+            assert self.bs.nb_storage_resources == 1, (
+                "Exactly one storage node is necessary for the 'pfs' variant")
             # WARN: This implies that at exactlly one storage is defined
-            self.pfs_id = [key for key,value in self.bs.storage.items() if
+            self.pfs_id = [key for key,value in self.bs.storage_resources.items() if
                     "role" in value["properties"] and
                     value["properties"]["role"] == "storage"][0]
 
@@ -683,6 +683,8 @@ class SchedBebida(BatsimScheduler):
 
                 io_jobs[job.id] = io_job
 
+            else:
+                raise Exception("This variant type '{}' does not exists".format(self.variant))
 
         self.bs.execute_jobs(to_execute, io_jobs)
         for job in to_execute:
