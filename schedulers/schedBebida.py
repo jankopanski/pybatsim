@@ -214,7 +214,9 @@ class SchedBebida(BatsimScheduler):
     def running_jobs(self):
         return self.filter_jobs_by_state(Job.State.RUNNING)
 
-    def submitted_jobs(self):
+    def to_schedule_jobs(self):
+        if len(self.filter_jobs_by_state(Job.State.IN_SUBMISSON)) > 0:
+            return []
         return self.filter_jobs_by_state(Job.State.SUBMITTED)
 
     def in_killing_jobs(self):
@@ -357,28 +359,30 @@ class SchedBebida(BatsimScheduler):
             self.schedule()
 
         self.logger.debug("=====================NO MORE EVENTS======================")
-        self.logger.debug("\nFREE RESOURCES = {}".format(str(self.free_resources)))
-        self.logger.debug("\nAVAILABLE RESOURCES = {}".format(str(self.available_resources)))
-        self.logger.debug("\nTO BE REMOVED RESOURCES: {}".format(str(self.to_be_removed_resources)))
+        self.logger.debug("FREE RESOURCES = {}".format(str(self.free_resources)))
+        self.logger.debug("AVAILABLE RESOURCES = {}".format(str(self.available_resources)))
+        self.logger.debug("TO BE REMOVED RESOURCES: {}".format(str(self.to_be_removed_resources)))
         nb_used_resources = self.nb_total_resources - len(self.free_resources)
         nb_allocated_resources = sum([len(job.allocation) for job in
             self.running_jobs()])
-        self.logger.debug(("\nNB USED RESOURCES = {}").format(nb_used_resources))
-
-
-        self.logger.debug(("\nSUBMITTED JOBS = {}\n"
-                           "SCHEDULED JOBS = {}\n"
-                           "COMPLETED JOBS = {}"
-                           ).format(
-                               self.bs.nb_jobs_submitted,
-                               self.bs.nb_jobs_scheduled,
-                               self.bs.nb_jobs_completed,
-                               ))
-        self.logger.debug("\nJOBS: \n{}".format(self.bs.jobs))
+        self.logger.debug(("NB USED RESOURCES = {}").format(nb_used_resources))
+        self.logger.debug('NO MORE STATIC JOBS: {}'.format(
+            self.bs.no_more_static_jobs))
+        self.logger.debug("SUBMITTED JOBS = {}".format(
+            self.bs.nb_jobs_submitted))
+        self.logger.debug("IN_SUBMISSON JOBS = {}".format(
+            self.bs.nb_jobs_in_submission))
+        self.logger.debug("SCHEDULED JOBS = {}".format(
+            self.bs.nb_jobs_scheduled))
+        self.logger.debug("COMPLETED JOBS = {}".format(
+            self.bs.nb_jobs_completed))
+        self.logger.debug("JOBS: \n{}".format(self.bs.jobs))
 
         if (self.bs.nb_jobs_scheduled == self.bs.nb_jobs_completed
                 and self.bs.no_more_static_jobs
-                and self.bs.nb_jobs_submitted == len(self.running_jobs()) == 0):
+                and self.bs.nb_jobs_in_submission == 0
+                and len(self.running_jobs()) == 0
+                and len(self.in_killing_jobs()) == 0):
             self.bs.notify_submission_finished()
 
     def onRemoveResources(self, resources):
@@ -485,26 +489,32 @@ class SchedBebida(BatsimScheduler):
                         new_job.profile = old_job.profile + "#" + str(curr_task) + "#" + str(curr_task_progress)
                         new_job.profile_dict["seq"] = old_job.profile_dict["seq"][curr_task:]
 
-                        # Now let's modify the current profile to reflect progress
-                        assert "profile" in progress["current_task"], ('The profile'
-                                ' is not forwarded in the job progress: set'
-                                ' {"job_kill": {"forward_profiles": true}} in the '
-                                'batsim config')
-                        curr_task_profile = progress["current_task"]["profile"]
-                        assert curr_task_profile["type"] == "msg_par_hg_tot", "Only msg_par_hg_tot profile are supported right now"
-                        for key, value in curr_task_profile.items():
-                            if isinstance(value, (int, float)):
-                                curr_task_profile[key] = value * (1 - curr_task_progress)
-                        parent_task_profile = progress["current_task"]["profile_name"].split("#")[0]
-                        curr_task_profile_name =  parent_task_profile + "#" + str(curr_task_progress)
+                        # Store the new job profile to be submitted if not
+                        # already registerd
+                        to_submit = {}
+                        if new_job.profile not in self.bs.profiles[new_job.workload]:
+                            to_submit = {new_job.profile: new_job.profile_dict}
 
-                        new_job.profile_dict["seq"][0] = curr_task_profile_name
+                        # only recreate a profile if it has started
+                        if curr_task_progress != 0:
+                            # Now let's modify the current internal profile to reflect progress
+                            assert "profile" in progress["current_task"], ('The profile'
+                                    ' is not forwarded in the job progress: set'
+                                    ' {"job_kill": {"forward_profiles": true}} in the '
+                                    'batsim config')
+                            curr_task_profile = progress["current_task"]["profile"]
+                            assert curr_task_profile["type"] == "msg_par_hg_tot", "Only msg_par_hg_tot profile are supported right now"
+                            for key, value in curr_task_profile.items():
+                                if isinstance(value, (int, float)):
+                                    curr_task_profile[key] = value * (1 - curr_task_progress)
+                            parent_task_profile = progress["current_task"]["profile_name"].split("#")[0]
+                            curr_task_profile_name =  parent_task_profile + "#" + str(curr_task_progress)
+
+                            new_job.profile_dict["seq"][0] = curr_task_profile_name
+                            to_submit[curr_task_profile_name] = curr_task_profile
 
                         # submit the new internal current task profile
-                        self.bs.submit_profiles(
-                                new_job.id.split("!")[0],
-                                {curr_task_profile_name: curr_task_profile,
-                                 new_job.profile: new_job.profile_dict})
+                        self.bs.submit_profiles(new_job.workload, to_submit)
 
                 elif (new_job_seq_size == old_job_seq_size):
                     # FIXME does it takes into account current task progress?
@@ -527,7 +537,7 @@ class SchedBebida(BatsimScheduler):
         if len(self.free_resources & self.available_resources) == 0:
             return
         to_execute = []
-        to_schedule_jobs = self.submitted_jobs()
+        to_schedule_jobs = self.to_schedule_jobs()
         self.logger.info("Start scheduling jobs, nb jobs to schedule: {}".format(
             len(to_schedule_jobs)))
 
@@ -540,7 +550,7 @@ class SchedBebida(BatsimScheduler):
 
             all_profiles = self.bs.profiles[job.workload]
 
-            self.logger.debug(f'Scheduling variant: {self.variant}')
+            self.logger.debug('Scheduling variant: {}'.format(self.variant))
             if self.variant == "no-io":
                 # Allocate resources
                 self.allocate_first_fit_in_best_effort(job)
