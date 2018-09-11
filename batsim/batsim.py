@@ -51,6 +51,8 @@ class Batsim(object):
             self.scheduler = validatingmachine(scheduler)
 
         # initialize some public attributes
+        self.nb_jobs_submitted_from_batsim = 0
+        self.nb_jobs_submitted_from_scheduler = 0
         self.nb_jobs_submitted = 0
         self.nb_jobs_killed = 0
         self.nb_jobs_rejected = 0
@@ -469,9 +471,10 @@ class Batsim(object):
                     self.profiles[job.workload][job.profile] = profile
 
                 # Keep a pointer in the job structure
+                assert job.profile in self.profiles[job.workload]
                 job.profile_dict = self.profiles[job.workload][job.profile]
 
-                # Warning: override dynamic job
+                # Warning: override dynamic job but keep metadata
                 if job_id in self.jobs:
                     self.logger.warn(
                         "The job '{}' was alredy in the job list. "
@@ -480,8 +483,14 @@ class Batsim(object):
                             job_id,
                             self.jobs[job_id],
                             job))
-                    # Keeping metadata
+                    if self.jobs[job_id].job_state == Job.State.IN_SUBMISSON:
+                        self.nb_jobs_in_submission = self.nb_jobs_in_submission - 1
+                    # Keeping metadata and profile
                     job.metadata = self.jobs[job_id].metadata
+                    self.nb_jobs_submitted_from_scheduler += 1
+                else:
+                    # This was submitted from batsim
+                    self.nb_jobs_submitted_from_batsim += 1
                 self.jobs[job_id] = job
 
                 self.scheduler.onJobSubmission(job)
@@ -745,7 +754,8 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onNoMoreJobsInWorkloads(self):
-        self.no_more_static_jobs = True
+        self.bs.no_more_static_jobs = True
+        self.logger.info("There is no more static jobs on the workoad")
 
     def onBeforeEvents(self):
         pass
