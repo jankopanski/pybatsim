@@ -51,7 +51,6 @@ class Batsim(object):
             self.scheduler = validatingmachine(scheduler)
 
         # initialize some public attributes
-        self.nb_jobs_received = 0
         self.nb_jobs_submitted = 0
         self.nb_jobs_killed = 0
         self.nb_jobs_rejected = 0
@@ -242,8 +241,6 @@ class Batsim(object):
         self.jobs[id].job_state = Job.State.IN_SUBMISSON
         self.nb_jobs_in_submission = self.nb_jobs_in_submission + 1
 
-        return id
-
     def set_resource_state(self, resources, state):
         """ args:resources: is a list of resource numbers or intervals as strings (e.g., "1-5").
             args:state: is a state identifier configured in the platform specification.
@@ -344,6 +341,8 @@ class Batsim(object):
                 }
             }
         )
+        self.jobs[job_id].metadata = metadata
+
 
     def resubmit_job(self, job):
         """
@@ -363,24 +362,22 @@ class Batsim(object):
 
         # Keep the current workload and add a resubmit number
         splitted_id = job.id.split(Batsim.ATTEMPT_JOB_SEPARATOR)
-        if len(splitted_id) == 0:
-            new_job_name = job.id
+        if len(splitted_id) == 1:
+            new_job_name = deepcopy(job.id)
         else:
             # This job as already an attempt number
             new_job_name = splitted_id[0]
+            assert splitted_id[1] == str(metadata["nb_resubmit"] - 1)
         new_job_name =  new_job_name + Batsim.ATTEMPT_JOB_SEPARATOR + str(metadata["nb_resubmit"])
+        # log in job metadata parent job and nb resubmit
 
-        new_job_id = self.submit_job(
+        self.submit_job(
                 new_job_name,
                 job.requested_resources,
                 job.requested_time,
                 job.profile)
 
-        # log in job metadata parent job and nb resubmit
-        self.set_job_metadata(new_job_id, metadata)
-        job.metadata = metadata
-        # Also store the job
-        self.jobs[new_job_id] = job
+        self.set_job_metadata(new_job_name, metadata)
 
     def do_next_event(self):
         return self._read_bat_msg()
@@ -468,18 +465,26 @@ class Batsim(object):
                 self.nb_jobs_submitted += 1
 
                 # Store profile if not already present
-                if job.profile not in self.profiles[job.workload]:
+                if profile is not None and job.profile not in self.profiles[job.workload]:
                     self.profiles[job.workload][job.profile] = profile
 
                 # Keep a pointer in the job structure
                 job.profile_dict = self.profiles[job.workload][job.profile]
 
-                # don't override dynamic job
-                if job_id not in self.jobs:
-                    self.jobs[job_id] = job
+                # Warning: override dynamic job
+                if job_id in self.jobs:
+                    self.logger.warn(
+                        "The job '{}' was alredy in the job list. "
+                        "Probaly a dynamic job that was submitted "
+                        "before: \nOld job: {}\nNew job: {}".format(
+                            job_id,
+                            self.jobs[job_id],
+                            job))
+                    # Keeping metadata
+                    job.metadata = self.jobs[job_id].metadata
+                self.jobs[job_id] = job
 
                 self.scheduler.onJobSubmission(job)
-                self.nb_jobs_received += 1
             elif event_type == "JOB_KILLED":
                 # get progress
                 killed_jobs = []
@@ -652,12 +657,12 @@ class Job(object):
 
     def __repr__(self):
         return(
-            ("<Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} "
-                "state:{5} ret:{6} alloc:{7}>\n").format(
+            ("{{Job {0}; sub:{1} res:{2} reqtime:{3} prof:{4} "
+                "state:{5} ret:{6} alloc:{7}, meta:{8}}}\n").format(
             self.id, self.submit_time, self.requested_resources,
             self.requested_time, self.profile,
             self.job_state,
-            self.return_code, self.allocation))
+            self.return_code, self.allocation, self.metadata))
 
     @property
     def workload(self):
