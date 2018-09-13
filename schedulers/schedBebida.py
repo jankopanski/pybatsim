@@ -528,6 +528,8 @@ class SchedBebida(BatsimScheduler):
                     new_job = copy.deepcopy(old_job)
                     new_job.profile = old_job.profile + "#" + str(curr_task)
                     new_job.profile_dict["seq"] = old_job.profile_dict["seq"][curr_task:]
+                    self.bs.submit_profiles(new_job.workload,
+                            {new_job.profile: new_job.profile_dict})
 
             # Re-submit the profile
             self.bs.resubmit_job(new_job)
