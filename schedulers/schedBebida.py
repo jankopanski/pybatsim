@@ -415,9 +415,12 @@ class SchedBebida(BatsimScheduler):
                         ProcSet.from_str(resources)) != 0]
 
     def onAddResources(self, resources):
-        self.available_resources = self.available_resources | ProcSet.from_str(resources)
+        to_add_resources = ProcSet.from_str(resources)
+        assert len(to_add_resources & ProcSet(*self.bs.storage_resources)) == 0, (
+                "Resources to be added should not contain storage resources!")
+        self.available_resources = self.available_resources | to_add_resources
         # add the resources
-        self.free_resources = self.free_resources | ProcSet.from_str(resources)
+        self.free_resources = self.free_resources | to_add_resources
 
         self.load_balance_jobs()
 
