@@ -5,6 +5,7 @@ import sys
 import os
 import logging
 
+
 ''' Here the master sched plays two roles:
     - first the interface between Batsim and the QNode/QBox schedulers
     - second it is itself the QNode scheduler
@@ -14,8 +15,8 @@ class QNodeSched(BatsimScheduler):
         self.options = options
 
         if not "qbox_sched" in options:
-            print("No qbox_sched provided in json options, aborting.")
-            sys.exit(1)
+            print("No qbox_sched provided in json options, using qBoxSched by default.")
+            self.qbox_sched_name = "schedulers/greco/qBoxSched.py"
         else:
             self.qbox_sched_name = options["qbox_sched"]
 
@@ -73,6 +74,9 @@ class QNodeSched(BatsimScheduler):
         self.received_begin = True
         for qb in self.dict_qboxes.values():
             qb.onSimulationBegins()
+
+        #self.bs.wake_me_up_at(10000)
+        self.bs.notify_submission_finished()
 
         #TODO send profile of CPU burn jobs
 

@@ -5,6 +5,7 @@ from collections import defaultdict
 import sys
 import os
 import logging
+from procset import ProcSet
 
 ''' This is the QBox scheduler
 '''
