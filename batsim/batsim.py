@@ -496,11 +496,13 @@ class Batsim(object):
             elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
                 job_id = event_data["job_id"]
-                job = self.get_job(event)
-                job.job_state = Job.State.SUBMITTED
 
                 # don't override dynamic job
-                if job_id not in self.jobs:
+                if job_id in self.jobs:
+                    job = self.jobs[job_id]
+                else:
+                    job = self.get_job(event)
+                    job.job_state = Job.State.SUBMITTED
                     self.jobs[job_id] = job
 
                 self.scheduler.onJobSubmission(job)

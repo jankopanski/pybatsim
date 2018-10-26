@@ -27,6 +27,7 @@ class QNodeSched(BatsimScheduler):
         self.waiting_jobs = []
 
         self.received_begin = False
+        self.dynamic_submission_enabled = True
 
     def onAfterBatsimInit(self):
         # Read the platform file to have the architecture.
@@ -75,8 +76,11 @@ class QNodeSched(BatsimScheduler):
         for qb in self.dict_qboxes.values():
             qb.onSimulationBegins()
 
-        #self.bs.wake_me_up_at(10000)
-        self.bs.notify_submission_finished()
+        profile = {
+            "burn" : {'type' : 'msg_par_hg', 'cpu' : 1e10, 'com' : 0}
+        }
+        self.bs.submit_profiles("dyn", profile)
+        self.bs.wake_me_up_at(100)
 
         #TODO send profile of CPU burn jobs
 
@@ -93,12 +97,15 @@ class QNodeSched(BatsimScheduler):
         # forward event to the related QBox
         
         #WIP
-        qb = self.jobs_mapping[job.id]
+        qb = self.jobs_mapping.pop(job.id)
         qb.onJobCompletion(job)
-        del self.jobs_mapping[job.id]
+
+    def onJobsKilled(self, jobs):
+        pass
 
     def onRequestedCall(self):
-        pass
+        self.notify_all_submission_finished()
+        #pass
         #TODO see if needed to forward to all QBoxes
 
     def onMachinePStateChanged(self, nodeid, pstate):
@@ -106,6 +113,7 @@ class QNodeSched(BatsimScheduler):
         #TODO see if needed to forward toa ll QBoxes
 
     def onBeforeEvents(self):
+        print("\n[", self.bs.time(), "] new Batsim message")
         if self.received_begin:
             for qb in self.dict_qboxes.values():
                 qb.onBeforeEvents()
@@ -155,3 +163,7 @@ class QNodeSched(BatsimScheduler):
                 self.jobs_mapping[job.id] = qb
                 # TODO see if we reschedule the job to another qbox or we use the onQBoxRejectJob call
                 qb.onJobSubmission(job)
+
+    def notify_all_submission_finished(self):
+        self.bs.notify_submission_finished()
+        self.dynamic_submission_enabled = False
