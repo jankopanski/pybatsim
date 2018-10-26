@@ -127,19 +127,22 @@ class FormatCommand(UserCommand):
             "--experimental",
             self.path)
 
+
 f = open("./README.rst")
 read_me = f.read().strip()
 f.close()
 
-f = open("./VERSION")
-version = f.read().strip()
+# Get the version
+f = open('batsim/_version.py')
+version = f.read()
+exec(version)
 f.close()
 
 setup(
     name='pybatsim',
     author="Michael Mercier",
     author_email="michael.mercier@inria.fr",
-    version=version,
+    version=__version__,
     url='https://gitlab.inria.fr/batsim/pybatsim',
     packages=find_packages(),
     install_requires=requirements,

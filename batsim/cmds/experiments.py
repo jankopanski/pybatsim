@@ -17,14 +17,11 @@ import json
 from docopt import docopt
 
 from batsim.tools.experiments import launch_experiment
+from batsim import __version__
 
 
 def main():
-    f = open("./VERSION")
-    version = f.read().strip()
-    f.close()
-
-    arguments = docopt(__doc__, version=version)
+    arguments = docopt(__doc__, version=__version__)
 
     verbose = not bool(arguments["--quiet"])
     debug = bool(arguments["--debug"])

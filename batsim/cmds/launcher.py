@@ -22,14 +22,10 @@ import json
 from docopt import docopt
 
 from batsim.tools.launcher import launch_scheduler, instanciate_scheduler
-
+from batsim import __version__
 
 def main():
-    f = open("./VERSION")
-    version = f.read().strip()
-    f.close()
-
-    arguments = docopt(__doc__, version=version)
+    arguments = docopt(__doc__, version=__version__)
 
     if arguments['--verbose']:
         verbose = 999
