@@ -5,9 +5,6 @@ from procset import ProcSet
 
 class RandomSched(BatsimScheduler):
 
-    def __init__(self, options):
-        self.options = options
-
     def onAfterBatsimInit(self):
         self.res = [x for x in range(self.bs.nb_resources)]
         self.jobs_res = {}
