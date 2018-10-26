@@ -127,12 +127,19 @@ class FormatCommand(UserCommand):
             "--experimental",
             self.path)
 
+f = open("./README.rst")
+read_me = f.read().strip()
+f.close()
+
+f = open("./VERSION")
+version = f.read().strip()
+f.close()
 
 setup(
     name='pybatsim',
     author="Michael Mercier",
     author_email="michael.mercier@inria.fr",
-    version=2.0,
+    version=version,
     url='https://gitlab.inria.fr/batsim/pybatsim',
     packages=find_packages(),
     install_requires=requirements,
@@ -140,6 +147,8 @@ setup(
     include_package_data=True,
     zip_safe=False,
     description="Python scheduler for Batsim",
+    long_description=read_me,
+    long_description_content_type='text/markdown',
     keywords='Scheduler',
     license='LGPLv3',
     classifiers=[

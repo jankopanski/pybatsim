@@ -5,6 +5,7 @@ Usage:
     pybatsim <scheduler> [-o <options_string>] [options]
 
 Options:
+    --version                               Print the version of pybatsim and exit
     -h --help                               Show this help message and exit.
     -v --verbose                            Be verbose.
     -p --protect                            Protect the scheduler using a validating machine.
@@ -24,7 +25,11 @@ from batsim.tools.launcher import launch_scheduler, instanciate_scheduler
 
 
 def main():
-    arguments = docopt(__doc__, version='2.0')
+    f = open("./VERSION")
+    version = f.read().strip()
+    f.close()
+
+    arguments = docopt(__doc__, version=version)
 
     if arguments['--verbose']:
         verbose = 999

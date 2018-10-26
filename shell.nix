@@ -1,26 +1,17 @@
+# Use this environment to publish this package on pypi:
+#
+#   # Enter the environment
+#   nix-shell release.nix
+#
+#   # create the package
+#   python setup.py sdist
+#
+#   # register to pypi (if not registered yet)
+#   twine register dist/project_name-x.y.z.tar.gz
+#
+#   # upload you package
+#   twine upload dist/project_name-x.y.z.tar.gz
+
 with import <nixpkgs> {};
-with pkgs.python36Packages;
-with import (fetchTarball "https://gitlab.inria.fr/vreis/datamove-nix/repository/master/archive.tar.gz") {
-  pkgs = (import <nixpkgs> {});
-};
 
-buildPythonPackage rec {
-  name = "pybatsim-local";
-  src = ./.;
-  doCheck = false;
-  propagatedBuildInputs = with python36Packages; [
-      sortedcontainers
-      pyzmq
-      redis
-      pandas
-      docopt
-      # for testing and debug
-      coverage
-      pytest
-      ipython
-      ipdb
-      # for doc generation
-      sphinx
-    ];
-
-}
+(pkgs.python36.withPackages (ps: with ps; [twine setuptools])).env

@@ -5,6 +5,7 @@ Usage:
     pybatsim-experiment <experiment> [options]
 
 Options:
+    --version                               Print the version of pybatsim and exit
     -h --help                               Show this help message and exit.
     -q --quiet                              Silent experiment output.
     -d --debug                              Print additional debug messages.
@@ -19,7 +20,11 @@ from batsim.tools.experiments import launch_experiment
 
 
 def main():
-    arguments = docopt(__doc__, version='2.0')
+    f = open("./VERSION")
+    version = f.read().strip()
+    f.close()
+
+    arguments = docopt(__doc__, version=version)
 
     verbose = not bool(arguments["--quiet"])
     debug = bool(arguments["--debug"])
