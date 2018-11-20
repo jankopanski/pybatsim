@@ -517,7 +517,7 @@ class Job:
                 job=self, type="job_starting_postponed_too_few_resources")
             return
 
-        if not self._scheduler.has_time_sharing:
+        if not self._scheduler.has_time_sharing_on_compute:
             for r in self.allocation.resources:
                 for a1 in r.allocations:
                     for a2 in r.allocations:

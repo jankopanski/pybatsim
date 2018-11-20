@@ -89,7 +89,7 @@ class Resource:
     def time_sharing(self):
         """Whether this resource can be shared."""
         if self._time_sharing is None:
-            return self._scheduler.has_time_sharing
+            return self._scheduler.has_time_sharing_on_compute
         return self._time_sharing
 
     @property

@@ -123,4 +123,4 @@ Testing
 
 To run the test experiments use the setup target::
 
-  ./setup.py test
+  ./setup.py test --batsim-bin=path/to/batsim/binary --workloads-basedir=path/to/workloads/dir --platforms-basedir=path/to/platforms/dir

@@ -16,6 +16,7 @@ class ValidatingMachine(BatsimScheduler):
     """
 
     def __init__(self, scheduler):
+        super().__init__()
         self.scheduler = scheduler
 
     def onAfterBatsimInit(self):

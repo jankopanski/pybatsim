@@ -700,7 +700,7 @@ class Job(object):
 
 class BatsimScheduler(object):
 
-    def __init__(self, options):
+    def __init__(self, options = {}):
         self.options = options
 
         FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -757,7 +757,7 @@ class BatsimScheduler(object):
 
     def onNoMoreJobsInWorkloads(self):
         self.bs.no_more_static_jobs = True
-        self.logger.info("There is no more static jobs on the workoad")
+        self.logger.info("There is no more static jobs in the workoad")
 
     def onBeforeEvents(self):
         pass

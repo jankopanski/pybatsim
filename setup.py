@@ -47,7 +47,7 @@ class TestCommand(UserCommand):
 
     description = 'Run tests'
     user_options = [
-        ('batsim-bin=', None, 'Path/to/batsim'),
+        ('batsim-bin=', None, 'Path/to/batsim/binary'),
         ('workloads-basedir=', None, 'Path/to/batsim/workloads'),
         ('platforms-basedir=', None, 'Path/to/batsim/platforms')
     ]

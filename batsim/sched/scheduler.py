@@ -306,9 +306,9 @@ class Scheduler(metaclass=ABCMeta):
         return self._time
 
     @property
-    def has_time_sharing(self):
-        """Whether or not time sharing is enabled."""
-        return self._batsim.time_sharing
+    def has_time_sharing_on_compute(self):
+        """Whether or not time sharing on compute machines is enabled."""
+        return self._batsim.time_sharing_on_compute
 
     @property
     def get_find_resource_handlers(self):

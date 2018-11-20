@@ -231,8 +231,7 @@ class JobDescription:
             self.res,
             self.walltime,
             self.workload.name+'!'+self.profile.name,
-            self.subtime,
-            self.profile.to_dict())
+            self.subtime)
         self._submitted = True
 
         # Keep track of the workload object in the scheduler to relate job
