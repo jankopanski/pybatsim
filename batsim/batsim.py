@@ -96,21 +96,21 @@ class Batsim(object):
              "type": "CALL_ME_LATER",
              "data": {"timestamp": time}})
 
-    def notify_submission_finished(self):
+    def notify_registration_finished(self):
         self._events_to_send.append({
             "timestamp": self.time(),
             "type": "NOTIFY",
             "data": {
-                    "type": "submission_finished",
+                    "type": "registration_finished",
             }
         })
 
-    def notify_submission_continue(self):
+    def notify_registration_continue(self):
         self._events_to_send.append({
             "timestamp": self.time(),
             "type": "NOTIFY",
             "data": {
-                    "type": "continue_submission",
+                    "type": "continue_registration",
             }
         })
 
@@ -197,11 +197,11 @@ class Batsim(object):
             }
         })
 
-    def submit_profiles(self, workload_name, profiles):
+    def register_profiles(self, workload_name, profiles):
         for profile_name, profile in profiles.items():
             msg = {
                 "timestamp": self.time(),
-                "type": "SUBMIT_PROFILE",
+                "type": "REGISTER_PROFILE",
                 "data": {
                     "workload_name": workload_name,
                     "profile_name": profile_name,
@@ -209,11 +209,10 @@ class Batsim(object):
                 }
             }
             self._events_to_send.append(msg)
-            self.logger.debug("Submitting profile: {}".format(msg["data"]))
-            # Register profile
+            self.logger.debug("Registering profile: {}".format(msg["data"]))
             self.profiles[workload_name][profile_name] = profile
 
-    def submit_job(
+    def register_job(
             self,
             id,
             res,
@@ -232,7 +231,7 @@ class Batsim(object):
         }
         msg = {
             "timestamp": self.time(),
-            "type": "SUBMIT_JOB",
+            "type": "REGISTER_JOB",
             "data": {
                 "job_id": id,
                 "job": job_dict,
@@ -350,8 +349,8 @@ class Batsim(object):
         """
         The given job is resubmited but in a dynamic workload. The name of this
         workload is "resubmit=N" where N is the number of resubmission.
-        The job metadata is fill with a dict that contains the original job
-        full id in "parent_job" and the number of resubmission in "nb_resumit".
+        The job metadata is filled with a dict that contains the original job
+        full id in "parent_job" and the number of resubmissions in "nb_resubmit".
         """
 
         if job.metadata is None:
@@ -373,7 +372,7 @@ class Batsim(object):
         new_job_name =  new_job_name + Batsim.ATTEMPT_JOB_SEPARATOR + str(metadata["nb_resubmit"])
         # log in job metadata parent job and nb resubmit
 
-        self.submit_job(
+        self.register_job(
                 new_job_name,
                 job.requested_resources,
                 job.requested_time,
@@ -422,16 +421,19 @@ class Batsim(object):
                 storage_resources = event_data["storage_resources"]
                 self.machines = {"compute": compute_resources, "storage": storage_resources}
                 self.batconf = event_data["config"]
-                self.time_sharing = event_data["allow_time_sharing"]
-                self.dynamic_job_submission_enabled = self.batconf["job_submission"]["from_scheduler"]["enabled"]
+                self.time_sharing_on_compute = event_data["allow_time_sharing_on_compute"]
+                self.time_sharing_on_storage = event_data["allow_time_sharing_on_storage"]
+                self.profiles_forwarded_on_submission = self.batconf["profiles-forwarded-on-submission"]
+                self.dynamic_job_registration_enabled = self.batconf["dynamic-jobs-enabled"]
+                self.ack_of_dynamic_jobs = self.batconf["dynamic-jobs-acknowledged"]
 
-                if self.dynamic_job_submission_enabled:
-                    self.logger.warning("Dynamic submission of jobs is ENABLED. The scheduler must send a NOTIFY event of type 'submission_finished' to let Batsim end the simulation.")
+                if self.dynamic_job_registration_enabled:
+                    self.logger.warning("Dynamic registration of jobs is ENABLED. The scheduler must send a NOTIFY event of type 'registration_finished' to let Batsim end the simulation.")
 
-                self.redis_enabled = self.batconf["redis"]["enabled"]
-                redis_hostname = self.batconf["redis"]["hostname"]
-                redis_port = self.batconf["redis"]["port"]
-                redis_prefix = self.batconf["redis"]["prefix"]
+                self.redis_enabled = self.batconf["redis-enabled"]
+                redis_hostname = self.batconf["redis-hostname"]
+                redis_port = self.batconf["redis-port"]
+                redis_prefix = self.batconf["redis-prefix"]
 
                 if self.redis_enabled:
                     self.redis = DataStorage(redis_prefix, redis_hostname,

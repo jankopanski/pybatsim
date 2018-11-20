@@ -6,7 +6,7 @@
     dynamically and submit them during the runtime of a scheduler.
 
     WorkloadDescriptions are used internally to manage dynamic jobs created with
-    `Scheduler.submit_dynamic_job` and with `Job.submit_sub_job`. For each job
+    `Scheduler.register_dynamic_job` and with `Job.submit_sub_job`. For each job
     a workload is generated named after the id of the job which is then submitted
     to Batsim.
 """
@@ -223,16 +223,16 @@ class JobDescription:
         additional_profiles = {p.name: p.to_dict()
                                for p in self._additional_profiles}
 
-        scheduler._batsim.submit_job(
+        scheduler._batsim.register_profiles(
+            self.workload.name,
+            additional_profiles)
+        scheduler._batsim.register_job(
             str(self.id),
             self.res,
             self.walltime,
             self.workload.name+'!'+self.profile.name,
             self.subtime,
             self.profile.to_dict())
-        scheduler._batsim.submit_profiles(
-            self.workload.name,
-            additional_profiles)
         self._submitted = True
 
         # Keep track of the workload object in the scheduler to relate job

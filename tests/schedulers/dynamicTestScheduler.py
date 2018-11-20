@@ -14,13 +14,13 @@ from batsim.sched.algorithms.utils import default_resources_filter
 class DynamicTestScheduler(Scheduler):
 
     def on_init(self):
-        self.submit_dynamic_job(
+        self.register_dynamic_job(
             walltime=10,
             res=2,
             id=42,
             profile=Profiles.Delay(7))
-        self.submit_dynamic_job(walltime=10, res=2, profile=Profiles.Delay(7))
-        self.submit_dynamic_job(walltime=10, res=2, profile=Profiles.Delay(7))
+        self.register_dynamic_job(walltime=10, res=2, profile=Profiles.Delay(7))
+        self.register_dynamic_job(walltime=10, res=2, profile=Profiles.Delay(7))
 
         w = WorkloadDescription(name="TestWorkload")
         w.new_job(subtime=0, walltime=10, res=4, profile=Profiles.Delay(5))
@@ -38,7 +38,7 @@ class DynamicTestScheduler(Scheduler):
             ])]))
 
         w.submit(self)
-        self.notify_submission_finished()
+        self.notify_registration_finished()
 
     def schedule(self):
         return filler_sched(self,

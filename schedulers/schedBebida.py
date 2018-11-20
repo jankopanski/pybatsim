@@ -15,21 +15,9 @@ resources.
 The Batsim job profile "msg_hg_tot" or a sequence of that kind of jobs are
 MANDATORY for this mechanism to work.
 
-Also, the folowing batsim configuration is mandatory:
-```json
-{
-    "job_submission": {
-        "forward_profiles": false,
-        "from_scheduler": {
-          "enabled": false,
-          "acknowledge": true
-        }
-    },
-    "job_kill": {
-        "forward_profiles": false
-    }
-}
-```
+Also, the `--dynamic-jobs-enabled` Batsim CLI option MUST be set, while
+`--profiles-forwarded-on-submission` and `--dynamic_jobs_acknowledged`
+must NOT be set.
 """
 
 from batsim.batsim import BatsimScheduler, Job
@@ -331,7 +319,7 @@ class SchedBebida(BatsimScheduler):
             # Fix the seed to have reproducible DFS behavior
             random.seed(0)
 
-        assert self.bs.batconf["job_submission"]["forward_profiles"] == True, (
+        assert self.bs.batconf["profiles-forwarded-on-submission"] == True, (
                 "Forward profile is mandatory for resubmit to work")
 
     def onJobSubmission(self, job):
@@ -383,7 +371,7 @@ class SchedBebida(BatsimScheduler):
                 and self.bs.nb_jobs_in_submission == 0
                 and len(self.running_jobs()) == 0
                 and len(self.in_killing_jobs()) == 0):
-            self.bs.notify_submission_finished()
+            self.bs.notify_registration_finished()
 
     def onRemoveResources(self, resources):
         self.available_resources = self.available_resources - ProcSet.from_str(resources)
@@ -517,7 +505,7 @@ class SchedBebida(BatsimScheduler):
                             to_submit[curr_task_profile_name] = curr_task_profile
 
                         # submit the new internal current task profile
-                        self.bs.submit_profiles(new_job.workload, to_submit)
+                        self.bs.register_profiles(new_job.workload, to_submit)
 
                 elif (new_job_seq_size == old_job_seq_size):
                     # FIXME does it takes into account current task progress?
@@ -528,7 +516,7 @@ class SchedBebida(BatsimScheduler):
                     new_job = copy.deepcopy(old_job)
                     new_job.profile = old_job.profile + "#" + str(curr_task)
                     new_job.profile_dict["seq"] = old_job.profile_dict["seq"][curr_task:]
-                    self.bs.submit_profiles(new_job.workload,
+                    self.bs.register_profiles(new_job.workload,
                             {new_job.profile: new_job.profile_dict})
 
             # Re-submit the profile
@@ -585,7 +573,7 @@ class SchedBebida(BatsimScheduler):
                                 self.pfs_id)
                     # submit these profiles
                     assert len(io_profiles) == len(job.profile_dict["seq"])
-                    self.bs.submit_profiles(job.workload, io_profiles)
+                    self.bs.register_profiles(job.workload, io_profiles)
 
                     # Create io job
                     io_job = {
@@ -657,7 +645,7 @@ class SchedBebida(BatsimScheduler):
                                 job_locality,
                                 self.storage_map)
                     # submit these profiles
-                    self.bs.submit_profiles(job.workload, io_profiles)
+                    self.bs.register_profiles(job.workload, io_profiles)
 
                     # Create io job
                     io_job = {

@@ -615,13 +615,13 @@ class Scheduler(metaclass=ABCMeta):
         """
         pass
 
-    def submit_dynamic_job(self, *args, **kwargs):
+    def register_dynamic_job(self, *args, **kwargs):
         job = self._dynamic_workload.new_job(*args, **kwargs)
         self._dynamic_workload.prepare()
         job.submit(self)
 
-    def notify_submission_finished(self):
-        self._batsim.notify_submission_finished()
+    def notify_registration_finished(self):
+        self._batsim.notify_registration_finished()
 
 
 def as_scheduler(*args, on_init=[], on_end=[], base_classes=[], **kwargs):
