@@ -225,13 +225,16 @@ class JobDescription:
 
         scheduler._batsim.register_profiles(
             self.workload.name,
-            additional_profiles)
+            {self.profile.name : self.profile.to_dict()})
         scheduler._batsim.register_job(
             str(self.id),
             self.res,
             self.walltime,
-            self.workload.name+'!'+self.profile.name,
+            self.profile.name,
             self.subtime)
+        scheduler._batsim.register_profiles(
+            self.workload.name,
+            additional_profiles)
         self._submitted = True
 
         # Keep track of the workload object in the scheduler to relate job
