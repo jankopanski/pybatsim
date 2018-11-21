@@ -13,7 +13,7 @@ class StorageSched(BatsimScheduler):
 
 
     def __init__(self, options):
-        self.options = options
+        super().__init__(options)
 
     def onSimulationBegins(self):
         self.bs.logger.setLevel(logging.ERROR)
@@ -27,7 +27,7 @@ class StorageSched(BatsimScheduler):
         self.idSub = 0 # Used to generate the next id of the communication job dynamically submitted
 
 
-        self.option1()
+        #self.option1()
         self.bs.wake_me_up_at(1000)
 
 
@@ -46,7 +46,7 @@ class StorageSched(BatsimScheduler):
 
     def onRequestedCall(self):
         self.option2()
-        self.bs.notify_submission_finished()
+        self.bs.notify_registration_finished()
 
 
     def option1(self):
@@ -62,21 +62,21 @@ class StorageSched(BatsimScheduler):
                     "commDOWN": {'type': 'msg_par','cpu': [0,0],'com': [0, 0, 
                                                                       1e8, 0]}}
 
-        self.bs.submit_profiles("dyn", profiles)
+        self.bs.register_profiles("dyn", profiles)
         
         toSched = []
 
         jid1 = "dyn!" + str(self.idSub)
         self.idSub += 1
-        self.bs.submit_job(id=jid1, res=2, walltime=-1, profile_name="commUP")
-        job1 = Job(jid1, 0, -1, 1, "", "", "")
+        self.bs.register_job(id=jid1, res=2, walltime=-1, profile_name="commUP")
+        job1 = Job(jid1, 0, -1, 1, "", "")
         job1.allocation = ProcSet(self.m1, self.m2)
         toSched.append(job1)
 
         jid2 = "dyn!" + str(self.idSub)
         self.idSub += 1
-        self.bs.submit_job(id=jid2, res=2, walltime=-1, profile_name="commDOWN")
-        job2 = Job(jid2, 0, -1, 1, "", "", "")
+        self.bs.register_job(id=jid2, res=2, walltime=-1, profile_name="commDOWN")
+        job2 = Job(jid2, 0, -1, 1, "", "")
         job2.allocation = ProcSet(self.m1, self.m2)
         toSched.append(job2)
 
@@ -88,22 +88,22 @@ class StorageSched(BatsimScheduler):
             "commUP2" : {'type' : 'data_staging', 'nb_bytes' : 1e8, 'from' : 'qb_disk', 'to' : 'ceph'},
             "commDOWN2" : {'type' : 'data_staging', 'nb_bytes' : 1e8, 'from' : 'ceph', 'to' : 'qb_disk'}
         }
-        self.bs.submit_profiles("dyn", profiles)
+        self.bs.register_profiles("dyn", profiles)
 
         toSched = []
 
         jid1 = "dyn!" + str(self.idSub)
         self.idSub += 1
-        self.bs.submit_job(id=jid1, res=1, walltime=-1, profile_name="commUP2")
-        job1 = Job(jid1, 0, -1, 1, "", "", "")
+        self.bs.register_job(id=jid1, res=1, walltime=-1, profile_name="commUP2")
+        job1 = Job(jid1, 0, -1, 1, "", "")
         job1.allocation = ProcSet(self.m1)
         job1.storage_mapping = {'qb_disk':self.m1, 'ceph':self.m2}
         toSched.append(job1)
 
         jid2 = "dyn!" + str(self.idSub)
         self.idSub += 1
-        self.bs.submit_job(id=jid2, res=1, walltime=-1, profile_name="commDOWN2")
-        job2 = Job(jid2, 0, -1, 1, "", "", "")
+        self.bs.register_job(id=jid2, res=1, walltime=-1, profile_name="commDOWN2")
+        job2 = Job(jid2, 0, -1, 1, "", "")
         job2.allocation = ProcSet(self.m1)
         job2.storage_mapping = {'qb_disk':self.m1, 'ceph':self.m2}
         toSched.append(job2)

@@ -12,7 +12,7 @@ import logging
 '''
 class QNodeSched(BatsimScheduler):
     def __init__(self, options):
-        self.options = options
+        super().__init__(options)
 
         if not "qbox_sched" in options:
             print("No qbox_sched provided in json options, using qBoxSched by default.")
@@ -26,7 +26,6 @@ class QNodeSched(BatsimScheduler):
         self.jobs_mapping = {}        # Maps the job id to the qbox id where it has been sent to
         self.waiting_jobs = []
 
-        self.received_begin = False
         self.dynamic_submission_enabled = True
 
     def onAfterBatsimInit(self):
@@ -72,14 +71,13 @@ class QNodeSched(BatsimScheduler):
 
     def onSimulationBegins(self):
         self.bs.logger.setLevel(logging.ERROR)
-        self.received_begin = True
         for qb in self.dict_qboxes.values():
             qb.onSimulationBegins()
 
         profile = {
             "burn" : {'type' : 'msg_par_hg', 'cpu' : 1e10, 'com' : 0}
         }
-        self.bs.submit_profiles("dyn", profile)
+        self.bs.register_profiles("dyn", profile)
         self.bs.wake_me_up_at(100)
 
         #TODO send profile of CPU burn jobs
@@ -104,7 +102,7 @@ class QNodeSched(BatsimScheduler):
         pass
 
     def onRequestedCall(self):
-        self.notify_all_submission_finished()
+        self.notify_all_registration_finished()
         #pass
         #TODO see if needed to forward to all QBoxes
 
@@ -114,9 +112,8 @@ class QNodeSched(BatsimScheduler):
 
     def onBeforeEvents(self):
         print("\n[", self.bs.time(), "] new Batsim message")
-        if self.received_begin:
-            for qb in self.dict_qboxes.values():
-                qb.onBeforeEvents()
+        for qb in self.dict_qboxes.values():
+            qb.onBeforeEvents()
 
 
     def onNoMoreEvents(self):
@@ -164,6 +161,6 @@ class QNodeSched(BatsimScheduler):
                 # TODO see if we reschedule the job to another qbox or we use the onQBoxRejectJob call
                 qb.onJobSubmission(job)
 
-    def notify_all_submission_finished(self):
-        self.bs.notify_submission_finished()
+    def notify_all_registration_finished(self):
+        self.bs.notify_registration_finished()
         self.dynamic_submission_enabled = False

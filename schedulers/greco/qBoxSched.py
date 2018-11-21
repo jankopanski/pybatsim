@@ -11,7 +11,8 @@ from procset import ProcSet
 '''
 class QBoxSched(BatsimScheduler):
     def __init__(self, options):
-        self.options = options
+        super().__init__(options)
+
         self.qbox_id = options["qbox_id"]
         tmp_list = options["resource_ids"]
         self.list_qrads = [x for (x,_) in tmp_list]
@@ -175,5 +176,5 @@ class QBoxSched(BatsimScheduler):
     def generateSubmitBurnJob(self):
         job_id = "dyn!qb" + str(self.qbox_id) + "_" + str(self.nextDynId)
         self.nextDynId += 1
-        self.bs.submit_job(id=job_id, res=1, walltime=-1, profile_name="burn")
+        self.bs.register_job(id=job_id, res=1, walltime=-1, profile_name="burn")
         return self.bs.jobs[job_id]
