@@ -47,7 +47,7 @@ class TestCommand(UserCommand):
 
     description = 'Run tests'
     user_options = [
-        ('batsim-bin=', None, 'Path/to/batsim'),
+        ('batsim-bin=', None, 'Path/to/batsim/binary'),
         ('workloads-basedir=', None, 'Path/to/batsim/workloads'),
         ('platforms-basedir=', None, 'Path/to/batsim/platforms')
     ]
@@ -128,11 +128,21 @@ class FormatCommand(UserCommand):
             self.path)
 
 
+f = open("./README.rst")
+read_me = f.read().strip()
+f.close()
+
+# Get the version
+f = open('batsim/_version.py')
+version = f.read()
+exec(version)
+f.close()
+
 setup(
     name='pybatsim',
     author="Michael Mercier",
     author_email="michael.mercier@inria.fr",
-    version=2.0,
+    version=__version__,
     url='https://gitlab.inria.fr/batsim/pybatsim',
     packages=find_packages(),
     install_requires=requirements,
@@ -140,6 +150,8 @@ setup(
     include_package_data=True,
     zip_safe=False,
     description="Python scheduler for Batsim",
+    long_description=read_me,
+    long_description_content_type='text/markdown',
     keywords='Scheduler',
     license='LGPLv3',
     classifiers=[

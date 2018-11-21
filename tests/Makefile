@@ -1,5 +1,3 @@
-SHELL := /bin/bash
-
 EXPE_FOLDERS := $(wildcard tests/*)
 SIMULS_OUT := $(patsubst %,%/out_jobs.csv,$(EXPE_FOLDERS))
 GANTTS_OUT := $(patsubst %,%/gantt.png,$(EXPE_FOLDERS))

@@ -1,7 +1,7 @@
 # Use this environment to publish this package on pypi:
 #
 #   # Enter the environment
-#   nix-shell release.nix
+#   nix-shell do_release.nix
 #
 #   # create the package
 #   python setup.py sdist

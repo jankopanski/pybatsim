@@ -129,7 +129,7 @@ def generate_basic(
         "batsim": {
             "executable": {
                 "path": batsim_bin,
-                "args": batsim_args,
+                "args": batsim_args.copy(),
             },
             "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
             "workload": w,
@@ -150,19 +150,9 @@ def generate_sched_static(
         batsim_args,
         options):
     schedulers = []
+    bat_args = batsim_args.copy()
+    bat_args.append("--forward-profiles-on-submission")
 
-    ''' Problems in parent_job status
-        {
-            "name_expe": "sched_delayProfilesAsTasks",
-            "name": "schedDelayProfilesAsTasks",
-            "verbose": False,
-            "protection": True,
-            "interpreter": "coverage",
-            "options": {
-            },
-            "dynamic": True
-        },
-    '''
     schedulers += [
         {
             "name_expe": "sched_fillerSched",
@@ -199,25 +189,10 @@ def generate_sched_static(
         "batsim": {
             "executable": {
                 "path": batsim_bin,
-                "args": batsim_args,
+                "args": bat_args,
             },
             "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
             "workload": w,
-            "config": {
-                "redis": {
-                    "enabled": False,
-                    "hostname": "127.0.0.1",
-                    "port": 6379,
-                    "prefix": "default"
-                },
-                "job_submission": {
-                    "forward_profiles": True,
-                    "from_scheduler": {
-                        "enabled": s["dynamic"],
-                        "acknowledge": True
-                    }
-                }
-            },
             "energy": False,  # Enables energy-aware experiments
             "disable-schedule-tracing": True,  # remove paje output
             "verbosity": "information"  # Sets the Batsim verbosity level. Available values
@@ -235,6 +210,8 @@ def generate_sched_script(
         batsim_args,
         options):
     schedulers = []
+    bat_args = batsim_args.copy()
+    bat_args.append("--forward-profiles-on-submission")
 
     schedulers += [
         {
@@ -271,26 +248,11 @@ def generate_sched_script(
         "batsim": {
             "executable": {
                 "path": batsim_bin,
-                "args": batsim_args,
+                "args": bat_args,
             },
             "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
             "workload-script": {
                 "path": w,
-            },
-            "config": {
-                "redis": {
-                    "enabled": False,
-                    "hostname": "127.0.0.1",
-                    "port": 6379,
-                    "prefix": "default"
-                },
-                "job_submission": {
-                    "forward_profiles": True,
-                    "from_scheduler": {
-                        "enabled": False,
-                        "acknowledge": True
-                    }
-                }
             },
             "energy": False,  # Enables energy-aware experiments
             "disable-schedule-tracing": True,  # remove paje output
@@ -309,6 +271,10 @@ def generate_sched_dynamic(
         batsim_args,
         options):
     schedulers = []
+    bat_args = batsim_args.copy()
+    bat_args.append("--forward-profiles-on-submission")
+    bat_args.append("--enable-dynamic-jobs")
+    bat_args.append("--acknowledge-dynamic-jobs")
 
     schedulers += [
         {
@@ -332,24 +298,9 @@ def generate_sched_dynamic(
         "batsim": {
             "executable": {
                 "path": batsim_bin,
-                "args": batsim_args,
+                "args": bat_args,
             },
             "platform": os.path.join(platforms_basedir, "simple_coalloc_platform.xml"),
-            "config": {
-                "redis": {
-                    "enabled": False,
-                    "hostname": "127.0.0.1",
-                    "port": 6379,
-                    "prefix": "default"
-                },
-                "job_submission": {
-                    "forward_profiles": True,
-                    "from_scheduler": {
-                        "enabled": True,
-                        "acknowledge": True
-                    }
-                }
-            },
             "energy": False,  # Enables energy-aware experiments
             "disable-schedule-tracing": True,  # remove paje output
             "verbosity": "information"  # Sets the Batsim verbosity level. Available values
@@ -416,7 +367,7 @@ def main(args):
     energy = False
     sched = False
 
-    workloads_basedir = "../../workload_profiles"
+    workloads_basedir = "../../workloads"
     platforms_basedir = "../../platforms"
     batsim_bin = None
     batsim_args = []

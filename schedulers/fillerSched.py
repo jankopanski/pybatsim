@@ -8,9 +8,6 @@ from itertools import islice
 
 class FillerSched(BatsimScheduler):
 
-    def __init__(self, options):
-        self.options = options
-
     def onAfterBatsimInit(self):
         self.nb_completed_jobs = 0
 
