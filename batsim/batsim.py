@@ -209,6 +209,9 @@ class Batsim(object):
                 }
             }
             self._events_to_send.append(msg)
+            if not workload_name in self.profiles:
+                self.profiles[workload_name] = {}
+                self.logger.debug("A new dynamic workload of name {} has been received".format(workload_name))
             self.logger.debug("Registering profile: {}".format(msg["data"]))
             self.profiles[workload_name][profile_name] = profile
 
