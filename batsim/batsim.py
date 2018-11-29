@@ -472,8 +472,11 @@ class Batsim(object):
                 self.nb_jobs_submitted += 1
 
                 # Store profile if not already present
-                if profile is not None and job.profile not in self.profiles[job.workload]:
-                    self.profiles[job.workload][job.profile] = profile
+                if profile is not None:
+                    if job.workload not in self.profiles:
+                        self.profiles[job.workload] = {}
+                    if job.profile not in self.profiles[job.workload]:
+                        self.profiles[job.workload][job.profile] = profile
 
                 # Keep a pointer in the job structure
                 assert job.profile in self.profiles[job.workload]
