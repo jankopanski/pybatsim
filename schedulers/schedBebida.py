@@ -481,7 +481,7 @@ class SchedBebida(BatsimScheduler):
                         new_job.profile_dict["seq"] = old_job.profile_dict["seq"][curr_task:]
 
                         # Store the new job profile to be submitted if not
-                        # already registerd
+                        # already registered
                         to_submit = {}
                         if new_job.profile not in self.bs.profiles[new_job.workload]:
                             to_submit = {new_job.profile: new_job.profile_dict}
@@ -516,8 +516,9 @@ class SchedBebida(BatsimScheduler):
                     new_job = copy.deepcopy(old_job)
                     new_job.profile = old_job.profile + "#" + str(curr_task)
                     new_job.profile_dict["seq"] = old_job.profile_dict["seq"][curr_task:]
-                    self.bs.register_profiles(new_job.workload,
-                            {new_job.profile: new_job.profile_dict})
+                    if new_job.profile not in self.bs.profiles[new_job.workload]:
+                        self.bs.register_profiles(new_job.workload,
+                                {new_job.profile: new_job.profile_dict})
 
             # Re-submit the profile
             self.bs.resubmit_job(new_job)
