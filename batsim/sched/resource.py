@@ -56,8 +56,8 @@ class Resource:
 
     :param resources_list: the main resources list where this resource is contained
 
-    :param time_sharing: whether this resource allows time sharing (if `None`, the
-                         value set in Batsim will be used)
+    :param resource_sharing: whether this resource allows jobs to run concurrently
+                            (if `None`, the value set in Batsim will be used)
     """
 
     TIME_DELTA = 0.00000000001
@@ -68,13 +68,13 @@ class Resource:
             name,
             id=None,
             resources_list=None,
-            time_sharing=None):
+            resource_sharing=None):
         self._scheduler = scheduler
 
         self._id = id
         self._name = name
 
-        self._time_sharing = time_sharing
+        self._resource_sharing = resource_sharing
 
         self._resources_list = resources_list
 
@@ -86,11 +86,11 @@ class Resource:
         return self._id
 
     @property
-    def time_sharing(self):
+    def resource_sharing(self):
         """Whether this resource can be shared."""
-        if self._time_sharing is None:
-            return self._scheduler.has_time_sharing_on_compute
-        return self._time_sharing
+        if self._resource_sharing is None:
+            return self._scheduler.has_resource_sharing_on_compute
+        return self._resource_sharing
 
     @property
     def name(self):
@@ -144,7 +144,7 @@ class Resource:
         """Get time how long this resource is still free until the next reservation starts, `0`
         if the resource is allocated, and `Inf` if this resource has no allocations.
 
-        Please note that this probably makes less sense for resources which allow time sharing
+        Please note that this probably makes less sense for resources which allow resource sharing
         since this function will only look for times where there is not a single allocation
         using this resource.
 
@@ -170,16 +170,16 @@ class Resource:
     def _do_add_allocation(self, allocation):
         """Adds an allocation to this resource.
 
-        It will be checked for overlaps (which are forbidden if time-sharing is not enabled).
+        It will be checked for overlaps (which are forbidden if resource sharing is not enabled).
 
         :param allocation: the allocation to be added
         """
-        # If time sharing is not enabled: check that allocations do not overlap
-        if not self.time_sharing:
+        # If resource sharing is not enabled: check that allocations do not overlap
+        if not self.resource_sharing:
             for alloc in self._allocations:
                 if alloc.overlaps_with(allocation):
                     self._scheduler.fatal(
-                        "Overlapping resource allocation in resource {resource} while time-sharing is not allowed, {own} overlaps with {other}",
+                        "Overlapping resource allocation in resource {resource} while resource sharing is not allowed, {own} overlaps with {other}",
                         resource=self,
                         own=alloc,
                         other=allocation)
