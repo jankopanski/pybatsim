@@ -444,8 +444,8 @@ class Batsim(object):
                 storage_resources = event_data["storage_resources"]
                 self.machines = {"compute": compute_resources, "storage": storage_resources}
                 self.batconf = event_data["config"]
-                self.time_sharing_on_compute = event_data["allow_time_sharing_on_compute"]
-                self.time_sharing_on_storage = event_data["allow_time_sharing_on_storage"]
+                self.allow_compute_sharing = event_data["allow_compute_sharing"]
+                self.allow_storage_sharing = event_data["allow_storage_sharing"]
                 self.profiles_forwarded_on_submission = self.batconf["profiles-forwarded-on-submission"]
                 self.dynamic_job_registration_enabled = self.batconf["dynamic-jobs-enabled"]
                 self.ack_of_dynamic_jobs = self.batconf["dynamic-jobs-acknowledged"]
@@ -492,8 +492,11 @@ class Batsim(object):
                 self.nb_jobs_submitted += 1
 
                 # Store profile if not already present
-                if profile is not None and job.profile not in self.profiles[job.workload]:
-                    self.profiles[job.workload][job.profile] = profile
+                if profile is not None:
+                    if job.workload not in self.profiles:
+                        self.profiles[job.workload] = {}
+                    if job.profile not in self.profiles[job.workload]:
+                        self.profiles[job.workload][job.profile] = profile
 
                 # Keep a pointer in the job structure
                 assert job.profile in self.profiles[job.workload]

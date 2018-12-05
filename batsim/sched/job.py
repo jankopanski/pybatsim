@@ -517,14 +517,14 @@ class Job:
                 job=self, type="job_starting_postponed_too_few_resources")
             return
 
-        if not self._scheduler.has_time_sharing_on_compute:
+        if not self._scheduler.has_resource_sharing_on_compute:
             for r in self.allocation.resources:
                 for a1 in r.allocations:
                     for a2 in r.allocations:
                         if a1 != a2:
                             if a1.overlaps_with(a2):
                                 self._scheduler.fatal(
-                                    "Time sharing is not enabled in Batsim (resource allocations are overlapping: own={own}, other={other})",
+                                    "Resource sharing is not enabled in Batsim (resource allocations are overlapping: own={own}, other={other})",
                                     own=a1, other=a2,
                                     type="schedule_resource_allocations_overlapping")
 
