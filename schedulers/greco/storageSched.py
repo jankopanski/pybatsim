@@ -57,9 +57,9 @@ class StorageSched(BatsimScheduler):
         If src_id > dest_id (here a comm from the storage_server to a qbox_disk for example)
         then the matrix of comm is inversed and looks like the one in profile2.
         '''
-        profiles = {"commUP": {'type': 'msg_par','cpu': [0,0],'com': [0, 1e8, 
+        profiles = {"commUP": {'type': 'parallel','cpu': [0,0],'com': [0, 1e8, 
                                                                       0, 0]},
-                    "commDOWN": {'type': 'msg_par','cpu': [0,0],'com': [0, 0, 
+                    "commDOWN": {'type': 'parallel','cpu': [0,0],'com': [0, 0, 
                                                                       1e8, 0]}}
 
         self.bs.register_profiles("dyn", profiles)

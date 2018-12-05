@@ -75,7 +75,7 @@ class QNodeSched(BatsimScheduler):
             qb.onSimulationBegins()
 
         profile = {
-            "burn" : {'type' : 'msg_par_hg', 'cpu' : 1e10, 'com' : 0}
+            "burn" : {'type' : 'parallel_homogeneous', 'cpu' : 1e10, 'com' : 0}
         }
         self.bs.register_profiles("dyn", profile)
         self.bs.wake_me_up_at(100)
