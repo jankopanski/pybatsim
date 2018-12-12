@@ -299,8 +299,7 @@ def main(args):
         sched = True
 
     if not batsim_bin:
-        batsim_bin = "docker"
-        batsim_args = ["run", "batsim:dev"]
+        raise Exception("Command line option '--batsim-bin' was not set.")
 
     if basic:
         generate_basic(

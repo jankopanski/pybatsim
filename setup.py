@@ -57,6 +57,8 @@ class TestCommand(UserCommand):
         self.args = []
         if self.batsim_bin is not None:
             self.args.append('BATSIMBIN=--batsim-bin=' + str(self.batsim_bin))
+        else:
+            raise Exception("Command line option '--batsim-bin' was not set.")
 
     def run(self):
         if len(self.args) > 0:
