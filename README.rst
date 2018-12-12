@@ -121,6 +121,10 @@ To generate the html documentation use the setup target::
 Testing
 -------
 
-To run the test experiments use the setup target::
+To run the test experiments it is preferable to first enter in a nix shell specific for the pybatsim development with the following command::
 
-  ./setup.py test --batsim-bin=path/to/batsim/binary --workloads-basedir=path/to/workloads/dir --platforms-basedir=path/to/platforms/dir
+  nix-shell https://github.com/oar-team/kapack/archive/master.tar.gz -A pybatsim_dev
+
+Then you can run tests with the setup target::
+
+  ./setup.py test --batsim-bin=path/to/batsim/binary
