@@ -13,7 +13,7 @@ simuls: testIntervals $(SIMULS_OUT) coverage_html
 	fi
 
 coverage_html: ../.coverage
-	cd ..; coverage html -i -d tests/coverage_html
+	cd ..; python3 -m coverage html -i -d tests/coverage_html
 
 testIntervals: generate
 	cd ..; python3 -m coverage run -a schedulers/intervalContainer.py
@@ -30,7 +30,7 @@ gantts_okular: $(GANTTS_OUT)
 	python3 ../../../../evalys/evalys/gantt.py $* $*/gantt.png
 
 generate:
-	python3 generate.py $(BATSIMBIN) $(WORKLOADSDIR) $(PLATFORMSDIR)
+	python3 generate.py $(BATSIMBIN)
 
 clean:
 	rm tests/*/out_jobs.csv

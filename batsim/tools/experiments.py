@@ -102,29 +102,19 @@ def execute_cl(
         stderr=None,
         on_failure=None,
         verbose=False):
-    try:
-        if verbose:
-            print("Starting: {}".format(" ".join(cl)), end="")
-            if stdout:
-                print(" 1>{}".format(stdout.name), end="")
-            if stderr:
-                print(" 2>{}".format(stderr.name), end="")
-            print()
+    if verbose:
+        print("Starting: {}".format(" ".join(cl)), end="")
+        if stdout:
+            print(" 1>{}".format(stdout.name), end="")
+        if stderr:
+            print(" 2>{}".format(stderr.name), end="")
+        print()
 
-        exec = subprocess.Popen(
-            cl, stdout=stdout, stderr=stderr,
-            preexec_fn=os.setsid)
-        exec.name = name
-        return exec
-    except PermissionError:
-        print(
-            "Failed to run {}: {}".format(name,
-                                          " ".join(sched_cl)),
-            file=sys.stderr)
-        if on_failure:
-            return on_failure(name, cl)
-        else:
-            sys.exit(2)
+    exec = subprocess.Popen(
+        cl, stdout=stdout, stderr=stderr)
+    exec.name = name
+    return exec
+
 
 
 def terminate_cl(p, terminate=False):
