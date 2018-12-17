@@ -511,8 +511,10 @@ class SchedBebida(BatsimScheduler):
                         # only recreate a profile if it has started
                         if curr_task_progress != 0:
                             # Now let's modify the current internal profile to reflect progress
-                            curr_task_profile = profile[old_job.profile]["seq"][
-                                progress["current_task"]
+                            curr_task_profile = self.bs.profiles[
+                                self.bs.profiles[old_job.profile]["seq"][
+                                    progress["current_task"]
+                                ]
                             ]
                             assert (
                                 curr_task_profile["type"]
