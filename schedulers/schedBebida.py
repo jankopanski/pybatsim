@@ -492,7 +492,10 @@ class SchedBebida(BatsimScheduler):
                         if curr_task_progress != 0:
                             # Now let's modify the current internal profile to reflect progress
                             curr_task_profile = profile[old_job.profile]["seq"][progress["current_task"]
-                            assert curr_task_profile["type"] == "parallel_homogeneous_total", "Only parallel_homegeneous_total profile are supported right now"
+                            assert (
+                                curr_task_profile["type"] == "parallel_homogeneous_total",
+                                "Only parallel_homegeneous_total profile are supported right now"
+                            )
                             for key, value in curr_task_profile.items():
                                 if isinstance(value, (int, float)):
                                     curr_task_profile[key] = value * (1 - curr_task_progress)
