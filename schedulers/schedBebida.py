@@ -253,6 +253,8 @@ class SchedBebida(BatsimScheduler):
         else:
             self.variant = self.options["variant"]
 
+        self.notify_already_send = False
+
     def onSimulationBegins(self):
         self.free_resources = ProcSet(*[res_id for res_id in self.bs.resources.keys()])
         self.nb_total_resources = len(self.free_resources)
@@ -375,8 +377,10 @@ class SchedBebida(BatsimScheduler):
             and self.bs.nb_jobs_in_submission == 0
             and len(self.running_jobs()) == 0
             and len(self.in_killing_jobs()) == 0
+            and not self.notify_already_send
         ):
             self.bs.notify_registration_finished()
+            self.notify_already_send = True
 
     def onRemoveResources(self, resources):
         self.available_resources = self.available_resources - ProcSet.from_str(
