@@ -537,7 +537,8 @@ class SchedBebida(BatsimScheduler):
                             )
 
                             new_job.profile_dict["seq"][0] = curr_task_profile_name
-                            to_submit[curr_task_profile_name] = curr_task_profile
+                            if curr_task_profile_name not in self.bs.profiles[new_job.workload]:
+                                to_submit[curr_task_profile_name] = curr_task_profile
 
                         # submit the new internal current task profile
                         self.bs.register_profiles(new_job.workload, to_submit)
