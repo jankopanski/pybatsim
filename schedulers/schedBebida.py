@@ -95,6 +95,7 @@ def new_io_profile_name(base_job_profile, io_profiles):
 def generate_dfs_io_profile(
     profile_dict,
     job_alloc,
+    io_alloc_read,
     io_alloc,
     remote_block_location_list,
     block_size_in_MB,
@@ -124,9 +125,9 @@ def generate_dfs_io_profile(
         host_id = nth(job_alloc, host_that_read_index)
 
         # Only pick local reads if the host AND its disk is involved
-        # in the io_alloc
+        # in the io_alloc_read
         if nb_blocks_to_read_local > 0 and local_disk_in_alloc(
-            host_id, io_alloc, storage_map
+            host_id, io_alloc_read, storage_map
         ):
 
             row = index_of(io_alloc, storage_map[host_id])
@@ -155,10 +156,6 @@ def generate_dfs_io_profile(
     for _ in reversed(range(nb_blocks_to_write)):
 
         host_id = nth(job_alloc, host_that_write_index)
-        # Only use hosts AND its disk is involved in the io_alloc
-        while not local_disk_in_alloc(host_id, io_alloc, storage_map):
-            host_that_write_index = (host_that_write_index + 1) % len(job_alloc)
-            host_id = nth(job_alloc, host_that_write_index)
 
         col = index_of(io_alloc, storage_map[host_id])
         row = host_that_write_index
@@ -371,7 +368,9 @@ class SchedBebida(BatsimScheduler):
         self.logger.debug("JOBS: \n{}".format(self.bs.jobs))
 
         if (
-            self.bs.nb_jobs_scheduled == self.bs.nb_jobs_completed
+            self.bs.nb_jobs_scheduled
+            == self.bs.nb_jobs_completed
+            == self.bs.nb_jobs_submitted
             and self.bs.no_more_static_jobs
             and self.bs.nb_jobs_in_submission == 0
             and len(self.running_jobs()) == 0
@@ -667,7 +666,12 @@ class SchedBebida(BatsimScheduler):
                     for _ in range(nb_blocks_to_read_remote)
                 ]
 
-                io_alloc = job.allocation | ProcSet(*remote_block_location_list)
+                io_alloc_read = job.allocation | ProcSet(*remote_block_location_list)
+                # Add all local disk in the allocation because they are
+                # involved in the write process
+                io_alloc = io_alloc_read | ProcSet(
+                    *[self.storage_map[disk] for disk in job.allocation]
+                )
 
                 # Manage Sequence job
                 if job.profile_dict["type"] == "composed":
@@ -683,6 +687,7 @@ class SchedBebida(BatsimScheduler):
                         io_profiles[io_profile_name] = generate_dfs_io_profile(
                             profile,
                             job.allocation,
+                            io_alloc_read,
                             io_alloc,
                             remote_block_location_list,
                             self.block_size_in_MB,
@@ -711,6 +716,7 @@ class SchedBebida(BatsimScheduler):
                         "profile": generate_dfs_io_profile(
                             job.profile_dict,
                             job.allocation,
+                            io_alloc_read,
                             io_alloc,
                             nb_blocks_to_read_local,
                             remote_block_location_list,
