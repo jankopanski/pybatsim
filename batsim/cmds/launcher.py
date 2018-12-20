@@ -8,6 +8,7 @@ Options:
     --version                               Print the version of pybatsim and exit
     -h --help                               Show this help message and exit.
     -v --verbose                            Be verbose.
+    -d --debug                              Be more verbose.
     -p --protect                            Protect the scheduler using a validating machine.
     -s --socket-endpoint=<endpoint>         Batsim socket endpoint to use [default: tcp://*:28000]
     -e --event-socket-endpoint=<endpoint>   Socket endpoint to use to publish scheduler events [default: tcp://*:29000]
@@ -18,6 +19,7 @@ Options:
 
 import sys
 import json
+import logging
 
 from docopt import docopt
 
@@ -27,10 +29,14 @@ from batsim import __version__
 def main():
     arguments = docopt(__doc__, version=__version__)
 
+    loglevel = logging.WARNING
     if arguments['--verbose']:
-        verbose = 999
-    else:
-        verbose = 0
+        loglevel = logging.INFO
+    if arguments['--debug']:
+        loglevel = logging.DEBUG
+
+    FORMAT = '[pybatsim - %(asctime)s - %(name)s - %(levelname)s] %(message)s'
+    logging.basicConfig(format=FORMAT, level=loglevel)
 
     timeout = int(arguments['--timeout'] or float("inf"))
 
@@ -55,8 +61,7 @@ def main():
                             event_socket_endpoint,
                             options,
                             timeout,
-                            protect,
-                            verbose)
+                            protect)
 
 
 if __name__ == "__main__":
