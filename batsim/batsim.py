@@ -22,21 +22,23 @@ class Batsim(object):
     WORKLOAD_JOB_SEPARATOR_REPLACEMENT = "%"
 
     def __init__(self, scheduler,
-                 network_handler=None,
-                 event_handler=None,
+                 network_endpoint,
+                 timeout,
+                 event_endpoint=None,
                  validatingmachine=None):
 
 
         self.logger = logging.getLogger(__name__)
 
         self.running_simulation = False
-        if network_handler is None:
-            network_handler = NetworkHandler('tcp://*:28000')
-        if event_handler is None:
-            event_handler = NetworkHandler(
-                'tcp://127.0.0.1:28001', type=zmq.PUB)
-        self.network = network_handler
-        self.event_publisher = event_handler
+        self.network = NetworkHandler(network_endpoint, timeout=timeout)
+        self.network.bind()
+
+        # event hendler is optional
+        self.event_publisher = None
+        if event_endpoint is not None:
+            self.event_publisher = NetworkHandler(event_endpoint, type=zmq.PUB)
+            self.event_publisher.bind()
 
         self.jobs = dict()
 
@@ -64,9 +66,6 @@ class Batsim(object):
 
         self.no_more_static_jobs = False
 
-        self.network.bind()
-        self.event_publisher.bind()
-
         self.scheduler.bs = self
         # import pdb; pdb.set_trace()
         # Wait the "simulation starts" message to read the number of machines
@@ -78,7 +77,8 @@ class Batsim(object):
         """Sends a message to subscribed event listeners (e.g. external processes which want to
         observe the simulation).
         """
-        self.event_publisher.send_string(event)
+        if self.event_publisher is not None:
+            self.event_publisher.send_string(event)
 
     def time(self):
         return self._current_time
@@ -592,7 +592,8 @@ class Batsim(object):
 
         if finished_received:
             self.network.close()
-            self.event_publisher.close()
+            if self.event_publisher is not None:
+                self.event_publisher.close()
 
         return not finished_received
 
