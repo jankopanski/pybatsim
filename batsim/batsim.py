@@ -353,7 +353,7 @@ class Batsim(object):
         full id in "parent_job" and the number of resubmissions in "nb_resubmit".
         """
 
-        if job.metadata is None:
+        if job.metadata is None or not "nb_resubmit" in metadata:
             metadata = {"parent_job" : job.id, "nb_resubmit": 1}
         else:
             metadata = deepcopy(job.metadata)
