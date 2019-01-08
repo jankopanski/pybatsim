@@ -731,7 +731,7 @@ class SchedBebida(BatsimScheduler):
                     if job.metadata is None:
                         metadata = {"locality" : seq_locality}
                     else:
-                        metadata = deepcopy(job.metadata)
+                        metadata = copy.deepcopy(job.metadata)
                         if "locality" not in metadata:
                             metadata["locality"] = seq_locality
                         else:
