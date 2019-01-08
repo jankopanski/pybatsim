@@ -353,13 +353,16 @@ class Batsim(object):
         full id in "parent_job" and the number of resubmissions in "nb_resubmit".
         """
 
-        if job.metadata is None or not "nb_resubmit" in job.metadata:
+        if job.metadata is None:
             metadata = {"parent_job": job.id, "nb_resubmit": 1}
         else:
             metadata = deepcopy(job.metadata)
+            if "nb_resubmit" not in metadata:
+                metadata["nb_resubmit"] = 1
+            else:
+                metadata["nb_resubmit"] = metadata["nb_resubmit"] + 1
             if "parent_job" not in metadata:
                 metadata["parent_job"] = job.id
-            metadata["nb_resubmit"] = metadata["nb_resubmit"] + 1
 
         # Keep the current workload and add a resubmit number
         splitted_id = job.id.split(Batsim.ATTEMPT_JOB_SEPARATOR)
