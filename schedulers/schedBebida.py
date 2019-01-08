@@ -95,7 +95,6 @@ def new_io_profile_name(base_job_profile, io_profiles):
 def generate_dfs_io_profile(
     profile_dict,
     job_alloc,
-    io_alloc_read,
     io_alloc,
     remote_block_location_list,
     block_size_in_MB,
@@ -121,24 +120,20 @@ def generate_dfs_io_profile(
 
     # Fill in reads in the matrix
     host_that_read_index = 0
+
+    # Add local reads
     while nb_blocks_to_read_local > 0:
         col = host_that_read_index
         host_id = nth(job_alloc, host_that_read_index)
 
-        # Only pick local reads if the host AND its disk is involved
-        # in the io_alloc_read
-        if nb_blocks_to_read_local > 0 and local_disk_in_alloc(
-            host_id, io_alloc_read, storage_map
-        ):
-
-            row = index_of(io_alloc, storage_map[host_id])
-            comm_matrix[(row * len(io_alloc)) + col] += block_size_in_Bytes
-            nb_blocks_to_read_local = nb_blocks_to_read_local - 1
+        row = index_of(io_alloc, storage_map[host_id])
+        comm_matrix[(row * len(io_alloc)) + col] += block_size_in_Bytes
+        nb_blocks_to_read_local = nb_blocks_to_read_local - 1
 
         # Round robin trough the hosts
         host_that_read_index = (host_that_read_index + 1) % len(job_alloc)
 
-    # This is a remote read
+    # Add remote reads
     while nb_blocks_to_read_remote > 0:
         row = index_of(
             io_alloc,
@@ -702,7 +697,6 @@ class SchedBebida(BatsimScheduler):
                         io_profiles[io_profile_name], real_locality = generate_dfs_io_profile(
                             profile,
                             job.allocation,
-                            io_alloc_read,
                             io_alloc,
                             remote_block_location_list,
                             self.block_size_in_MB,
