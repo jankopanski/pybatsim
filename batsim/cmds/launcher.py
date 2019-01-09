@@ -7,8 +7,9 @@ Usage:
 Options:
     --version                               Print the version of pybatsim and exit
     -h --help                               Show this help message and exit.
-    -v --verbose                            Be verbose.
-    -d --debug                              Be more verbose.
+    -v --verbosity=<verbosity-level>        Sets the verbosity level. Available
+                                            values are {debug, info, warning, error, critical}
+                                            Default: info
     -p --protect                            Protect the scheduler using a validating machine.
     -s --socket-endpoint=<endpoint>         Batsim socket endpoint to use [default: tcp://*:28000]
     -e --event-socket-endpoint=<endpoint>   Socket endpoint to use to publish scheduler events
@@ -30,10 +31,10 @@ def main():
     arguments = docopt(__doc__, version=__version__)
 
     loglevel = logging.WARNING
-    if arguments['--verbose']:
+    if not arguments['--verbosity']:
         loglevel = logging.INFO
-    if arguments['--debug']:
-        loglevel = logging.DEBUG
+    else:
+        loglevel = logging.getLevelName(arguments['--verbosity'].upper())
 
     FORMAT = '[pybatsim - %(asctime)s - %(name)s - %(levelname)s] %(message)s'
     logging.basicConfig(format=FORMAT, level=loglevel)

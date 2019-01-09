@@ -709,11 +709,7 @@ class BatsimScheduler(object):
 
     def __init__(self, options = {}):
         self.options = options
-
-        FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        logging.basicConfig(format=FORMAT)
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
 
     def onAfterBatsimInit(self):
         # You now have access to self.bs and all other functions
