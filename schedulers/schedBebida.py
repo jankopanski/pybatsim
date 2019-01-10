@@ -296,22 +296,16 @@ class SchedBebida(BatsimScheduler):
             )
 
             ## Locality default values are taken from Bebida experiments
-            ## observed locality. For more details See:
+            ## observed locality 70%+-10. For more details See:
             ## https://gitlab.inria.fr/mmercier/bebida/blob/master/experiments/run_bebida/bebida_results_analysis.ipynb
 
             # Level of locality
-            if "node_locality_in_percent" not in self.options:
-                self.node_locality_in_percent = 70
-            else:
-                self.node_locality_in_percent = self.options["node_locality_in_percent"]
+            self.node_locality_in_percent = self.options.get(
+                    "node_locality_in_percent", 70)
 
             # Level of locality variation (uniform)
-            if "node_locality_variation_in_percent" not in self.options:
-                self.node_locality_variation_in_percent = 10
-            else:
-                self.node_locality_variation_in_percent = self.options[
-                    "node_locality_variation_in_percent"
-                ]
+            self.node_locality_variation_in_percent = self.options.get(
+                    "node_locality_variation_in_percent", 10)
 
             self.logger.info(
                 "Node locality is set to: {}% +- {}%".format(
