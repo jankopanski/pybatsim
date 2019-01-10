@@ -514,9 +514,10 @@ class SchedBebida(BatsimScheduler):
                         # only recreate a profile if it has started
                         if curr_task_progress != 0:
                             # Now let's modify the current internal profile to reflect progress
-                            curr_task_profile = self.bs.profiles[old_job.workload][
+                            curr_task_profile = copy.deepcopy(
+                                    self.bs.profiles[old_job.workload][
                                 progress["current_task"]["profile_name"]
-                            ]
+                            ])
                             assert (
                                 curr_task_profile["type"]
                                 == "parallel_homogeneous_total"
