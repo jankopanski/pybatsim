@@ -37,7 +37,7 @@ As there are different release paces between Batsim and Pybatsim versions, here 
     - `Batsim v3_0_0`_ with `Pybatsim v3_0_0`_ (latest major release, stable)
     - `Batsim v2_0_0`_ with `Pybatsim batsim_2_0_compatible`_
 
-Moreover, all notable changes are listed in the :ref:`changelog`.
+Moreover, all notable changes are listed in the `changelog <https://gitlab.inria.fr/batsim/pybatsim/blob/master/CHANGELOG.rst>`_.
 
 Examples
 --------
