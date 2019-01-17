@@ -383,15 +383,13 @@ class SchedBebida(BatsimScheduler):
             self.notify_already_send = True
 
     def onRemoveResources(self, resources):
-        self.available_resources = self.available_resources - ProcSet.from_str(
-            resources
-        )
+        self.available_resources = self.available_resources - resources
 
         # find the list of jobs that are impacted
         # and kill all those jobs
         to_be_killed = []
         for job in self.running_jobs():
-            if job.allocation & ProcSet.from_str(resources):
+            if job.allocation & resources:
                 to_be_killed.append(job)
 
         if len(to_be_killed) > 0:
@@ -403,7 +401,7 @@ class SchedBebida(BatsimScheduler):
         in_killing = self.in_killing_jobs()
         if not in_killing or all(
             [
-                len(job.allocation & ProcSet.from_str(resources)) == 0
+                len(job.allocation & resources) == 0
                 for job in in_killing
             ]
         ):
@@ -412,20 +410,19 @@ class SchedBebida(BatsimScheduler):
         else:
             # keep track of resources to be removed that are from killed jobs
             # related to a previous event
-            self.to_be_removed_resources[resources] = [
+            self.to_be_removed_resources[str(resources)] = [
                 job
                 for job in in_killing
-                if len(job.allocation & ProcSet.from_str(resources)) != 0
+                if len(job.allocation & resources) != 0
             ]
 
     def onAddResources(self, resources):
-        to_add_resources = ProcSet.from_str(resources)
         assert (
-            len(to_add_resources & ProcSet(*self.bs.storage_resources)) == 0
+            len(resources & ProcSet(*self.bs.storage_resources)) == 0
         ), "Resources to be added should not contain storage resources!"
-        self.available_resources = self.available_resources | to_add_resources
+        self.available_resources = self.available_resources | resources
         # add the resources
-        self.free_resources = self.free_resources | to_add_resources
+        self.free_resources = self.free_resources | resources
 
         self.load_balance_jobs()
 
@@ -456,7 +453,7 @@ class SchedBebida(BatsimScheduler):
         for resources, to_be_killed in self.to_be_removed_resources.items():
             if len(to_be_killed) > 0 and any([job in jobs for job in to_be_killed]):
                 # Notify that the resources was removed
-                self.bs.notify_resources_removed(resources)
+                self.bs.notify_resources_removed(ProcSet.from_str(resources))
                 to_remove.append(resources)
                 # Mark the resources as not available
                 self.free_resources = self.free_resources - ProcSet.from_str(resources)

@@ -122,6 +122,7 @@ class Batsim(object):
         })
 
     def start_jobs(self, jobs, res):
+        """ DEPRECATED: please use execute_jobs instead """
         """ args:res: is list of int (resources ids) """
         for job in jobs:
             self._events_to_send.append({
@@ -243,7 +244,7 @@ class Batsim(object):
         self.nb_jobs_in_submission = self.nb_jobs_in_submission + 1
 
     def set_resource_state(self, resources, state):
-        """ args:resources: is a list of resource numbers or intervals as strings (e.g., "1-5").
+        """ args:resources: is a ProcSet containing a list of resources.
             args:state: is a state identifier configured in the platform specification.
         """
 
@@ -251,7 +252,7 @@ class Batsim(object):
             "timestamp": self.time(),
             "type": "SET_RESOURCE_STATE",
             "data": {
-                    "resources": " ".join([str(r) for r in resources]),
+                    "resources": str(resources),
                     "state": str(state)
             }
         })
@@ -312,7 +313,7 @@ class Batsim(object):
                 "timestamp": self.time(),
                 "type": "RESOURCES_ADDED",
                 "data": {
-                    "resources": resources
+                    "resources": str(resources)
                 }
             }
         )
@@ -323,7 +324,7 @@ class Batsim(object):
                 "timestamp": self.time(),
                 "type": "RESOURCES_REMOVED",
                 "data": {
-                    "resources": resources
+                    "resources": str(resources)
                 }
             }
         )
@@ -464,6 +465,7 @@ class Batsim(object):
                 self.logger.info("All jobs have been submitted and completed!")
                 finished_received = True
                 self.scheduler.onSimulationEnds()
+
             elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
                 job_id = event_data["job_id"]
@@ -502,6 +504,7 @@ class Batsim(object):
                 self.jobs[job_id] = job
 
                 self.scheduler.onJobSubmission(job)
+
             elif event_type == "JOB_KILLED":
                 # get progress
                 killed_jobs = []
@@ -516,6 +519,7 @@ class Batsim(object):
                         killed_jobs.append(j)
                 if len(killed_jobs) != 0:
                     self.scheduler.onJobsKilled(killed_jobs)
+
             elif event_type == "JOB_COMPLETED":
                 job_id = event_data["job_id"]
                 j = self.jobs[job_id]
@@ -537,12 +541,14 @@ class Batsim(object):
                 elif j.job_state == Job.State.COMPLETED_KILLED:
                     self.nb_jobs_killed += 1
                 self.nb_jobs_completed += 1
+
             elif event_type == "FROM_JOB_MSG":
                 job_id = event_data["job_id"]
                 j = self.jobs[job_id]
                 timestamp = event["timestamp"]
                 msg = event_data["msg"]
                 self.scheduler.onJobMessage(timestamp, j, msg)
+
             elif event_type == "RESOURCE_STATE_CHANGED":
                 intervals = event_data["resources"].split(" ")
                 for interval in intervals:
@@ -555,6 +561,7 @@ class Batsim(object):
                         raise Exception("Multiple intervals are not supported")
                     self.scheduler.onMachinePStateChanged(
                         nodeInterval, event_data["state"])
+
             elif event_type == "ANSWER":
                 if "consumed_energy" in event_data:
                     consumed_energy = event_data["consumed_energy"]
@@ -565,12 +572,16 @@ class Batsim(object):
                 elif "air_temperature_all" in event_data:
                     air_temperature_all = event_data["air_temperature_all"]
                     self.scheduler.onAnswerAirTemperatureAll(air_temperature_all)
+
             elif event_type == 'REQUESTED_CALL':
                 self.scheduler.onRequestedCall()
+
             elif event_type == 'ADD_RESOURCES':
-                self.scheduler.onAddResources(event_data["resources"])
+                self.scheduler.onAddResources(ProcSet.from_str(event_data["resources"]))
+
             elif event_type == 'REMOVE_RESOURCES':
-                self.scheduler.onRemoveResources(event_data["resources"])
+                self.scheduler.onRemoveResources(ProcSet.from_str(event_data["resources"]))
+
             elif event_type == "NOTIFY":
                 notify_type = event_data["type"]
                 if notify_type == "no_more_static_job_to_submit":
