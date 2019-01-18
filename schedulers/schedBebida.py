@@ -577,7 +577,8 @@ class SchedBebida(BatsimScheduler):
 
     def schedule(self):
         # Implement a simple FIFO scheduler
-        if len(self.free_resources & self.available_resources) == 0:
+        if (len(self.free_resources & self.available_resources) == 0
+                or len(self.load_balanced_jobs) != 0):
             return
         to_execute = []
         to_schedule_jobs = self.to_schedule_jobs()
