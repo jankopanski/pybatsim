@@ -42,8 +42,8 @@ class QBoxSched(BatsimScheduler):
         self.idleResource = {x:2 for x in self.list_qrads}          # whether the resource is running a job (0), a CPU burn (1) or idle (2)
         self.resourcePstate = {x:0 for x in self.list_qrads}        # maps the resource id to its current Pstate
 
-        # keys are the target states, values are lists of resources to which to change the state
-        self.stateChanges = defaultdict(list)
+        # keys are the target states, values are ProcSets of resources to which to change the state
+        self.stateChanges = defaultdict(ProcSet)
 
         self.flag = True
 
@@ -84,12 +84,12 @@ class QBoxSched(BatsimScheduler):
             self.processingJobs[job.id] = index
             if heating > 1.5: #if heating more than 1.5 degrees required, set machine to full speed
                 if self.resourcePstate[index] != 0:
-                    self.stateChanges[0].append(index)
+                    self.stateChanges[0] |= ProcSet(index)
                     #self.addStateChange(index, 0)
             else: # set machine to lowest speed
                 if self.resourcePstate[index] != (self.qrads_properties[index]["nb_pstates"] -1):
                     #self.addStateChange(index, self.qrads_properties[index]["nb_pstates"]-1)
-                    self.stateChanges[self.qrads_properties[index]["nb_pstates"] -1].append(index)
+                    self.stateChanges[self.qrads_properties[index]["nb_pstates"] -1] |= ProcSet(index)
 
             # assume that the job will heat for 1 degree
             self.temperatureDiffs[index] -= 1.0 
@@ -114,9 +114,10 @@ class QBoxSched(BatsimScheduler):
                 # it SHOULD have been modified when requesting kill of this job'''
 
     def onNoMoreEvents(self):
-
         #populate stateChanges with machines that are idle but the pstate is not the last one
         to_sched = []
+
+        print("-----------No more events")
 
         for (index, run_state) in self.idleResource.items():
             idleState = self.qrads_properties[index]["nb_pstates"]-1
@@ -131,16 +132,16 @@ class QBoxSched(BatsimScheduler):
                 self.cpuBurn[index] = job.id
                 self.qnode.jobs_mapping[job.id] = self
                 if self.resourcePstate[index] != 0:
-                    self.stateChanges[0].append(index)
+                    self.stateChanges[0] |= ProcSet(index)
             elif (run_state == 2) and (self.resourcePstate[index] != idleState):
-                self.stateChanges[idleState].append(index)
+                self.stateChanges[idleState] |= ProcSet(index)
                 self.resourcePstate[index] = idleState
 
         self.bs.execute_jobs(to_sched)
         # Append all SET_RESOURCE_STATE events that occurred during this scheduling phase.
         for (key,value) in self.stateChanges.items():
             self.bs.set_resource_state(value, key)
-        self.stateChanges = defaultdict(list)
+        self.stateChanges.clear()
 
 
     # takes the temperature of the room and compute amount of work needed for each QRad.
@@ -168,9 +169,9 @@ class QBoxSched(BatsimScheduler):
     # Internal function to add to stateChanges another machine.
     '''def addStateChange(self, index, state):
         if state in self.stateChanges:
-            self.stateChanges[state].append(index)
+            self.stateChanges[state] |= ProcSet(index)
         else:
-            self.stateChanges[state] = [index]'''
+            self.stateChanges[state] = ProcSet(index)'''
 
 
     def generateSubmitBurnJob(self):

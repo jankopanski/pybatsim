@@ -96,7 +96,7 @@ class StorageSched(BatsimScheduler):
         self.idSub += 1
         self.bs.register_job(id=jid1, res=1, walltime=-1, profile_name="commUP2")
         job1 = Job(jid1, 0, -1, 1, "", "")
-        job1.allocation = ProcSet(self.m1)
+        job1.allocation = ProcSet(self.m1, self.m2)
         job1.storage_mapping = {'qb_disk':self.m1, 'ceph':self.m2}
         toSched.append(job1)
 
@@ -104,7 +104,7 @@ class StorageSched(BatsimScheduler):
         self.idSub += 1
         self.bs.register_job(id=jid2, res=1, walltime=-1, profile_name="commDOWN2")
         job2 = Job(jid2, 0, -1, 1, "", "")
-        job2.allocation = ProcSet(self.m1)
+        job2.allocation = ProcSet(self.m1, self.m2)
         job2.storage_mapping = {'qb_disk':self.m1, 'ceph':self.m2}
         toSched.append(job2)
 

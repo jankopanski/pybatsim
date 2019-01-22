@@ -13,7 +13,7 @@ import logging
 class QNodeSched(BatsimScheduler):
     def __init__(self, options):
         super().__init__(options)
-
+        
         if not "qbox_sched" in options:
             print("No qbox_sched provided in json options, using qBoxSched by default.")
             self.qbox_sched_name = "schedulers/greco/qBoxSched.py"
@@ -28,7 +28,7 @@ class QNodeSched(BatsimScheduler):
 
         self.dynamic_submission_enabled = True
 
-    def onAfterBatsimInit(self):
+    def initQBoxes(self):
         # Read the platform file to have the architecture.
         dict_ids = {}
         # Retrieves the QBoxe ids and the associated list of QRad ids
@@ -70,17 +70,17 @@ class QNodeSched(BatsimScheduler):
 
 
     def onSimulationBegins(self):
-        self.bs.logger.setLevel(logging.ERROR)
-        for qb in self.dict_qboxes.values():
-            qb.onSimulationBegins()
-
+        #self.bs.logger.setLevel(logging.ERROR)
         profile = {
             "burn" : {'type' : 'parallel_homogeneous', 'cpu' : 1e10, 'com' : 0}
         }
         self.bs.register_profiles("dyn", profile)
         self.bs.wake_me_up_at(100)
 
-        #TODO send profile of CPU burn jobs
+        self.initQBoxes()
+        for qb in self.dict_qboxes.values():
+            qb.onBeforeEvents()
+            qb.onSimulationBegins()
 
     def onSimulationEnds(self):
         for qb in self.dict_qboxes.values():
@@ -111,7 +111,7 @@ class QNodeSched(BatsimScheduler):
         #TODO see if needed to forward toa ll QBoxes
 
     def onBeforeEvents(self):
-        print("\n[", self.bs.time(), "] new Batsim message")
+        #print("\n[", self.bs.time(), "] new Batsim message")
         for qb in self.dict_qboxes.values():
             qb.onBeforeEvents()
 
