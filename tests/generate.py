@@ -7,94 +7,6 @@ import os.path
 import json
 import copy
 
-'''
-def generate_energy(
-        workloads_basedir,
-        platforms_basedir,
-        batsim_bin,
-        batsim_args,
-        options):
-    schedulers = []
-
-    budgets = [0, 2, 0.5]
-
-    name_allow = {}
-    name_allow[(True, False)] = "energyBud"
-    name_allow[(True, True)] = "reducePC"
-    name_allow[(False, True)] = "PC"
-    name_allow[(False, False)] = "SHIT"
-
-    name_shut = {}
-    name_shut[True] = "SHUT"
-    name_shut[False] = "IDLE"
-
-    schedulers += [{
-        "name_expe": "easyEnergyBudget_" + str(b) + "_" + name_allow[allow] + "_" + name_shut[shut],
-        "name":"easyEnergyBudget",
-        "verbose":True,
-        "protection":True,
-        "interpreter": "coverage",
-        "options": {
-            "budget_total": 100 * b * 100 + 30 * (7 - b) * 100,
-            "budget_start": 10,
-            "budget_end": 110,
-            "allow_FCFS_jobs_to_use_budget_saved_measured": allow[0],
-            "reduce_powercap_to_save_energy": allow[1],
-            "monitoring_period":5,
-            "power_idle": 30.0,
-            "power_compute": 100.0,
-            "opportunist_shutdown": shut,
-            "pstate_switchon": 0,
-            "pstate_switchoff": 1,
-            "timeto_switchoff": 5,
-            "timeto_switchon": 25
-        }
-    } for b in budgets for allow in [(True, False), (True, True), (False, True)] for shut in [True, False]]
-
-    budgets = [1000 * 7 * 30 + 30 * 3 * 70, 1000 * 7 * 30]
-
-    schedulers += [
-        {"name_expe": "easyEnergyBudget_" + str(b) + "on1000_" +
-         name_allow[allow] + "_" + name_shut[shut],
-         "name": "easyEnergyBudget", "verbose": True, "protection": True,
-         "interpreter": "coverage",
-         "options":
-         {"budget_total": b, "budget_start": 10, "budget_end": 1010,
-          "allow_FCFS_jobs_to_use_budget_saved_measured": allow[0],
-          "reduce_powercap_to_save_energy": allow[1],
-          "monitoring_period": 5, "power_idle": 30.0, "power_compute": 100.0,
-          "opportunist_shutdown": shut, "pstate_switchon": 0,
-          "pstate_switchoff": 1, "timeto_switchoff": 5, "timeto_switchon": 25}}
-        for b in budgets
-        for allow in [(True, False),
-                      (True, True),
-                      (False, True)] for shut in [True, False]]
-
-    workloads_to_use = [os.path.join(workloads_basedir, "stupid.json")]
-
-    options += [{
-        # where all output files (stdins, stderrs, csvs...) will be outputed.
-        "output-dir": "SELF",
-        # if set to "SELF" then output on the same dir as this option file.
-
-        "export": "out",        # The export filename prefix used to generate simulation output
-
-        "batsim": {
-            "executable": {
-                "path": batsim_bin,
-                "args": batsim_args,
-            },
-            "platform": os.path.join(platforms_basedir, "energy_platform_homogeneous_no_net.xml"),
-            "workload": w,
-            "energy": True,  # Enables energy-aware experiments
-            "disable-schedule-tracing": True,  # remove paje output
-            "verbosity": "information"  # Sets the Batsim verbosity level. Available values
-                                        # are : quiet, network-only,
-                                        # information (default), debug.
-        },
-        "scheduler": copy.deepcopy(s)
-    } for s in schedulers for w in workloads_to_use]
-'''
 
 def generate_basic(
         workloads_basedir,
@@ -106,7 +18,7 @@ def generate_basic(
 
     schedulers += [
         {
-            "name_expe": "basic_filler_sched",
+            "name_expe": "basic_filler_sched_",
             "name": "fillerSched",
             "verbose": False,
             "protection": True,
@@ -155,7 +67,7 @@ def generate_sched_static(
 
     schedulers += [
         {
-            "name_expe": "sched_fillerSched",
+            "name_expe": "sched_fillerSched_",
             "name": "schedFiller",
             "verbose": False,
             "protection": True,
@@ -165,7 +77,7 @@ def generate_sched_static(
             "dynamic":False
         },
         {
-            "name_expe": "sched_backfilling",
+            "name_expe": "sched_backfilling_",
             "name": "schedEasySjfBackfill",
             "verbose": False,
             "protection": True,
@@ -177,7 +89,7 @@ def generate_sched_static(
     ]
 
     workloads_to_use = [
-        os.path.join(workloads_basedir, "simple_delay_workload.json")]
+        os.path.join(workloads_basedir, "test_delays.json")]
 
     options += [{
         # where all output files (stdins, stderrs, csvs...) will be outputed.
@@ -215,7 +127,7 @@ def generate_sched_script(
 
     schedulers += [
         {
-            "name_expe": "sched_fillerSched",
+            "name_expe": "sched_fillerSched_",
             "name": "schedFiller",
             "verbose": False,
             "protection": True,
@@ -224,7 +136,7 @@ def generate_sched_script(
             }
         },
         {
-            "name_expe": "sched_backfilling",
+            "name_expe": "sched_backfilling_",
             "name": "schedEasySjfBackfill",
             "verbose": False,
             "protection": True,
@@ -347,7 +259,7 @@ def do_generate(options):
                 workload_name = opt["batsim"]["workload-script"]["path"]
             except KeyError:
                 workload_name = ""
-        opt["scheduler"]["name_expe"] += "_" + os.path.splitext(
+        opt["scheduler"]["name_expe"] += os.path.splitext(
             os.path.basename(workload_name))[0]
 
         new_dir = "tests/" + opt["scheduler"]["name_expe"]
@@ -364,39 +276,30 @@ def main(args):
     options = []
 
     basic = False
-    energy = False
     sched = False
 
-    workloads_basedir = "../../workloads"
-    platforms_basedir = "../../platforms"
+    workloads_basedir = "tests/workloads"
+    platforms_basedir = "tests/platforms"
     batsim_bin = None
     batsim_args = []
 
     for arg in args:
         if arg == "--basic":
             basic = True
-        elif arg == "--energy":
-            energy = True
         elif arg == "--sched":
             sched = True
-        elif arg.startswith("--workloads-basedir="):
-            workloads_basedir = arg.split("=")[1]
-        elif arg.startswith("--platforms-basedir="):
-            platforms_basedir = arg.split("=")[1]
         elif arg.startswith("--batsim-bin="):
             batsim_bin = arg.split("=")[1]
         else:
             print("Unknown argument: {}".format(arg))
             return 1
 
-    if not energy and not sched and not basic:
+    if not sched and not basic:
         basic = True
-        energy = True
         sched = True
 
     if not batsim_bin:
-        batsim_bin = "docker"
-        batsim_args = ["run", "batsim:dev"]
+        raise Exception("Command line option '--batsim-bin' was not set.")
 
     if basic:
         generate_basic(
@@ -405,15 +308,6 @@ def main(args):
             batsim_bin,
             batsim_args,
             options)
-
-    ''' easyEnergyBudget scheduler is no longer maintained
-    if energy:
-        generate_energy(
-            workloads_basedir,
-            platforms_basedir,
-            batsim_bin,
-            batsim_args,
-            options)'''
 
     if sched:
         generate_sched(

@@ -143,7 +143,7 @@ class FcfsSchedSleep(BatsimScheduler):
         # send to uds
         self.bs.execute_jobs(scheduled_jobs)
         for (val, (r1,r2)) in pstates_to_change:
-            self.bs.set_resource_state([r1], val)
+            self.bs.set_resource_state(ProcSet(r1), val)
 
     def onJobSubmission(self, job):
         self.open_jobs.append(job)

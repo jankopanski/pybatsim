@@ -47,24 +47,18 @@ class TestCommand(UserCommand):
 
     description = 'Run tests'
     user_options = [
-        ('batsim-bin=', None, 'Path/to/batsim/binary'),
-        ('workloads-basedir=', None, 'Path/to/batsim/workloads'),
-        ('platforms-basedir=', None, 'Path/to/batsim/platforms')
+        ('batsim-bin=', None, 'Path/to/batsim/binary')
     ]
 
     def initialize_options(self):
         self.batsim_bin = None
-        self.workloads_basedir = None
-        self.platforms_basedir = None
 
     def finalize_options(self):
         self.args = []
         if self.batsim_bin is not None:
             self.args.append('BATSIMBIN=--batsim-bin=' + str(self.batsim_bin))
-        if self.workloads_basedir is not None:
-            self.args.append('WORKLOADSDIR=--workloads-basedir=' + str(self.workloads_basedir))
-        if self.platforms_basedir is not None:
-            self.args.append('PLATFORMSDIR=--platforms-basedir=' + str(self.platforms_basedir))
+        else:
+            raise Exception("Command line option '--batsim-bin' was not set.")
 
     def run(self):
         if len(self.args) > 0:
@@ -151,7 +145,6 @@ setup(
     zip_safe=False,
     description="Python scheduler for Batsim",
     long_description=read_me,
-    long_description_content_type='text/markdown',
     keywords='Scheduler',
     license='LGPLv3',
     classifiers=[

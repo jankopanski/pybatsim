@@ -3,11 +3,11 @@
 #   # Enter the environment
 #   nix-shell do_release.nix
 #
+#   # Create the tag
+#   git tag -a vx.y.z
+#
 #   # create the package
 #   python setup.py sdist
-#
-#   # register to pypi (if not registered yet)
-#   twine register dist/project_name-x.y.z.tar.gz
 #
 #   # upload you package
 #   twine upload dist/project_name-x.y.z.tar.gz

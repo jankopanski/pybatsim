@@ -6,6 +6,7 @@
 """
 import zmq
 import json
+import logging
 
 
 class NetworkHandler:
@@ -13,23 +14,22 @@ class NetworkHandler:
     def __init__(
             self,
             socket_endpoint,
-            verbose=0,
             timeout=2000,
             type=zmq.REP):
         self.socket_endpoint = socket_endpoint
-        self.verbose = verbose
         self.timeout = timeout
         self.context = zmq.Context()
         self.connection = None
         self.type = type
+
+        self.logger = logging.getLogger(__name__)
 
     def send(self, msg):
         self.send_string(json.dumps(msg))
 
     def send_string(self, msg):
         assert self.connection, "Connection not open"
-        if self.verbose > 0:
-            print("[PYBATSIM]: SEND_MSG\n {}".format(msg))
+        self.logger.debug("[PYBATSIM]: SEND_MSG\n {}".format(msg))
         self.connection.send_string(msg)
 
     def recv(self, blocking=False):
@@ -49,8 +49,7 @@ class NetworkHandler:
         except zmq.error.Again:
             return None
 
-        if self.verbose > 0:
-            print('[PYBATSIM]: RECEIVED_MSG\n {}'.format(msg))
+        self.logger.debug('[PYBATSIM]: RECEIVED_MSG\n {}'.format(msg))
 
         return msg
 
@@ -58,8 +57,7 @@ class NetworkHandler:
         assert not self.connection, "Connection already open"
         self.connection = self.context.socket(self.type)
 
-        if self.verbose > 0:
-            print("[PYBATSIM]: binding to {addr}"
+        self.logger.debug("[PYBATSIM]: binding to {addr}"
                   .format(addr=self.socket_endpoint))
         self.connection.bind(self.socket_endpoint)
 
@@ -67,8 +65,7 @@ class NetworkHandler:
         assert not self.connection, "Connection already open"
         self.connection = self.context.socket(self.type)
 
-        if self.verbose > 0:
-            print("[PYBATSIM]: connecting to {addr}"
+        self.logger.debug("[PYBATSIM]: connecting to {addr}"
                   .format(addr=self.socket_endpoint))
         self.connection.connect(self.socket_endpoint)
 

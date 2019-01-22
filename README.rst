@@ -28,6 +28,17 @@ The following commands are provided:
     To manipulate the `out_jobs.csv` file based on data only available in the
     scheduler but not in Batsim.
 
+Batsim Version Compatibilities
+------------------------------
+
+As there are different release paces between Batsim and Pybatsim versions, here is a list of compatibilities between the two projects:
+
+    - `Batsim master branch`_ with `Pybatsim master branch`_ (development branches, may be unstable)
+    - `Batsim v3_0_0`_ with `Pybatsim v3_0_0`_ (latest major release, stable)
+    - `Batsim v2_0_0`_ with `Pybatsim batsim_2_0_compatible`_
+
+Moreover, all notable changes are listed in the `changelog <https://gitlab.inria.fr/batsim/pybatsim/blob/master/CHANGELOG.rst>`_.
+
 Examples
 --------
 
@@ -121,6 +132,18 @@ To generate the html documentation use the setup target::
 Testing
 -------
 
-To run the test experiments use the setup target::
+To run the test experiments it is preferable to first enter in a nix shell specific for the pybatsim development with the following command::
 
-  ./setup.py test --batsim-bin=path/to/batsim/binary --workloads-basedir=path/to/workloads/dir --platforms-basedir=path/to/platforms/dir
+  nix-shell https://github.com/oar-team/kapack/archive/master.tar.gz -A pybatsim_dev
+
+Then you can run tests with the setup target::
+
+  ./setup.py test --batsim-bin=path/to/batsim/binary
+
+
+.. _Batsim master branch: https://gitlab.inria.fr/batsim/batsim/tree/master
+.. _Pybatsim master branch: https://gitlab.inria.fr/batsim/pybatsim/tree/master
+.. _Batsim v3_0_0: https://gitlab.inria.fr/batsim/batsim/tags/v3.0.0
+.. _Pybatsim v3_0_0: https://gitlab.inria.fr/batsim/pybatsim/tags/v3.0.0
+.. _Batsim v2_0_0: https://gitlab.inria.fr/batsim/batsim/tags/v2.0.0
+.. _Pybatsim batsim_2_0_compatible: https://gitlab.inria.fr/batsim/pybatsim/tags/batsim_2.0_compatible

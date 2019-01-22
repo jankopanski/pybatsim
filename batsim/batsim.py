@@ -22,24 +22,23 @@ class Batsim(object):
     WORKLOAD_JOB_SEPARATOR_REPLACEMENT = "%"
 
     def __init__(self, scheduler,
-                 network_handler=None,
-                 event_handler=None,
+                 network_endpoint,
+                 timeout,
+                 event_endpoint=None,
                  validatingmachine=None):
 
 
-        FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        logging.basicConfig(format=FORMAT)
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
 
         self.running_simulation = False
-        if network_handler is None:
-            network_handler = NetworkHandler('tcp://*:28000')
-        if event_handler is None:
-            event_handler = NetworkHandler(
-                'tcp://127.0.0.1:28001', type=zmq.PUB)
-        self.network = network_handler
-        self.event_publisher = event_handler
+        self.network = NetworkHandler(network_endpoint, timeout=timeout)
+        self.network.bind()
+
+        # event hendler is optional
+        self.event_publisher = None
+        if event_endpoint is not None:
+            self.event_publisher = NetworkHandler(event_endpoint, type=zmq.PUB)
+            self.event_publisher.bind()
 
         self.jobs = dict()
 
@@ -67,9 +66,6 @@ class Batsim(object):
 
         self.no_more_static_jobs = False
 
-        self.network.bind()
-        self.event_publisher.bind()
-
         self.scheduler.bs = self
         # import pdb; pdb.set_trace()
         # Wait the "simulation starts" message to read the number of machines
@@ -81,7 +77,8 @@ class Batsim(object):
         """Sends a message to subscribed event listeners (e.g. external processes which want to
         observe the simulation).
         """
-        self.event_publisher.send_string(event)
+        if self.event_publisher is not None:
+            self.event_publisher.send_string(event)
 
     def time(self):
         return self._current_time
@@ -126,6 +123,7 @@ class Batsim(object):
 
     ''' THIS FUNCTION IS DEPRECATED '''
     def start_jobs(self, jobs, res):
+        """ DEPRECATED: please use execute_jobs instead """
         """ args:res: is list of int (resources ids) """
         for job in jobs:
             self._events_to_send.append({
@@ -250,7 +248,7 @@ class Batsim(object):
         self.nb_jobs_in_submission = self.nb_jobs_in_submission + 1
 
     def set_resource_state(self, resources, state):
-        """ args:resources: is a list of resource numbers or intervals as strings (e.g., "1-5").
+        """ args:resources: is a ProcSet containing a list of resources.
             args:state: is a state identifier configured in the platform specification.
         """
 
@@ -258,7 +256,7 @@ class Batsim(object):
             "timestamp": self.time(),
             "type": "SET_RESOURCE_STATE",
             "data": {
-                    "resources": " ".join([str(r) for r in resources]),
+                    "resources": str(resources),
                     "state": str(state)
             }
         })
@@ -333,7 +331,7 @@ class Batsim(object):
                 "timestamp": self.time(),
                 "type": "RESOURCES_ADDED",
                 "data": {
-                    "resources": resources
+                    "resources": str(resources)
                 }
             }
         )
@@ -344,7 +342,7 @@ class Batsim(object):
                 "timestamp": self.time(),
                 "type": "RESOURCES_REMOVED",
                 "data": {
-                    "resources": resources
+                    "resources": str(resources)
                 }
             }
         )
@@ -375,12 +373,15 @@ class Batsim(object):
         """
 
         if job.metadata is None:
-            metadata = {"parent_job" : job.id, "nb_resubmit": 1}
+            metadata = {"parent_job": job.id, "nb_resubmit": 1}
         else:
             metadata = deepcopy(job.metadata)
+            if "nb_resubmit" not in metadata:
+                metadata["nb_resubmit"] = 1
+            else:
+                metadata["nb_resubmit"] = metadata["nb_resubmit"] + 1
             if "parent_job" not in metadata:
                 metadata["parent_job"] = job.id
-            metadata["nb_resubmit"] = metadata["nb_resubmit"] + 1
 
         # Keep the current workload and add a resubmit number
         splitted_id = job.id.split(Batsim.ATTEMPT_JOB_SEPARATOR)
@@ -484,6 +485,7 @@ class Batsim(object):
                 self.logger.info("All jobs have been submitted and completed!")
                 finished_received = True
                 self.scheduler.onSimulationEnds()
+
             elif event_type == "JOB_SUBMITTED":
                 # Received WORKLOAD_NAME!JOB_ID
                 job_id = event_data["job_id"]
@@ -522,6 +524,7 @@ class Batsim(object):
                 self.jobs[job_id] = job
 
                 self.scheduler.onJobSubmission(job)
+
             elif event_type == "JOB_KILLED":
                 # get progress
                 killed_jobs = []
@@ -536,6 +539,7 @@ class Batsim(object):
                         killed_jobs.append(j)
                 if len(killed_jobs) != 0:
                     self.scheduler.onJobsKilled(killed_jobs)
+
             elif event_type == "JOB_COMPLETED":
                 job_id = event_data["job_id"]
                 j = self.jobs[job_id]
@@ -557,12 +561,14 @@ class Batsim(object):
                 elif j.job_state == Job.State.COMPLETED_KILLED:
                     self.nb_jobs_killed += 1
                 self.nb_jobs_completed += 1
+
             elif event_type == "FROM_JOB_MSG":
                 job_id = event_data["job_id"]
                 j = self.jobs[job_id]
                 timestamp = event["timestamp"]
                 msg = event_data["msg"]
                 self.scheduler.onJobMessage(timestamp, j, msg)
+
             elif event_type == "RESOURCE_STATE_CHANGED":
                 intervals = event_data["resources"].split(" ")
                 for interval in intervals:
@@ -575,6 +581,7 @@ class Batsim(object):
                         raise Exception("Multiple intervals are not supported")
                     self.scheduler.onMachinePStateChanged(
                         nodeInterval, event_data["state"])
+
             elif event_type == "ANSWER":
                 if "consumed_energy" in event_data:
                     consumed_energy = event_data["consumed_energy"]
@@ -585,12 +592,16 @@ class Batsim(object):
                 elif "air_temperature_all" in event_data:
                     air_temperature_all = event_data["air_temperature_all"]
                     self.scheduler.onAnswerAirTemperatureAll(air_temperature_all)
+
             elif event_type == 'REQUESTED_CALL':
                 self.scheduler.onRequestedCall()
+
             elif event_type == 'ADD_RESOURCES':
-                self.scheduler.onAddResources(event_data["resources"])
+                self.scheduler.onAddResources(ProcSet.from_str(event_data["resources"]))
+
             elif event_type == 'REMOVE_RESOURCES':
-                self.scheduler.onRemoveResources(event_data["resources"])
+                self.scheduler.onRemoveResources(ProcSet.from_str(event_data["resources"]))
+
             elif event_type == "NOTIFY":
                 notify_type = event_data["type"]
                 if notify_type == "no_more_static_job_to_submit":
@@ -615,7 +626,8 @@ class Batsim(object):
 
         if finished_received:
             self.network.close()
-            self.event_publisher.close()
+            if self.event_publisher is not None:
+                self.event_publisher.close()
 
         return not finished_received
 
@@ -728,11 +740,7 @@ class BatsimScheduler(object):
 
     def __init__(self, options = {}):
         self.options = options
-
-        FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        logging.basicConfig(format=FORMAT)
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
 
     def onAfterBatsimInit(self):
         # You now have access to self.bs and all other functions

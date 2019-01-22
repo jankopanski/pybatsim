@@ -100,12 +100,11 @@ def instanciate_scheduler(name, options):
 
 
 def launch_scheduler(scheduler,
-                     socket_endpoint="tcp://*:28000",
-                     event_socket_endpoint="tcp://*:28001",
-                     options={},
-                     timeout=2000,
-                     protect=True,
-                     verbose=0):
+                     socket_endpoint,
+                     event_socket_endpoint,
+                     options,
+                     timeout,
+                     protect):
 
     if protect:
         vm = ValidatingMachine
@@ -117,8 +116,9 @@ def launch_scheduler(scheduler,
 
     #try:
     bs = Batsim(scheduler,
-                NetworkHandler(socket_endpoint, verbose, timeout),
-                NetworkHandler(event_socket_endpoint, type=zmq.PUB),
+                socket_endpoint,
+                timeout,
+                event_socket_endpoint,
                 validatingmachine=vm)
     aborted = False
     # try:
