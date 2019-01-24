@@ -1,5 +1,6 @@
 from batsim.batsim import BatsimScheduler, Batsim, Job
 from batsim.tools.launcher import launch_scheduler, instanciate_scheduler
+from StorageController import *
 
 import sys
 import os
@@ -28,15 +29,15 @@ class QNodeSched(BatsimScheduler):
 
         self.dynamic_submission_enabled = True
 
-    def initQBoxes(self):
+    def initQBoxesAndStrorageController(self):
         # Read the platform file to have the architecture.
         dict_ids = {}
         # Retrieves the QBoxe ids and the associated list of QRad ids
         for res in self.bs.machines["compute"]:
             batsim_id = res["id"]
             names = res["name"].split("_")
-            qb_id = names[0].lstrip("qb")
-            qr_id = names[1].lstrip("qr")
+            qb_id = names[0]#.lstrip("qb")
+            qr_id = names[1]#.lstrip("qr")
             properties = res["properties"]
 
             if not qb_id in dict_ids:
@@ -63,6 +64,21 @@ class QNodeSched(BatsimScheduler):
             for qr_id in list_qr:
                 self.dict_resources[str(qr_id)] = qb_id
 
+        self.storage_controller = StorageController(self.bs)
+        for machine in self.bs.machines["storage"]:
+            self.storage_controller.add_storage(Storage(machine["id"], machine["name"], int(float(machine["properties"]["size"]))))
+            if machine["name"] == "storage_server":
+                self.ceph_id = machine["id"]
+                self.storage_controller._ceph_id = machine["id"]
+            else:
+                # Each QBox has to know the resource id of its own disk
+                qb_id = machine["name"].rstrip("_disk")
+                self.dict_qboxes[qb_id].disk_id = machine["id"]
+                self.storage_controller.mappingQBoxes[machine["id"]] = self.dict_qboxes[qb_id]
+
+        self.storage_controller.add_dataset(self.ceph_id, Dataset("d1", 100000))
+        self.storage_controller.add_dataset(self.ceph_id, Dataset("d2", 30000))
+
         self.nb_qboxes = len(self.dict_qboxes)
         self.nb_resources = len(self.dict_resources)
         print("-----In QNode Init: Nb_qboxes {}, nb_resources {}, batsim resources {}\n".format(
@@ -75,9 +91,9 @@ class QNodeSched(BatsimScheduler):
             "burn" : {'type' : 'parallel_homogeneous', 'cpu' : 1e10, 'com' : 0}
         }
         self.bs.register_profiles("dyn", profile)
-        self.bs.wake_me_up_at(100)
+        self.bs.wake_me_up_at(1000)
 
-        self.initQBoxes()
+        self.initQBoxesAndStrorageController()
         for qb in self.dict_qboxes.values():
             qb.onBeforeEvents()
             qb.onSimulationBegins()
@@ -85,6 +101,7 @@ class QNodeSched(BatsimScheduler):
     def onSimulationEnds(self):
         for qb in self.dict_qboxes.values():
             qb.onSimulationEnds()
+        self.storage_controller.onSimulationEnds()
 
     def onJobSubmission(self, job):
         #forward job to one QBox that needs most heating
@@ -93,10 +110,13 @@ class QNodeSched(BatsimScheduler):
 
     def onJobCompletion(self, job):
         # forward event to the related QBox
+        print("--- Job", job.id, "completed!")
         
-        #WIP
-        qb = self.jobs_mapping.pop(job.id)
-        qb.onJobCompletion(job)
+        if "dyn-staging" in job.id:
+            self.storage_controller.onDataStagingCompletion(job)
+        else:
+            qb = self.jobs_mapping.pop(job.id)
+            qb.onJobCompletion(job)
 
     def onJobsKilled(self, jobs):
         pass

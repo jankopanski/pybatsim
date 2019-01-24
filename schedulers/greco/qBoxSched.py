@@ -1,11 +1,10 @@
 from batsim.batsim import BatsimScheduler, Batsim, Job
-
 from collections import defaultdict
+from procset import ProcSet
 
 import sys
 import os
 import logging
-from procset import ProcSet
 
 ''' This is the QBox scheduler
 '''
@@ -42,6 +41,10 @@ class QBoxSched(BatsimScheduler):
         self.idleResource = {x:2 for x in self.list_qrads}          # whether the resource is running a job (0), a CPU burn (1) or idle (2)
         self.resourcePstate = {x:0 for x in self.list_qrads}        # maps the resource id to its current Pstate
 
+        self.waitingDatasets = {}
+        self.waitingToLaunch = {}
+        self.datasetMapping = defaultdict(list)
+
         # keys are the target states, values are ProcSets of resources to which to change the state
         self.stateChanges = defaultdict(ProcSet)
 
@@ -72,15 +75,27 @@ class QBoxSched(BatsimScheduler):
             print("-------\n",self.temperatureDiffs, "\n")
             self.qnode.onQBoxRejectJob(job, self.qbox_id)
         else:
+            # Need to rework all this with taking into account the storage controller
             if self.idleResource[index] == 1: # This resource is computing a CPU burn job, kill it
                 job_id = self.cpuBurn[index]
                 self.bs.kill_jobs([self.bs.jobs[job_id]])
                 print("------ Just asked to kill the job", job_id, "on machine", index)
 
-            print("------ Execute job", job.id, "on machine", index)
+            print("[", self.bs.time(), "]------ Execute job", job.id, "on machine", index)
             job.allocation = ProcSet(index)
-            self.bs.execute_jobs([job])
-            self.idleResource[index] = 0
+            #self.bs.execute_jobs([job])
+            datasets = job.json_dict["datasets"]
+            self.waitingDatasets[job.id] = datasets
+            self.waitingToLaunch[job.id] = job
+            for dataset_id in datasets:
+                self.datasetMapping[dataset_id].append(job.id)
+            print("[", self.bs.time(), "] For job", job.id, str(job.allocation), "asking datasets", datasets, " to qbox disk", self.disk_id, self.qbox_id)
+            self.qnode.storage_controller.move_to_dest(datasets, self.disk_id)
+
+            # assume that the job will heat for 1 degree
+            self.temperatureDiffs[index] -= 1.0 
+            self.qnode.heat_requirements[self.qbox_id] -= 1.0
+            '''self.idleResource[index] = 0
             self.processingJobs[job.id] = index
             if heating > 1.5: #if heating more than 1.5 degrees required, set machine to full speed
                 if self.resourcePstate[index] != 0:
@@ -91,18 +106,20 @@ class QBoxSched(BatsimScheduler):
                     #self.addStateChange(index, self.qrads_properties[index]["nb_pstates"]-1)
                     self.stateChanges[self.qrads_properties[index]["nb_pstates"] -1] |= ProcSet(index)
 
-            # assume that the job will heat for 1 degree
-            self.temperatureDiffs[index] -= 1.0 
-            self.qnode.heat_requirements[self.qbox_id] -= 1.0
+            '''
 
     def onJobCompletion(self, job):
-        index = self.processingJobs.pop(job.id)
+        resource_index = self.processingJobs.pop(job.id)
         if job.id.split("!")[0] == "dyn": # This was a CPU burn job
-            del self.cpuBurn[index]
+            del self.cpuBurn[resource_index]
             if job.job_state != Job.State.COMPLETED_KILLED: # Only if the CPU burn was not killed
-                self.idleResource[index] = 2
+                self.idleResource[resource_index] = 2
         else:
-            self.idleResource[index] = 2
+            self.idleResource[resource_index] = 2
+            for dataset_id in job.json_dict["datasets"]:
+                self.datasetMapping[dataset_id].remove(job.id)
+
+
 
 
     def onJobsKilled(self, jobs):
@@ -179,3 +196,33 @@ class QBoxSched(BatsimScheduler):
         self.nextDynId += 1
         self.bs.register_job(id=job_id, res=1, walltime=-1, profile_name="burn")
         return self.bs.jobs[job_id]
+
+
+    def onDatasetArrived(self, dataset_id):
+        print("[", self.bs.time(), "] Dataset", dataset_id, "just arrived!")
+        for job_id in self.datasetMapping[dataset_id]:
+            if job_id in self.waitingDatasets and dataset_id in self.waitingDatasets[job_id]:
+                self.waitingDatasets[job_id].remove(dataset_id)
+                if len(self.waitingDatasets[job_id]) == 0:
+                    del self.waitingDatasets[job_id]
+                    self.launchJob(job_id)
+
+    def launchJob(self, job_id):
+        job = self.waitingToLaunch.pop(job_id)
+        print("[", self.bs.time(), "] Asking to launch job", job.id, "on machine", str(job.allocation))
+
+        print(self.temperatureDiffs)
+
+        self.bs.execute_jobs([job])
+        index = list(job.allocation)[0]
+        heating = self.temperatureDiffs[index]
+        self.idleResource[index] = 0
+        self.processingJobs[job.id] = index
+        if heating > 1.5: #if heating more than 1.5 degrees required, set machine to full speed
+            if self.resourcePstate[index] != 0:
+                self.stateChanges[0] |= ProcSet(index)
+                #self.addStateChange(index, 0)
+        else: # set machine to lowest speed
+            if self.resourcePstate[index] != (self.qrads_properties[index]["nb_pstates"] -1):
+                #self.addStateChange(index, self.qrads_properties[index]["nb_pstates"]-1)
+                self.stateChanges[self.qrads_properties[index]["nb_pstates"] -1] |= ProcSet(index)
