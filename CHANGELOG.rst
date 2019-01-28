@@ -14,6 +14,11 @@ Unreleased
 - `Commits since v3.0.0 <https://gitlab.inria.fr/batsim/pybatsim/compare/v3.0.0...master>`_
 - ``nix-env -f https://github.com/oar-team/kapack/archive/master.tar.gz -iA pybatsim_dev``
 
+Additions
+~~~~~~~~~
+
+- Added the handling of `machine_available` and `machine_unavailable` events.
+
 ........................................................................................................................
 
 v3.1.0
