@@ -65,6 +65,7 @@ class Batsim(object):
         self.jobs_manually_changed = set()
 
         self.no_more_static_jobs = False
+        self.no_more_external_events = False
 
         self.scheduler.bs = self
         # import pdb; pdb.set_trace()
@@ -472,7 +473,7 @@ class Batsim(object):
                     res_key = "resources_data"
                 else:
                     res_key = "compute_resources"
-                self.resources = {
+                self.compute_resources = {
                         res["id"]: res for res in event_data[res_key]}
                 self.storage_resources = {
                         res["id"]: res for res in event_data["storage_resources"]}
@@ -609,7 +610,16 @@ class Batsim(object):
             elif event_type == "NOTIFY":
                 notify_type = event_data["type"]
                 if notify_type == "no_more_static_job_to_submit":
+                    self.no_more_static_jobs = True
                     self.scheduler.onNoMoreJobsInWorkloads()
+                elif notify_type == "no_more_external_event_to_occur":
+                    self.no_more_external_events = True
+                    self.scheduler.onNoMoreExternalEvents()
+                elif notify_type == "event_machine_unavailable":
+                    self.scheduler.onNotifyEventMachineUnavailable(ProcSet.from_str(event_data["resources"]))
+                elif notify_type == "event_machine_available":
+                    self.scheduler.onNotifyEventMachineAvailable(ProcSet.from_str(event_data["resources"]))
+
             else:
                 raise Exception("Unknown event type {}".format(event_type))
 
@@ -794,8 +804,16 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onNoMoreJobsInWorkloads(self):
-        self.bs.no_more_static_jobs = True
         self.logger.info("There is no more static jobs in the workoad")
+
+    def onNoMoreExternalEvents(self):
+        self.logger.info("There is no more external events to occur")
+
+    def onNotifyEventMachineUnavailable(self, machines):
+        raise NotImplementedError()
+
+    def onNotifyEventMachineAvailable(self, machines):
+        raise NotImplementedError()
 
     def onBeforeEvents(self):
         pass

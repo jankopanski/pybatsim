@@ -268,7 +268,7 @@ class SchedBebida(BatsimScheduler):
         self.notify_already_send = False
 
     def onSimulationBegins(self):
-        self.free_resources = ProcSet(*[res_id for res_id in self.bs.resources.keys()])
+        self.free_resources = ProcSet(*[res_id for res_id in self.bs.compute_resources.keys()])
         self.nb_total_resources = len(self.free_resources)
         self.available_resources = copy.deepcopy(self.free_resources)
 
@@ -286,11 +286,11 @@ class SchedBebida(BatsimScheduler):
 
         elif self.variant == "dfs":
             self.storage_map = fill_storage_map(
-                self.bs.resources, self.bs.storage_resources
+                self.bs.compute_resources, self.bs.storage_resources
             )
 
             # check if all the nodes have a storage attached
-            assert all([res in self.storage_map for res in self.bs.resources])
+            assert all([res in self.storage_map for res in self.bs.compute_resources])
 
             # size of the DFS block
             if "dfs_block_size_in_MB" not in self.options:
