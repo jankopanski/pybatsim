@@ -619,7 +619,14 @@ class Batsim(object):
                     self.scheduler.onNotifyEventMachineUnavailable(ProcSet.from_str(event_data["resources"]))
                 elif notify_type == "event_machine_available":
                     self.scheduler.onNotifyEventMachineAvailable(ProcSet.from_str(event_data["resources"]))
-
+                elif notify_type == "target_temperature_changed":
+                    self.scheduler.onNotifyEventTargetTemperatureChanged(ProcSet.from_str(event_data["resources"]), event_data["temperature"])
+                elif notify_type == "outside_temperature_changed":
+                    self.scheduler.onNotifyEventOutsideTemperatureChanged(ProcSet.from_str(event_data["resources"]), event_data["temperature"])
+                elif notify_type == "new_dataset_on_storage":
+                    self.scheduler.onNotifyEventNewDatasetOnStorage(ProcSet.from_str(event_data["resources"]), event_data["id"], event_data["size"])
+                else:
+                    raise Exception("Unknown NOTIFY type {}".format(notify_type))
             else:
                 raise Exception("Unknown event type {}".format(event_type))
 
@@ -804,15 +811,24 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onNoMoreJobsInWorkloads(self):
-        self.logger.info("There is no more static jobs in the workoad")
+        self.logger.info("There is no more static jobs in the workload")
 
     def onNoMoreExternalEvents(self):
         self.logger.info("There is no more external events to occur")
 
-    def onNotifyEventMachineUnavailable(self, machines):
+    def onNotifyEventMachineUnavailable(self, machines:ProcSet):
         raise NotImplementedError()
 
-    def onNotifyEventMachineAvailable(self, machines):
+    def onNotifyEventMachineAvailable(self, machines:ProcSet):
+        raise NotImplementedError()
+
+    def onNotifyEventTargetTemperatureChanged(self, machines:ProcSet, new_temperature:float):
+        raise NotImplementedError()
+
+    def onNotifyEventOutsideTemperatureChanged(self, machines:ProcSet, new_temperature:float):
+        pass#raise NotImplementedError()
+
+    def onNotifyEventNewDatasetOnStorage(self, machines:ProcSet, dataset_id:str, dataset_size:str):
         raise NotImplementedError()
 
     def onBeforeEvents(self):

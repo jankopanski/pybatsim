@@ -11,9 +11,9 @@ from procset import ProcSet
 class Dataset:
 
     def __init__(self, id, size):
-        self._id = id
-        self._size = size
-        self._timestamp = 0
+        self._id = id                       # UID of the dataset
+        self._size = size                   # Size in bytes of the dataset (float)
+        self._timestamp = 0                 # When the dataset has been added to a Storage
 
     def get_id(self):
         return self._id
@@ -37,10 +37,10 @@ class Dataset:
 class Storage:
     
     def __init__(self, id, name, storage_capacity):
-        self._id = id
-        self._name = name
-        self._storage_capacity = storage_capacity
-        self._available_space = storage_capacity
+        self._id = id                               # Resource id of the storage
+        self._name = name                           # Name of the storage
+        self._storage_capacity = storage_capacity   # Capacity of the storage in bytes (float)
+        self._available_space = storage_capacity    # Current available space of the storage in bytes (float)
         self._datasets = dict()
 
     def get_available_space(self):
@@ -66,7 +66,7 @@ class Storage:
     def add_dataset(self, dataset):
         """ Add Dataset to the Storage
         
-        When adding a dataset, its timestamp is setted to current time.
+        When adding a dataset, its timestamp is set to current time.
         Then, we subtract the available space on storage with the size of the Dataset.
         """
 
@@ -94,12 +94,12 @@ class Storage:
 class StorageController:
 
     def __init__(self, bs): 
-        self._storages = dict()
-        self._ceph_id = -1
+        self._storages = dict()  # Maps the storage resource id to the Storage
+        self._ceph_id = -1       # The resource id of the storage server
         self._idSub = 0
         self._bs = bs
 
-        self.mappingQBoxes = {}  # Maps the disk index to the QBox
+        self.mappingQBoxes = {}  # Maps the disk index to the QBox object
         self.moveRequested = {}  # Maps the job_id to the dataset_id
 
     def get_storage(self, storage_id):
@@ -210,6 +210,8 @@ class StorageController:
             storage.delete_dataset(dataset_to_delete)
 
 
+# Handlers of Batsim-related events
+
     def onDataStagingCompletion(self, job):
         print("---", job.allocation)
         dest_id = list(job.allocation)[0] # TODO 0 should always be the mahcine id of a qbox disk and not the storage server, but should not be hardcodded like that...
@@ -220,5 +222,10 @@ class StorageController:
         self.mappingQBoxes[dest_id].onDatasetArrived(dataset_id)
         
     def onSimulationEnds(self):
+        print("End of simulation")
         for storage in self._storages.values():
-            print(storage._name, storage._datasets)
+            print(storage._name, "contains the following Datasets:", ", ".join(storage._datasets.keys()))
+
+    def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
+        for machine_id in machines:
+            self.add_dataset(machine_id, Dataset(dataset_id, float(dataset_size)))

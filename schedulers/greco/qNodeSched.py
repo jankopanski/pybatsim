@@ -1,6 +1,7 @@
 from batsim.batsim import BatsimScheduler, Batsim, Job
 from batsim.tools.launcher import launch_scheduler, instanciate_scheduler
 from StorageController import *
+from collections import defaultdict
 
 import sys
 import os
@@ -22,16 +23,14 @@ class QNodeSched(BatsimScheduler):
             self.qbox_sched_name = options["qbox_sched"]
 
         self.dict_qboxes = {}    # Maps the QBox id to the QBoxSched object
-        self.dict_resources = {} # Maps the batsim resource id to the QBox associated
+        self.dict_resources = {} # Maps the batsim resource id to the QBoxSched object
         self.heat_requirements = {}
         self.jobs_mapping = {}        # Maps the job id to the qbox id where it has been sent to
         self.waiting_jobs = []
 
-        self.dynamic_submission_enabled = True
-
     def initQBoxesAndStrorageController(self):
         # Read the platform file to have the architecture.
-        dict_ids = {}
+        dict_ids = defaultdict(list)
         # Retrieves the QBoxe ids and the associated list of QRad ids
         for res in self.bs.machines["compute"]:
             batsim_id = res["id"]
@@ -40,18 +39,13 @@ class QNodeSched(BatsimScheduler):
             qr_id = names[1]#.lstrip("qr")
             properties = res["properties"]
 
-            if not qb_id in dict_ids:
-                dict_ids[qb_id] = [(batsim_id, properties)]
-            else:
-                dict_ids[qb_id].append((batsim_id, properties))
+            dict_ids[qb_id].append((batsim_id, properties))
 
         # loops over the QBoxes in the platform
         for (qb_id, list_qr) in dict_ids.items():
             opts_dict = {}
             opts_dict["qbox_id"] = qb_id
             opts_dict["resource_ids"] = list_qr # Contains a list of pairs (qrad_id, qrad_properties)
-            #TODO PUT SOMEWHERE HERE THE TEMPERATURE REQUIREMENTS TO GIVE TO THE QBOX SCHED
-            # Maybe put the temperature schema filename in the SG xml platform description
             
             qb = instanciate_scheduler(self.qbox_sched_name, opts_dict)
             qb.qnode = self
@@ -61,12 +55,12 @@ class QNodeSched(BatsimScheduler):
             self.heat_requirements[qb_id] = 0
 
             # Populate the mapping between batsim resource ids and the id of the associated QBox
-            for qr_id in list_qr:
-                self.dict_resources[str(qr_id)] = qb_id
+            for qr_tuple in list_qr:
+                self.dict_resources[qr_tuple[0]] = qb
 
         self.storage_controller = StorageController(self.bs)
         for machine in self.bs.machines["storage"]:
-            self.storage_controller.add_storage(Storage(machine["id"], machine["name"], int(float(machine["properties"]["size"]))))
+            self.storage_controller.add_storage(Storage(machine["id"], machine["name"], float(machine["properties"]["size"])))
             if machine["name"] == "storage_server":
                 self.ceph_id = machine["id"]
                 self.storage_controller._ceph_id = machine["id"]
@@ -92,6 +86,8 @@ class QNodeSched(BatsimScheduler):
         }
         self.bs.register_profiles("dyn", profile)
         self.bs.wake_me_up_at(1000)
+
+        self.dynamic_submission_enabled = self.bs.dynamic_job_registration_enabled
 
         self.initQBoxesAndStrorageController()
         for qb in self.dict_qboxes.values():
@@ -139,6 +135,7 @@ class QNodeSched(BatsimScheduler):
     def onNoMoreEvents(self):
         for qb in self.dict_qboxes.values():
             qb.onNoMoreEvents()
+        print("---QNode after NoMoreEvents")
         '''if(self.bs.time() < 1e4):
             self.bs.wake_me_up_at(self.bs.time()+300)
         else:
@@ -184,3 +181,21 @@ class QNodeSched(BatsimScheduler):
     def notify_all_registration_finished(self):
         self.bs.notify_registration_finished()
         self.dynamic_submission_enabled = False
+
+
+    def onNotifyEventTargetTemperatureChanged(self, machines, new_temperature):
+        for machine_id in machines:
+            self.dict_resources[machine_id].onTargetTemperatureChanged(machine_id, new_temperature)
+
+    def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
+        self.storage_controller.onNotifyEventNewDatasetOnStorage(machines, dataset_id, dataset_size)
+
+
+    def onNotifyEventMachineUnavailable(self, machines):
+        for machine_id in machines:
+            self.dict_resources[machine_id].onNotifyMachineUnavailable(machine_id)
+
+    def onNotifyEventMachineAvailable(self, machines):
+        for machine_id in machines:
+            self.dict_resources[machine_id].onNotifyMachineAvailable(machine_id)
+
