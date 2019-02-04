@@ -1,9 +1,5 @@
 from batsim.batsim import Job
 
-import sys
-import os
-import logging
-import datetime
 from procset import ProcSet
 
 
@@ -63,14 +59,14 @@ class Storage:
 
         return self._datasets[dataset_id] if dataset_id in self._datasets else None
 
-    def add_dataset(self, dataset):
+    def add_dataset(self, dataset, timestamp):
         """ Add Dataset to the Storage
         
         When adding a dataset, its timestamp is set to current time.
         Then, we subtract the available space on storage with the size of the Dataset.
         """
 
-        dataset.set_timestamp(datetime.datetime.now())
+        dataset.set_timestamp(timestamp)
         self._datasets[dataset._id] = dataset
         self._available_space = self._available_space - dataset.get_size()
 
@@ -122,7 +118,7 @@ class StorageController:
         if not storage.has_enough_space(dataset.get_size()):
             self.clear_storage(storage, dataset)
 
-        storage.add_dataset(dataset)
+        storage.add_dataset(dataset, self._bs.time())
 
 
     def move_to_dest(self, dataset_ids, dest_id):
@@ -213,11 +209,13 @@ class StorageController:
 # Handlers of Batsim-related events
 
     def onDataStagingCompletion(self, job):
-        print("---", job.allocation)
-        dest_id = list(job.allocation)[0] # TODO 0 should always be the mahcine id of a qbox disk and not the storage server, but should not be hardcodded like that...
+        dest_id = list(job.allocation)[0] # TODO index 0 of the allocation should always be the machine id of a qbox disk and not the storage server, but should not be hardcodded like that...
         dataset_id = self.moveRequested.pop(job.id)
+
+        # TODO make a HARD copy of the dataset when it's been downloaded on another storage
         dataset = self.get_storage(self._ceph_id).get_dataset(dataset_id)
-        self.get_storage(dest_id).add_dataset(dataset)
+
+        self.get_storage(dest_id).add_dataset(dataset, job.finish_time)
 
         self.mappingQBoxes[dest_id].onDatasetArrived(dataset_id)
         
