@@ -45,7 +45,7 @@ class QNodeSched(BatsimScheduler):
         for (qb_id, list_qr) in dict_ids.items():
             opts_dict = {}
             opts_dict["qbox_id"] = qb_id
-            opts_dict["resource_ids"] = list_qr # Contains a list of pairs (qrad_id, qrad_properties)
+            opts_dict["qrad_tuple"] = list_qr # Contains a list of pairs (qrad_id, qrad_properties)
             
             qb = instanciate_scheduler(self.qbox_sched_name, opts_dict)
             qb.qnode = self
@@ -93,6 +93,7 @@ class QNodeSched(BatsimScheduler):
         for qb in self.dict_qboxes.values():
             qb.onBeforeEvents()
             qb.onSimulationBegins()
+        print("QNode end of SimuBegins")
 
     def onSimulationEnds(self):
         for qb in self.dict_qboxes.values():
@@ -130,6 +131,7 @@ class QNodeSched(BatsimScheduler):
         #print("\n[", self.bs.time(), "] new Batsim message")
         for qb in self.dict_qboxes.values():
             qb.onBeforeEvents()
+        print("After beforeevents heating req:", self.heat_requirements)
 
 
     def onNoMoreEvents(self):
@@ -153,6 +155,7 @@ class QNodeSched(BatsimScheduler):
     def getMaxHeatingReq(self):
         maxh = 0.0
         ih = -1
+        print("QNode heat requirements", self.heat_requirements)
         for (index, heating) in self.heat_requirements.items():
             if (maxh < heating):
                 ih = index
@@ -163,12 +166,13 @@ class QNodeSched(BatsimScheduler):
 
     # Internal function that dispatches jobs in the waiting queue on QBoxes that needs most heating
     def tryAndSubmitJobs(self):
-        print("--- QNode heating requirements:", self.heat_requirements)
+        #print("--- QNode heating requirements:", self.heat_requirements)
         flag = True
         while flag:
             (index, heating) = self.getMaxHeatingReq()
             if (index == -1) or (len(self.waiting_jobs) == 0):
                 # No QBox needs heating or there is no job in the queue
+                print("No job dispatched", index, len(self.waiting_jobs))
                 flag = False
             else:
                 # Schedule the job
@@ -176,6 +180,7 @@ class QNodeSched(BatsimScheduler):
                 qb = self.dict_qboxes[index]
                 self.jobs_mapping[job.id] = qb
                 # TODO see if we reschedule the job to another qbox or we use the onQBoxRejectJob call
+                print("QNode sent job", job.id, "to QBox", index)
                 qb.onJobSubmission(job)
 
     def notify_all_registration_finished(self):

@@ -37,7 +37,7 @@ class Storage:
         self._name = name                           # Name of the storage
         self._storage_capacity = storage_capacity   # Capacity of the storage in bytes (float)
         self._available_space = storage_capacity    # Current available space of the storage in bytes (float)
-        self._datasets = dict()
+        self._datasets = dict()                     # Dict of dataset_id -> Dataset object
 
     def get_available_space(self):
         """ Returns the remaining space on the Storage """
@@ -89,14 +89,25 @@ class Storage:
 
 class StorageController:
 
-    def __init__(self, bs): 
-        self._storages = dict()  # Maps the storage resource id to the Storage
-        self._ceph_id = -1       # The resource id of the storage server
+    def __init__(self, storage_resources, bs, qn):
+        self._storages = dict()  # Maps the storage batsim id to the Storage object
+        self._ceph_id = -1       # The batsim id of the storage_server
         self._idSub = 0
-        self._bs = bs
+        self._bs = bs            # Pybatsim
+        self._qn = qn            # The QNode Scheduler
+        self._logger = bs.logger
 
-        self.mappingQBoxes = {}  # Maps the disk index to the QBox object
+        self.mappingQBoxes = {}  # Maps the disk index to the QBox Scheduler object
         self.moveRequested = {}  # Maps the job_id to the dataset_id
+
+        for res in storage_resources:
+            self.add_storage(Storage(res["id"], res["name"], float(res["properties"]["size"])))
+
+            if res["name"] == "storage_server":
+                self._ceph_id = res["id"]
+
+        self._logger.info("- StorageController initialization completed, CEPH id is {} and there are {} QBox disks".format(self._ceph_id, len(self._storages)-1))
+
 
     def get_storage(self, storage_id):
         """ Returns the Storage corresponding to given storage_id """
@@ -206,6 +217,17 @@ class StorageController:
             storage.delete_dataset(dataset_to_delete)
 
 
+    ''' This function should be called during init of the QBox Scheduler '''
+    def onQBoxRegistration(self, qbox_name, qbox):
+        qbox_disk_name = qbox_name + "_disk"
+        for disk in self._storages.values():
+            if (disk._name == qbox_disk_name):
+                self.mappingQBoxes[disk._id] = qbox
+                return
+                #return disk._id #TODO clement: Not sure it will be used by the QBox sched
+
+        assert False, "QBox {} registered but no corresponding disk was found".format(qbox_name)
+
 # Handlers of Batsim-related events
 
     def onDataStagingCompletion(self, job):
@@ -218,11 +240,15 @@ class StorageController:
         self.get_storage(dest_id).add_dataset(dataset, job.finish_time)
 
         self.mappingQBoxes[dest_id].onDatasetArrived(dataset_id)
-        
+
+
+    def onSimulationBegins(self):
+        pass
+
     def onSimulationEnds(self):
         print("End of simulation")
         for storage in self._storages.values():
-            print(storage._name, "contains the following Datasets:", ", ".join(storage._datasets.keys()))
+            self._logger.info("{} contains the following Datasets:{}".format(storage._name,", ".join(storage._datasets.keys())))
 
     def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
         for machine_id in machines:

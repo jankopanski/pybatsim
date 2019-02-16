@@ -1,6 +1,7 @@
 from batsim.batsim import BatsimScheduler, Batsim, Job
 from collections import defaultdict
 from procset import ProcSet
+from FrequencyRegulator import *
 
 import sys
 import os
@@ -13,10 +14,11 @@ class QBoxSched(BatsimScheduler):
         super().__init__(options)
 
         self.qbox_id = options["qbox_id"]
-        tmp_list = options["resource_ids"]
-        self.list_qrads = [x for (x,_) in tmp_list]
-        self.nb_qrads = len(self.list_qrads)
-        self.qrads_properties = {}
+        tmp_list = options["qrad_tuple"]
+        self.list_qrads = [x for (x,_) in tmp_list]     # List of Batsim resource ids of the qrads
+        self.nb_qrads = len(self.list_qrads)            # Number of qrads under this qbox
+        self.qrads_properties = {}                      # The dict of qrad properties, keys are batsim resource ids
+                                                        # and values are dicts of properties ("watt_per_state", "nb_pstates")
 
         for (index, properties) in tmp_list:
             watts = (properties["watt_per_state"]).split(', ')
@@ -47,7 +49,8 @@ class QBoxSched(BatsimScheduler):
         # keys are the target states, values are ProcSets of resources to which to change the state
         self.stateChanges = defaultdict(ProcSet)
 
-        self.flag = True
+        #self.frequency_regulator = FrequencyRegulator(self, self.qrads_properties, self.bs)
+        self.flag = False
 
     def onBeforeEvents(self):
         self.updateHeatingReq()
@@ -61,6 +64,7 @@ class QBoxSched(BatsimScheduler):
 
 
     def onSimulationBegins(self):
+        self.flag = True
         pass
 
     def onSimulationEnds(self):
@@ -74,11 +78,11 @@ class QBoxSched(BatsimScheduler):
             print("-------\n",self.diffTemperatures, "\n")
             self.qnode.onQBoxRejectJob(job, self.qbox_id)
         else:
-            # Need to rework all this with taking into account the storage controller
+            # Need to rework all this to take into account the storage controller
             if self.idleResource[index] == 1: # This resource is computing a CPU burn job, kill it
                 job_id = self.cpuBurn[index]
                 self.bs.kill_jobs([self.bs.jobs[job_id]])
-                print("------ Just asked to kill the job", job_id, "on machine", index)
+                print("------ Just asked to kill the CPU burn job", job_id, "on machine", index)
 
             print("[", self.bs.time(), "]------ Execute job", job.id, "on machine", index)
             job.allocation = ProcSet(index)
@@ -157,6 +161,7 @@ class QBoxSched(BatsimScheduler):
 
 
     def onDatasetArrived(self, dataset_id):
+        #TODO cehck if the machines are still available before launching the job
         print("[", self.bs.time(), "] Dataset", dataset_id, "just arrived!")
         for job_id in self.datasetMapping[dataset_id]:
             if job_id in self.waitingDatasets and dataset_id in self.waitingDatasets[job_id]:
@@ -197,6 +202,19 @@ class QBoxSched(BatsimScheduler):
     # takes the temperature of the room and compute amount of work needed for each QRad.
     # for now just compute the difference between required and actual temperature
     def updateHeatingReq(self):
+        # Ugly init
+        if self.flag:
+            summ = 0.0
+            self.flag = False
+            for qr_id in self.list_qrads:
+                self.diffTemperatures[qr_id] = 2
+                summ += 2
+            self.qnode.heat_requirements[self.qbox_id] = summ
+            print("---QBox", self.qbox_id, "sending heating requirement", summ)
+            print(self.qnode.heat_requirements)
+            return
+
+
         summ = 0.0
         for qr_id in self.list_qrads:
             self.diffTemperatures[qr_id] = self.targetTemperatures[qr_id] - self.bs.air_temperatures[str(qr_id)]
