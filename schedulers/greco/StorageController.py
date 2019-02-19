@@ -85,7 +85,6 @@ class Storage:
         """
 
         return self._available_space - size >= 0
-    
 
 class StorageController:
 
@@ -97,6 +96,10 @@ class StorageController:
 
         self.mappingQBoxes = {}  # Maps the disk index to the QBox object
         self.moveRequested = {}  # Maps the job_id to the dataset_id
+
+    def get_storages(self):
+        """ Returns the storages list """
+        return self._storages
 
     def get_storage(self, storage_id):
         """ Returns the Storage corresponding to given storage_id """
