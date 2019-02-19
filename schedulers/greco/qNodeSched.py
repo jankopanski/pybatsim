@@ -59,7 +59,7 @@ class QNodeSched(BatsimScheduler):
         self.candidadates_qb = {}
 
     def initQBoxesAndStrorageController(self):
-        print("Heeeeeeeeeeeeeeeeey -------\n")
+        print("------- Initializing the QBoxes and the StorageController -------\n")
         # Read the platform file to have the architecture.
         dict_ids = defaultdict(list)
         # Retrieves the QBoxe ids and the associated list of QRad ids
@@ -102,13 +102,11 @@ class QNodeSched(BatsimScheduler):
                 self.storage_controller.mappingQBoxes[machine["id"]] = self.dict_qboxes[qb_id]
 
         self.storage_controller.add_dataset(self.ceph_id, Dataset("d1", 100000))
-        self.storage_controller.add_dataset(self.ceph_id, Dataset("d2", 30000))
-
-        print("\n********************* ", self.dict_qboxes['1'].disk_id)
-        
+        self.storage_controller.add_dataset(self.ceph_id, Dataset("d2", 30000))       
         #TODO: Add some dataset in some QBox to do the experiment
-        self.storage_controller.add_dataset(self.dict_qboxes['0'].disk_id, Dataset("ds3", 17500))
-        self.storage_controller.add_dataset(self.dict_qboxes['1'].disk_id, Dataset("ds3, ds2", 15000))
+        self.storage_controller.add_dataset(self.dict_qboxes['0'].disk_id, Dataset("ds1", 17500))
+        self.storage_controller.add_dataset(self.dict_qboxes['1'].disk_id, Dataset("ds1", 15000))
+        self.storage_controller.add_dataset(self.dict_qboxes['1'].disk_id, Dataset("ds3", 15000))
         
 
         self.nb_qboxes = len(self.dict_qboxes)
@@ -116,6 +114,7 @@ class QNodeSched(BatsimScheduler):
         print("-----In QNode Init: Nb_qboxes {}, nb_resources {}, batsim resources {}\n".format(
                     self.nb_qboxes, self.nb_resources, self.bs.nb_resources))
 
+    # TODO: At the end, put it on the StoraController.py 
     def list_qboxes_with_datasets(self, job):
         """ Lists all QBoxes that has the required list of datasets from the job """
 
@@ -138,9 +137,13 @@ class QNodeSched(BatsimScheduler):
             # At this point, storage is an ID. Let's take the storage (Class) with this ID.
             storage = self.storage_controller.get_storage(storage)
             print("{} storages: {} " .format(storage._name, storage._datasets))
-            # required_datasets[job.profile] has the list of datasets, here we are looking just for the first,
-            # assuming that we have only one.
-            if (storage._datasets.get(required_datasets[job.profile][0]) != None):
+            hasDataset = True
+            # To check if this storage has all the datasets required.
+            for dataset in required_datasets[job.profile]:
+                if (storage._datasets.get(dataset) == None):
+                    hasDataset = False
+                    break
+            if(hasDataset):
                 print("     This QBOX has the required dataset. QBOX: ", self.storage_controller.mappingQBoxes[storage._id])
                 candidadate_qb[self.storage_controller.mappingQBoxes[storage._id]] = required_datasets[job.profile]
         print("--------------------------------------------------------------------------")
