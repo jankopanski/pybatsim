@@ -12,6 +12,35 @@ import logging
     - first the interface between Batsim and the QNode/QBox schedulers
     - second it is itself the QNode scheduler
 '''
+'''
+    Workload example
+    
+    "nb_res": 1000,
+        "jobs": [
+            {
+                "id": "QJOB-0206-0100-da09-6ceed368695c-0",
+                "profile": "QJOB-0206-0100-da09-6ceed368695c-0-profile",
+                "res": 1,
+                "subtime": 0
+            }, 
+        ...
+        ]
+        "QJOB-0206-0702-e8a3-b383e8952792-0-profile": {
+            "priority": "normal-user",
+            "user": "unknown-user",
+            "type": "parallel_homogeneous",
+            "cpu": 161.798736572266,
+            "com": 0,
+            "datasets": [
+                "QJOB-0206-0702-e8a3-b383e8952792:user-input:0",
+                "QJOB-0206-0702-e8a3-b383e8952792:docker:103846696",
+                "QJOB-0206-0702-e8a3-b383e8952792:user-input:41428162"
+            ]
+        },
+        ...
+
+'''
+
 class QNodeSched(BatsimScheduler):
     def __init__(self, options):
         super().__init__(options)
@@ -27,8 +56,10 @@ class QNodeSched(BatsimScheduler):
         self.heat_requirements = {}
         self.jobs_mapping = {}        # Maps the job id to the qbox id where it has been sent to
         self.waiting_jobs = []
+        self.candidadates_qb = {}
 
     def initQBoxesAndStrorageController(self):
+        print("Heeeeeeeeeeeeeeeeey -------\n")
         # Read the platform file to have the architecture.
         dict_ids = defaultdict(list)
         # Retrieves the QBoxe ids and the associated list of QRad ids
@@ -73,10 +104,58 @@ class QNodeSched(BatsimScheduler):
         self.storage_controller.add_dataset(self.ceph_id, Dataset("d1", 100000))
         self.storage_controller.add_dataset(self.ceph_id, Dataset("d2", 30000))
 
+        print("\n********************* ", self.dict_qboxes['1'].disk_id)
+        
+        #TODO: Add some dataset in some QBox to do the experiment
+        self.storage_controller.add_dataset(self.dict_qboxes['0'].disk_id, Dataset("ds3", 17500))
+        self.storage_controller.add_dataset(self.dict_qboxes['1'].disk_id, Dataset("ds3, ds2", 15000))
+        
+
         self.nb_qboxes = len(self.dict_qboxes)
         self.nb_resources = len(self.dict_resources)
         print("-----In QNode Init: Nb_qboxes {}, nb_resources {}, batsim resources {}\n".format(
                     self.nb_qboxes, self.nb_resources, self.bs.nb_resources))
+
+    def list_qboxes_with_datasets(self, job):
+        """ Lists all QBoxes that has the required list of datasets from the job """
+
+        required_datasets = {} # To get the list of datasets requireds by the job
+        candidadate_qb = {} # The dict of all qboxes with the required dataset
+
+        # To get the datasets required per a job, we need to search the profile in the bs.profiles.
+        # So, we search in the bs.profiles the job.profile.
+        # The bs.profile is the format: {ID : {pf1: "descrip. pf1", pf2: "descrip. pf2, ...}}
+        for key in self.bs.profiles:
+            # Here we are in the ID level, so, now we have a dict as {pf1: "descrip. pf1", pf2: "descrip. pf2, ...}
+            if (self.bs.profiles[key].get(job.profile) != None) :
+                # To save like : required_datasets = {"job.profile" : "datasets"}
+                required_datasets[job.profile] = self.bs.profiles[key][job.profile]['datasets']
+        print("--------------------------------------------------------------------------")
+        print("Job: {} Requires (profile, dataset): {}" .format(job.id.split("!")[1], required_datasets))
+
+        # To check the storages
+        for storage in self.storage_controller.get_storages():
+            # At this point, storage is an ID. Let's take the storage (Class) with this ID.
+            storage = self.storage_controller.get_storage(storage)
+            print("{} storages: {} " .format(storage._name, storage._datasets))
+            # required_datasets[job.profile] has the list of datasets, here we are looking just for the first,
+            # assuming that we have only one.
+            if (storage._datasets.get(required_datasets[job.profile][0]) != None):
+                print("     This QBOX has the required dataset. QBOX: ", self.storage_controller.mappingQBoxes[storage._id])
+                candidadate_qb[self.storage_controller.mappingQBoxes[storage._id]] = required_datasets[job.profile]
+        print("--------------------------------------------------------------------------")
+        print("List of candidate qboxes: ", candidadate_qb)
+        print("--------------------------------------------------------------------------")
+        self.candidadates_qb[job] = candidadate_qb
+
+    def schedule(self, job):
+
+        print("------ Working on the list of QBoxes that already have some specific datset -------\n")
+        print("Job_ID: ", job.id)
+        print("Job_Profile: ", job.profile)
+        print("----------------------------------")
+        self.list_qboxes_with_datasets(job)
+                 
 
 
     def onSimulationBegins(self):
@@ -93,109 +172,69 @@ class QNodeSched(BatsimScheduler):
         for qb in self.dict_qboxes.values():
             qb.onBeforeEvents()
             qb.onSimulationBegins()
+        pass
+        #TODO
 
     def onSimulationEnds(self):
-        for qb in self.dict_qboxes.values():
-            qb.onSimulationEnds()
-        self.storage_controller.onSimulationEnds()
+        pass
+        #TODO
 
     def onJobSubmission(self, job):
-        #forward job to one QBox that needs most heating
-        self.waiting_jobs.append(job)
-        self.tryAndSubmitJobs()
+        print("-------------------------------------\n")
+        self.schedule(job)
+        #TODO
 
     def onJobCompletion(self, job):
-        # forward event to the related QBox
-        print("--- Job", job.id, "completed!")
-        
-        if "dyn-staging" in job.id:
-            self.storage_controller.onDataStagingCompletion(job)
-        else:
-            qb = self.jobs_mapping.pop(job.id)
-            qb.onJobCompletion(job)
+        pass
+        #TODO
 
     def onJobsKilled(self, jobs):
         pass
+        #TODO
 
     def onRequestedCall(self):
-        self.notify_all_registration_finished()
-        #pass
-        #TODO see if needed to forward to all QBoxes
-
+        pass
+        #TODO
     def onMachinePStateChanged(self, nodeid, pstate):
         pass
         #TODO see if needed to forward toa ll QBoxes
 
     def onBeforeEvents(self):
-        #print("\n[", self.bs.time(), "] new Batsim message")
-        for qb in self.dict_qboxes.values():
-            qb.onBeforeEvents()
-
+        pass
+        #TODO
 
     def onNoMoreEvents(self):
-        for qb in self.dict_qboxes.values():
-            qb.onNoMoreEvents()
-        print("---QNode after NoMoreEvents")
-        '''if(self.bs.time() < 1e4):
-            self.bs.wake_me_up_at(self.bs.time()+300)
-        else:
-            self.bs.notify_submission_finished()'''
-
+        pass
+        #TODO
     # Internal function used by QBoxes to reject a job and return it to the QNode scheduler
     def onQBoxRejectJob(self, job, qbox_id):
-        #TODO for now the job is just rejected to batsim.
-        # In the future, send the job to another qbox.
-        del self.jobs_mapping[job.id]
-        self.bs.reject_jobs([job])
-        #TODO KEEP THE JOB IN THE WAITING QUEUE, OR GIVE IT TO ANOTHER QRAD, but it cannot just be rejected to the user (aka Batsim here)
-
+        pass
+        #TODO
     # Internal function returning the QBox that needs most heating
     def getMaxHeatingReq(self):
-        maxh = 0.0
-        ih = -1
-        for (index, heating) in self.heat_requirements.items():
-            if (maxh < heating):
-                ih = index
-                maxh = heating
-
-        return (ih, maxh)
-        # if return value is -1 then no QBox needs heating
+        pass
+        #TODO
 
     # Internal function that dispatches jobs in the waiting queue on QBoxes that needs most heating
     def tryAndSubmitJobs(self):
-        print("--- QNode heating requirements:", self.heat_requirements)
-        flag = True
-        while flag:
-            (index, heating) = self.getMaxHeatingReq()
-            if (index == -1) or (len(self.waiting_jobs) == 0):
-                # No QBox needs heating or there is no job in the queue
-                flag = False
-            else:
-                # Schedule the job
-                job = self.waiting_jobs.pop(0)
-                qb = self.dict_qboxes[index]
-                self.jobs_mapping[job.id] = qb
-                # TODO see if we reschedule the job to another qbox or we use the onQBoxRejectJob call
-                qb.onJobSubmission(job)
+        pass
+        #TODO
 
     def notify_all_registration_finished(self):
-        self.bs.notify_registration_finished()
-        self.dynamic_submission_enabled = False
-
+        pass
+        #TODO
 
     def onNotifyEventTargetTemperatureChanged(self, machines, new_temperature):
-        for machine_id in machines:
-            self.dict_resources[machine_id].onTargetTemperatureChanged(machine_id, new_temperature)
-
+        pass
+        #TODO
     def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
-        self.storage_controller.onNotifyEventNewDatasetOnStorage(machines, dataset_id, dataset_size)
-
+        pass
+        #TODO
 
     def onNotifyEventMachineUnavailable(self, machines):
-        for machine_id in machines:
-            self.dict_resources[machine_id].onNotifyMachineUnavailable(machine_id)
-
+        pass
+        #TODO
     def onNotifyEventMachineAvailable(self, machines):
-        for machine_id in machines:
-            self.dict_resources[machine_id].onNotifyMachineAvailable(machine_id)
+        pass
+        #TODO
 
