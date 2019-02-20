@@ -1,4 +1,5 @@
 from batsim.batsim import Batsim, Job
+from qarnotUtils import QTask, FrequencyRegulator
 
 from procset import ProcSet
 from collections import defaultdict
@@ -10,12 +11,30 @@ import logging
 This is the qarnot QBox scheduler
 
 
+List of available mobos:
+- AvailForBkgd: for each QBox number of mobos that are too cold and are running CPU burn tasks to heat
+  We start CPU burn if air_temp < target - 1
+  We stop the CPU burn if air_temp > target + 1
+  We can start low and high priority tasks here as well
 
+- AvailForLow: for each QBox number of mobos that are too hot to run cpu burn and are probably idle (or running cpu burn)
+  We can start low priority tasks if air_temp < target + 1
+  We stop the low priority tasks there if air_temp > target + 3
+  We can start high priority tasks here as well
+
+- AvailForHigh: for each QBox number of mobos that are too hot to run low priority tasks
+  We can start high priority tasks if air_temp < target + 4
+  We stop high priority tasks if air_temp > target + 10
+
+
+When a task of higher priority is sent to a mobo that is already running something,
+wait for all the datasets to arrive before stopping the execution of the current task.
 
 
 #TODO when an event of type "machine_unavailable" is received
 # we should mark the qrad/mobos as unavailable as well 
 
+#TODO need to add a "warmup" time for booting the mobo when a new task is executed on it
 
 '''
 
@@ -45,7 +64,7 @@ class QarnotBoxSched():
         self.availLow = ProcSet()
         self.availHigh = ProcSet()
 
-        # TODO when should be init these? SimuBEGINS or BeforeEvents?
+        # TODO when should we init these? SimuBEGINS or BeforeEvents?
         self.targetTemp = {}
         self.diffTemp = {}
 
@@ -64,4 +83,39 @@ class QarnotBoxSched():
         pass
 
     def onNoMoreEvents(self):
+        pass
+
+    def updateAndReportState(self):
+        '''
+        The state of the QBox is updated every 30 seconds.
+        The temperature of the QRads is checked and decisions are taken:
+         - Whether to kill an instance if the rad is too hot
+         - Whether to change the frequencies of the mobos
+        Then, the list of mobos available for each priority group is updated
+        and returned back to the QNode.
+        Returns a list [qbox_id, slots bkgd, slots low, slots high]
+        '''
+        pass
+
+    def onDispatchedInstance(self, instances, priority_group):
+        '''
+        Instances is a list of Batsim jobs corresponding to the instances dispatched to this QBox.
+        Priority_group is either bkgd/low/high and tells in which list of available
+        mobos we should execute the instances.
+        '''
+        # TODO we need to think about the datasets which should be shared between the instances of the same qtask in a QBox
+        # Maybe just ask for the datasets of the first instance and consider it's the same for the others?
+        # BUT apparently it's already the same dataset-id shared between the instances, TODO check that
+        pass
+
+    def onJobCompletion(self, job, direct_job = -1):
+        '''
+        An isntance has completed successfully.
+        If direct_job is specified, this is a new instance of the same QTask
+        that has been dispatched directly.
+        '''
+        pass
+
+
+    def onJobKilled(self, job):
         pass

@@ -1,5 +1,6 @@
 from batsim.batsim import BatsimScheduler, Batsim, Job
 from StorageController import StorageController
+from qarnotUtils import QTask, PriorityGroup
 from qarnotBoxSched import QarnotBoxSched
 
 from procset import ProcSet
@@ -13,41 +14,12 @@ This is the scheduler instanciated by Pybatsim for a simulation of the Qarnot pl
 - It holds the implementation of the Qarnot QNode scheduler (dispatcher)
 
 
+Every 30 seconds from t=0 the QNode scheduler will be woken up by Batsim.
+At this time, the QBox sched will be asked to update their state (cf function updateAndReportState of the QBox scheduler)
 
-List of available mobos:
-- AvailForBkgd: for each QBox number of mobos that are too cold and are running CPU burn tasks to heat
-  We start CPU burn if air_temp < target - 1
-  We stop the CPU burn if air_temp > target + 1
-  We can start low and high priority tasks here as well
+Every time the QNode sched will be woken up, a dispatch of the tasks in the queue will be performed after each event
+in the message from Batsim was handled.
 
-- AvailForLow: for each QBox number of mobos that are too hot to run cpu burn and are probably idle (or running cpu burn)
-  We can start low priority tasks if air_temp < target + 1
-  We stop the low priority tasks there if air_temp > target + 3
-  We can start high priority tasks here as well
-
-- AvailForHigh: for each QBox number of mobos that are too hot to run low priority tasks
-  We can start high priority tasks if air_temp < target + 4
-  We stop high priority tasks if air_temp > target + 10
-
-
-For the dispatch of a task:
-Select the task of highest priority that have the smallest number of running instances.
-Then to choose the QBoxes/Mobos where to send it:
-- First send as much instances as possible on mobos available for bkgd
-  (the ones that are running bkgd tasks, because they have the most "coolness reserve"
-  and will likely run faster and longer than idle cpus)
-
-- Second on mobos available for low
-- Third on mobos available for high
-
-The QBoxes where the instances are sent are sorted by increasing number of available mobos
-(so keep large blocks of mobos available for cluster tasks)
-Always send as much instances as there are available mobos in a QBox,
-
-
-A dispatch is done when a task arrives in the system or every 30 seconds.
-When an instance finishes, we do a quick dispatch if there are more instances of the same task to execute
-(and if there is no other waiting task of higher priority value)
 
 Notion of priority for tasks:
 There are 3 major groups: Bkgd, Low and High
@@ -57,6 +29,8 @@ A task cannot preempt a task in the same priority group (even if its numerical p
 but can preempt tasks from a lower priority group.
 
 
+A job refers to a Batsim job (see batsim.batsim.Job)
+A task or QTask refers to a Qarnot QTask (see qarnotUtils.QTask)
 '''
 
 class QarnotNodeSched(BatsimScheduler):
@@ -68,24 +42,33 @@ class QarnotNodeSched(BatsimScheduler):
         self.dict_resources = {} # Maps the Batsim resource id to the QarnotBoxSched object
 
         # Dispatcher
-        self.job_queue = []     # The queue of jobs waiting to be dispatched
-        self.job_mapping = {}   # Maps the job id to the qbox id where it has been sent to
-        self.qboxes_available_mobos = {} # Maps the QBox id to the number of available qmobos for each type (bkgd, low, high)
-                                         # The values should be a triplet
-                                         # Values are updated by the QBoxes
-                      # TODO maybe change this to a list of 4-uple (qbox id, slots bkgd, slots low, slots high)
-                      # This way we can sort the list as we want
-                      # BUT BEWARE, NEED TO EMPTY THE LIST AT EACH TIME ...
+        self.qtasks_queue = {}   # Maps the QTask id to the QTask object that is waiting to be scheduled
+        self.jobs_mapping = {}   # Maps the batsim job id to the QBox Object where it has been sent to
+        
+        self.lists_available_mobos = [] # List of [qbox_id, slots bkgd, slots low, slots high]
+                                         # This list is updated every 30 seconds from the reports of the QBoxes
+        
 
         #NOT USED AT THE MOMENT:
         #self.qboxes_free_disk_space = {} # Maps the QBox id to the free disk space (in GB)
         #self.qboes_queued_upload_size = {} # Maps the QBox id to the queued upload size (in GB)
 
+        self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
+        self.time_next_update = 0.0 # The next time the scheduler should be woken up
+        self.ask_next_update = False # Whether to ask for next update in onNoMoreEvents function
+
+        self.nb_rejected_jobs_by_qboxes = 0 # Just to keep track of the count
+
 
     def onSimulationBegins(self):
-      assert self.bs.dynamic_job_registration_enabled, "Registration of dynamic jobs should be enabled to use this scheduler"
-      assert len(self.bs.air_temperatures) > 0, "Temperature option '-T 1' of Batsim should be set to use this scheduler"
+      assert self.bs.dynamic_job_registration_enabled, "Registration of dynamic jobs must be enabled for this scheduler to work"
+      assert self.bs.allow_storage_sharing, "Storage sharing must be enabled for this scheduler to work"
+      assert self.bs.ack_of_dynamic_jobs == False, "Acknowledgment of dynamic jobs must be disabled for this scheduler to work"
+      assert len(self.bs.air_temperatures) > 0, "Temperature option '-T 1' of Batsim should be set for this scheduler to work"
       # TODO maybe change the option to send every 30 seconds instead of every message of Batsim (see TODO list)
+
+      # Register the profile of the cpu-burn jobs. CPU value is 1e20 because it's supposed to be endless and killed when needed.
+      self.bs.register_profiles("dyn-burn", {"burn":"parallel_homogeneous", "cpu":1e20, "com":0})
 
       self.initQBoxesAndStorageController()
       for qb in self.dict_qboxes.values():
@@ -96,9 +79,8 @@ class QarnotNodeSched(BatsimScheduler):
 
       self.logger.info("- QNode: End of SimulationBegins")
 
+      self.end_of_simulation = False
 
-      self.bs.notify_registration_finished()
-      #TODO remove this
 
     def onSimulationEnds(self):
       for qb in self.dict_qboxes.values():
@@ -106,11 +88,13 @@ class QarnotNodeSched(BatsimScheduler):
 
       self.storage_controller.onSimulationEnds()
 
+      self.logger.info("Number of rejected instances by QBoxes during dispatch:", self.nb_rejected_jobs_by_qboxes)
+
 
     def initQBoxesAndStorageController(self):
       # Let's create the StorageController
       self.storage_controller = StorageController(self.bs.machines["storage"], self.bs, self)
-      
+
 
       # Retrieve the QBox ids and the associated list of QMobos Batsim ids
       dict_ids = defaultdict(list) # Maps the QBox name to a list of (batsim_id of the mobo and properties)
@@ -139,17 +123,273 @@ class QarnotNodeSched(BatsimScheduler):
 
 
     def onBeforeEvents(self):
+      if self.bs.time() >= self.time_next_update:
+        # It's time to ask QBoxes to update and report their state
+        self.lists_available_mobos = []
+        for qb in self.dict_qboxes.values():
+          # This will update the list of availabilities of the QMobos (and other QBox-related stuff)
+          tup = qb.updateAndReportState()
+          self.lists_available_mobos.append(tup)
+
+        self.time_next_update = self.bs.time() + self.update_period
+        self.ask_next_update = True # We will ask for the next wake up in onNoMoreEvents if the simulation is not finished yet
+
+        self.do_dispatch = True # We will do a dispatch anyway
+      else:
+        self.do_dispatch = False # We may not have to dispatch, depending on the events in this message
+
       for qb in self.dict_qboxes.values():
         qb.onBeforeEvents()
 
+
     def onNoMoreEvents(self):
-      '''if self.received_job:
+      if self.do_dispatch:
         self.doDispatch()
-        self.received_job = False'''
 
       for qb in self.dict_qboxes.values():
         qb.onNoMoreEvents()
 
+      # If the simulation is not finished and we need to ask Batsim for the next waking up
+      if not self.isSimulationFinished() and self.ask_next_update:
+        self.bs.wake_me_up_at(self.time_next_update)
+
+
+    def onNotifyEventTargetTemperatureChanged(self, machines, new_temperature):
+      for machine_id in machines:
+        self.dict_resources[machine_id].onTargetTemperatureChanged(machine_id, new_temperature)
+
+    def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
+      self.storage_controller.onNotifyEventNewDatasetOnStorage(machines, dataset_id, dataset_size)
+
+    def onNotifyEventMachineUnavailable(self, machines):
+        for machine_id in machines:
+            self.dict_resources[machine_id].onNotifyMachineUnavailable(machine_id)
+
+    def onNotifyEventMachineAvailable(self, machines):
+        for machine_id in machines:
+            self.dict_resources[machine_id].onNotifyMachineAvailable(machine_id)
+
+
+
+
+
     def onJobSubmission(self, job):
-      #self.job_queue.append(job)
-      self.bs.reject_jobs([job])
+      qtask_id = job.id.split('_')[0]
+      job.qtask_id = qtask_id
+
+      #Retrieve or create the corresponding QTask
+      if not qtask_id in self.dict_qtasks:
+        qtask = QTask(qtask_id, job.profile_dict["priority"])
+        self.dict_qtasks[qtask_id] = qtask
+      else:
+        qtask = self.dict_qtasks[qtask_id]
+
+      qtask.instance_submitted(job)
+      self.do_dispatch = True
+
+
+    def onRejectedInstance(self, job):
+      #Should not happen a lot of times
+      self.nb_rejected_jobs_by_qboxes += 1
+      qb = self.jobs_mapping.pop(job.id)
+      self.logger.info("The job {} was rejected by QBox {}".format(job.id, qb.name))
+      self.qtasks_queue[job.qtask_id].instance_rejected(job)
+
+
+    def onJobCompletion(self, job):
+      if job.workload == "dyn-burn":
+        assert job.job_state != Job.State.COMPLETED_SUCCESSFULLY, "CPU burn job on machine {} finished, this should never happen".format(str(job.allocation))
+        # If the job was killed, don't do anything
+        self.logger.info("CPU burn job on machine", str(job.allocation), "was just killed")
+        # TODO maybe we'll need to forward it to the QBox, but I don't think so
+
+      elif job.workload == "dyn-staging":
+        if job.job_state == Job.State.COMPLETED_SUCCESSFULLY:
+          self.storage_controller.onDataStagingCompletion(job)
+        elif job.job_state == Job.State.COMPLETED_KILLED:
+          self.storage_controller.onDataStagingKilled(job)
+        else:
+          assert False, "Data staging job {} reached the state {}, this should not happen.".format(job.id, job.job_state)
+
+      else:
+        # This should either be a job from a static workflow or from "dyn-resubmit"
+        # (or another name of worklow for re-submitted instances that were previously preempted)
+        qtask = self.dict_qtasks[job.qtask_id]
+        if job.job_state == Job.State.COMPLETED_KILLED:
+          # This should be an instance preempted by an instance of higher priority
+          qtask.instance_killed()
+          #TODO need to re-submit to Batsim a new instance and add it to the QTask.
+
+          qb = self.jobs_mapping.pop(job.id)
+          qb.onJobKilled(job)
+
+        elif job.job_state == Job.State.COMPLETED_SUCCESSFULLY:
+          qtask.instance_finished()
+          qb = self.jobs_mapping.pop(job.id)
+
+          #Check if direct dispatch is possible
+          if len(qtask.waiting_instances) > 0 and not self.existsHigherPriority(qtask.priority):
+            #This Qtask still has instances to dispatch and it has the highest priority in the queue
+            direct_job = qtask.instance_poped_and_dispatched()
+            self.jobs_mapping[direct_job.id] = qb
+            qb.onJobCompletion(job, direct_job)
+          else:
+            qb.onJobCompletion(job)
+            # A slot should be available, do a general dispatch
+            self.do_dispatch = True
+
+        else:
+          # "Regular" instances are not supposed to have a walltime nor fail
+          assert False, "Job {} reached the state {}, this should not happen.".format(job.id, job.job_state)
+      #End if/else on job.workload
+    #End onJobCompletion
+
+    def onJobsKilled(self,job):
+      pass
+      #TODO pass?
+
+
+
+
+
+    def isSimulationFinished(self):
+      if self.bs.no_more_static_jobs and self.bs.no_more_external_events and len(self.job_queue) == 0 and len(self.jobs_mapping) == 0:
+        self.end_of_simulation = True
+        return True
+      else:
+        return False
+
+
+    def sortAvailableMobos(self, priority):
+      if priority == "bkgd":
+        self.lists_available_mobos.sort(key=lambda nb:nb[1])
+      elif priority == "low":
+        self.lists_available_mobos.sort(key=lambda nb:nb[2])
+      elif priority == "high":
+        self.lists_available_mobos.sort(key=lambda nb:nb[3])
+
+
+    def addJobsToMapping(self, jobs, qb):
+      for job in jobs:
+        self.jobs_mapping[job.id] = qb
+
+
+    def existsHigherPriority(self, priority):
+      '''
+      Returns whether there is a QTask of strictly higher priority than the one given in parameter
+      have still an instance waiting to be dispatched
+      This is used to know whether quickDispatch is possible upon completion of an instance
+      '''
+      for qtask in self.qtasks_queue.values():
+        if (qtask.priority > priority) and (len(qtask.waiting_instances) > 0):
+          return True
+      return False
+
+
+    def doDispatch(self):
+      '''For the dispatch of a task:
+      Select the task of highest priority that have the smallest number of running instances.
+      Then to choose the QBoxes/Mobos where to send it:
+      - First send as much instances as possible on mobos available for bkgd
+        (the ones that are running bkgd tasks, because they have the most "coolness reserve"
+        and will likely run faster and longer than idle cpus)
+
+      - Second on mobos available for low
+      - Third on mobos available for high
+
+      The QBoxes where the instances are sent are sorted by increasing number of available mobos
+      (so keep large blocks of mobos available for cluster tasks)
+      Always send as much instances as there are available mobos in a QBox
+      '''
+
+      # TODO here we take care only of "regular" tasks with instances and not cluster tasks
+
+      # Sort the jobs by decreasing priority (hence the '-' sign) and then by increasing number of running instances
+      for qtask in sorted(self.qtasks_queue.values(),key=lambda qtask:(-qtask.priority, qtask.nb_dispatched_instances)):
+        self.logger.info("- QNode trying to dispatch {} of priority {} having {} dispatched instances".format(qtask.id, qtask.priority, qtask.nb_dispatched_instances))
+        nb_instances_left = len(qtask.waiting_instances)
+        if nb_instances_left > 0:
+          # Dispatch as many instances as possible on mobos available for bkgd, no matter the priority of the qtask
+          self.sortAvailableMobos("bkgd")
+          for tup in self.lists_available_mobos:
+            qb = self.dict_qboxes[tup[0]]
+            nb_slots = tup[1]
+            if nb_slots >= nb_instances_left:
+              # There are more available slots than instances, gotta dispatch'em all!
+              jobs = qtask.waiting_instances.copy()
+
+              qb.onDispatchedInstance(jobs, "bkgd") # Dispatch the instances
+              self.addJobsToMapping(jobs, qb)           # Add the Jobs to the internal mapping
+              qtask.instances_dispatched(jobs)          # Update the QTask
+              tup[1] -= nb_instances_left               # Update the number of slots in the list
+              nb_instances_left = 0
+              # No more instances are waiting, stop the dispatch for this qtask
+              break
+            else:
+              # Schedule instances for all slots of this QBox
+              jobs = qtask.waiting_instances[0:nb_slots]
+              qb.onDispatchedInstance(jobs, "bkgd")
+              self.addJobsToMapping(jobs, qb)
+              qtask.instances_dispatched(jobs)
+              tup[1] = 0
+              nb_instances_left -= nb_slots
+          #End for bkgd slots
+
+          if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.BKGD):
+            # There are more instances to dispatch and the qtask is either low or high priority
+            self.sortAvailableMobos("low")
+            for tup in self.lists_available_mobos:
+              qb = self.dict_qboxes[tup[0]]
+              nb_slots = tup[2]
+              if nb_slots >= nb_instances_left:
+                # There are more available slots than instances, gotta dispatch'em all!
+                jobs = qtask.waiting_instances.copy()
+                qb.onDispatchedInstance(jobs, "low")
+                self.addJobsToMapping(jobs, qb)
+                qtask.instances_dispatched(jobs)
+                tup[2] -= nb_instances_left
+                nb_instances_left = 0
+                # No more instances are waiting, stop the dispatch for this qtask
+                break
+              else:
+                # Schedule instances for all slots of this QBox
+                jobs = qtask.waiting_instances[0:nb_slots]
+                qb.onDispatchedInstance(jobs, "low")
+                self.addJobsToMapping(jobs, qb)
+                qtask.instances_dispatched(jobs)
+                tup[2] = 0
+                nb_instances_left -= nb_slots
+            #End for low slots
+
+            if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.LOW):
+              # There are more instances to dispatch and the qtask is high priority
+              self.sortAvailableMobos("high")
+              for tup in self.lists_available_mobos:
+                qb = self.dict_qboxes[tup[0]]
+                nb_slots = tup[3]
+                if nb_slots >= nb_instances_left:
+                  # There are more available slots than wild instances, gotta catch'em all!
+                  jobs = qtask.waiting_instances.copy()
+                  qb.onDispatchedInstance(jobs, "high")
+                  self.addJobsToMapping(jobs, qb)
+                  qtask.instances_dispatched(jobs)
+                  tup[3] -= nb_instances_left
+                  nb_instances_left = 0
+                  # No more instances are waiting, stop the dispatch for this qtask
+                  break
+                else:
+                  # Schedule instances for all slots of this QBox
+                  jobs = qtask.waiting_instances[0:nb_slots]
+                  qb.onDispatchedInstance(jobs, "high")
+                  self.addJobsToMapping(jobs, qb)
+                  qtask.instances_dispatched(jobs)
+                  tup[3] = 0
+                  nb_instances_left -= nb_slots
+              #End for high slots
+            #End if high priority and nb_instances_left > 0
+          #End if low/high priority and nb_instances_left > 0
+        #End if nb_instances_left > 0
+        self.logger.info("- QNode now dispatched {} instances of {}".format(qtask.nb_dispatched_instances, qtask.id))
+      #End for qtasks in queue
+    #End of doDispatch function
+

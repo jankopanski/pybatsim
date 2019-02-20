@@ -241,6 +241,17 @@ class StorageController:
 
         self.mappingQBoxes[dest_id].onDatasetArrived(dataset_id)
 
+    def onDataStagingKilled(self, job):
+        #TODO
+        '''
+        A data staging has been stopped, probably due to the QRad where the job was to be executed
+        became too hot and the job is not planned to execute here anymore.
+        The job has been rejected back to the QNode and the data staging was stopped.
+
+        I think you just need to clean in the list of current jobs of data staging
+        and don't do anything about the content of the storages
+        '''
+
 
     def onSimulationBegins(self):
         pass
