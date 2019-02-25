@@ -33,7 +33,7 @@ class QBoxSched(BatsimScheduler):
 
         self.nextDynId = 0         # Index of next dynamic job
 
-        #self.jobQueue = []                                          # stores the jobs waiting to be scheduled (or rejected)
+        #self.jobQueue = []                                         # stores the jobs waiting to be scheduled (or rejected)
         self.processingJobs = {}                                    # maps the job id that is running to the resource id
         self.cpuBurn = {}                                           # maps the resource id to the job id
         self.idleResource = {x:2 for x in self.list_qrads}          # whether the resource is running a job (0), a CPU burn (1) or idle (2)

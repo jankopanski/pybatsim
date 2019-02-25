@@ -107,6 +107,10 @@ class QNodeSched(BatsimScheduler):
         self.storage_controller.add_dataset(self.dict_qboxes['0'].disk_id, Dataset("ds2", 175))
         self.storage_controller.add_dataset(self.dict_qboxes['1'].disk_id, Dataset("ds2", 150))
         self.storage_controller.add_dataset(self.dict_qboxes['1'].disk_id, Dataset("ds3", 150))
+        
+        self.storage_controller.add_dataset(self.dict_qboxes['0'].disk_id, Dataset("QJOB-0206-0100-da09-6ceed368695c:user-input:41428146", 17))
+        self.storage_controller.add_dataset(self.dict_qboxes['0'].disk_id, Dataset("QJOB-0206-0100-da09-6ceed368695c:docker:0", 17))
+        self.storage_controller.add_dataset(self.dict_qboxes['0'].disk_id, Dataset("QJOB-0206-0100-da09-6ceed368695c:user-input:0", 17))
         print("---Qboxes have a life :) ")
 
         self.nb_qboxes = len(self.dict_qboxes)
@@ -182,6 +186,15 @@ class QNodeSched(BatsimScheduler):
                 maxh = heating # maybe I will use it, not now
         return qboxh
 
+    def getTasksFromJob(self):
+        """ To get the indexes of jobs in the waiting list that composes the same main job"""
+        for task in self.waiting_jobs :
+            print(task.id)
+            task = task.id.split("!")[1]
+            print(task)
+            task = task.split("-")
+            print(task)
+
     def schedule(self, job):
         print("------ Working on the list of QBoxes that already have some specific datset -------\n")
         print("Job_ID: ", job.id)
@@ -195,6 +208,9 @@ class QNodeSched(BatsimScheduler):
         
         # To check if there is some qbox to run the job, if more than one, select the best one.
         print(" 2 ==================================")
+        self.getTasksFromJob()
+
+        print(" 2.1 ==================================")
         if (self.candidates_qb.get(job) != None):
             print(" >>>> Can run ")
             selected_qbox = self.getMaxHeatingReq_inList(job)
@@ -203,7 +219,7 @@ class QNodeSched(BatsimScheduler):
                 self.jobs_mapping[selected_qbox] = job # To map the Job on the QBox
                 # Dispatching the jobs
                 print(" 3 ==================================")
-                self.dict_qboxes[selected_qbox].onJobSubmission(job)
+                #self.dict_qboxes[selected_qbox].onJobSubmission(job)
             else:
                 # Dispatch on the first Qbox of the list L
                 selected_qbox = list(self.candidates_qb.get(job).keys())[0]
@@ -211,7 +227,7 @@ class QNodeSched(BatsimScheduler):
                 self.jobs_mapping[selected_qbox] = job # To map the Job on the QBox
                 # Dispatching the jobs
                 print(" 3 ==================================")
-                self.dict_qboxes[selected_qbox.qbox_id].onJobSubmission(job)
+                #self.dict_qboxes[selected_qbox.qbox_id].onJobSubmission(job)
 
     def onSimulationBegins(self):
         #self.bs.logger.setLevel(logging.ERROR)
