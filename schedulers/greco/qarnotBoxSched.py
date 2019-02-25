@@ -64,17 +64,14 @@ class QarnotBoxSched():
         self.availLow = ProcSet()
         self.availHigh = ProcSet()
 
-        # TODO when should we init these? SimuBEGINS or BeforeEvents?
         self.targetTemp = {}
         self.diffTemp = {}
 
         # Tells the StorageController who we are
         self.storage_controller.onQBoxRegistration(self.name, self)
 
-        self.logger.info("--- QBox {} initialization completed, I have {} mobos under my watch!".format(self.name, self.nb_mobos))
+        self.logger.info("--- QBox {} initialization completed. Night gathers, and now my watch on {} mobos begins!".format(self.name, self.nb_mobos))
 
-    def onSimulationBegins(self):
-        pass
 
     def onSimulationEnds(self):
         pass
@@ -84,6 +81,24 @@ class QarnotBoxSched():
 
     def onNoMoreEvents(self):
         pass
+
+
+    def onTargetTemperatureChanged(machine_id, new_temperature):
+        #self.diffTemp[machine_id] = self.diffTemp[machine_id] + self.targetTemp[machine_id] - new_temperature
+        self.diffTemp[machine_id] = self.bs.air_temeratures[machine_id] - new_temperature
+        self.targetTemp[machine_id] = new_temperature
+
+
+    def onNotifyMachineUnavailable(machine_id):
+        # The QRad became too hot, need to kill the instance running on it, if any
+        # Then mark this machine as unavailable
+        pass
+
+    def onNotifyMachineAvailable(machine_id):
+        # Put the machine back available
+        pass
+
+
 
     def updateAndReportState(self):
         '''
@@ -110,7 +125,7 @@ class QarnotBoxSched():
 
     def onJobCompletion(self, job, direct_job = -1):
         '''
-        An isntance has completed successfully.
+        An instance has completed successfully.
         If direct_job is specified, this is a new instance of the same QTask
         that has been dispatched directly.
         '''

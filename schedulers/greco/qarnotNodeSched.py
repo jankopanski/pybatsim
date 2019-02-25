@@ -73,7 +73,6 @@ class QarnotNodeSched(BatsimScheduler):
       self.initQBoxesAndStorageController()
       for qb in self.dict_qboxes.values():
         qb.onBeforeEvents()
-        qb.onSimulationBegins()
 
       self.storage_controller.onSimulationBegins()
 
@@ -247,9 +246,6 @@ class QarnotNodeSched(BatsimScheduler):
     def onJobsKilled(self,job):
       pass
       #TODO pass?
-
-
-
 
 
     def isSimulationFinished(self):
