@@ -5,15 +5,16 @@ class PriorityGroup:
 
 
 class QTask:
-    def __init__(self, id, priority):
+    def __init__(self, id, priority, profile):
         self.id = id
         self.waiting_instances = [] # List of Batsim Jobs waiting to be scheduled
         self.nb_received_instances = 0    # Number of jobs submitted by Batsim
         self.nb_dispatched_instances = 0  # Number of jobs disatched to the QBoxes
         self.nb_terminated_instances = 0  # Number of jobs that have finished correctly (not killed)
-
         self.priority = int(priority)
+        self.profile = profile
         #self.priority_group = PriorityGroup.BKGD
+
 
         #TODO
         ''' At some point we'll need to re-submit dynamic jobs that have been killed
