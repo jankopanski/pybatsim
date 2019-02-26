@@ -128,6 +128,7 @@ class QarnotNodeSched(BatsimScheduler):
                 self.lists_available_mobos = []
                 for qb in self.dict_qboxes.values():
                     # This will update the list of availabilities of the QMobos (and other QBox-related stuff)
+                    # TODO ask for an update in a general number
                     tup = qb.updateAndReportState()
                     self.lists_available_mobos.append(tup)
 
@@ -319,19 +320,42 @@ class QarnotNodeSched(BatsimScheduler):
                 if(len(self.qtasks_queue) > 0):
                     # At this point, we dispatched all possible instances in all possible QBoxes with the required dataset for this profile
                     self.doDispatch() 
-            
+
+        def get_max_priority(self, qbox):
+            '''
+            It returns the max priority of jobs running in this qbox.
+            '''
+
+            # TODO
+
+        def check_max_priority(self, qtask_priority, qbox_list):
+            '''
+            It checks if there are some qbox with priority bigger than qtask_priority.
+            It returns True or False.
+            '''
 
         def doDispatch_by_dataset(self):
-            # Let's use the qtasks_queue ordered by profiles
-            qtask_queue_by_profile = sorted(self.qtasks_queue.values(),key=lambda qtask:(qtask.profile))
+            # Let's use the qtasks_queue ordered by profiles and priorities(to avoid preemptions)
+            qtask_queue_by_profile = sorted(self.qtasks_queue.values(),key=lambda qtask:(-qtask.priority, qtask.profile))
             for qtask in qtask_queue_by_profile:
                 #TODO put self.logger.info("")
                 nb_instances_left = len(qtask.waiting_instances)
                 if (nb_instances_left > 0):
-                    # We have the same profile until the next one index start
-                    nb_same_profile = self.next_profile_index()
+                    nb_same_profile = self.next_profile_index()                 # We have the same profile until the next one index start
                     qboxes_list_by_profile = list_qboxes_with_dataset(qtask)
+                    
+                    #TODO Check the preemption things
+
+                    without_preemption = False
+                    if (self.check_max_priority(qtask.priority, qboxes_list_by_profile) == True):
+                        without_preemption = True
                     for qb in qboxes_list_by_profile:
+                        # If this qbox are running jobs with less priority than qtask.priority, than this qtask would cause a preemption.
+                        #   if without_preemption == True then there is another Qbox in this list that it would not happen.
+                        #   else, we do not have a better option. So let's do the normal procedure. 
+                        if ((get_max_priority(qb) < qtask.priority) and (without_preemption)):
+                            without_preemption = False
+                            break
                         nb_slots = # nb_free_slots
                         if (nb_slots >= nb_same_profile):
                             # There are more available slots than instances, gotta dispatch'em all!
