@@ -106,6 +106,28 @@ class StorageController:
 
         return self._storages[storage_id]
 
+    def get_storages_by_dataset(self, required_dataset):
+        """ Returns the list of storages that already has the required dataset """
+
+        qboxes_list = [] # The dict of all qboxes with the required dataset
+        # To check the storages
+        for storage in self.get_storages():
+            # At this point, storage is an ID. Let's take the storage (Class) with this ID.
+            storage = self.get_storage(storage)
+            print("{} storages: {} " .format(storage._name, storage._datasets))
+            hasDataset = True
+            # To check if this storage has all the datasets required.
+            for dataset in required_dataset:
+                if (storage.get_dataset(dataset) == None):
+                    hasDataset = False
+                    break
+            # If true, the storage has all required datasets. So, candidate_qb = {storages}
+            if(hasDataset):
+                print("     This QBOX has the required dataset. QBOX: ", self.storage_controller.mappingQBoxes[storage._id])
+                qboxes_list.append(storage._id)
+        
+        return qboxes_list
+
     def add_storage(self, storage):
         """ Add storage to storages list """
 
