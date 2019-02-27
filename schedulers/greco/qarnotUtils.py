@@ -2,7 +2,11 @@ from procset import ProcSet
 
 class PriorityGroup:
     BKGD, LOW, HIGH = range(3)
-
+    '''
+    If priority in (-max_int, -10) then BKGD
+                   [-10,0) then LOW
+                   [0,+10] then HIGH
+    '''
 
 class QTask:
     def __init__(self, id, priority):
@@ -13,7 +17,8 @@ class QTask:
         self.nb_terminated_instances = 0  # Number of jobs that have finished correctly (not killed)
 
         self.priority = int(priority)
-        self.priority_group = self.priority >= 0 ? PriorityGroup.HIGH :(self.priority < -10 ? PriorityGroup.BKGD : PriorityGroup.LOW)
+        self.priority_group = PriorityGroup.HIGH if self.priority >= 0 else ( PriorityGroup.BKGD if self.priority < -10 else PriorityGroup.LOW )
+
 
         #TODO
         ''' At some point we'll need to re-submit dynamic jobs that have been killed

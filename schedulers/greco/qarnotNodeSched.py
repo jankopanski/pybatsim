@@ -169,9 +169,6 @@ class QarnotNodeSched(BatsimScheduler):
             self.dict_resources[machine_id].onNotifyMachineAvailable(machine_id)
 
 
-
-
-
     def onJobSubmission(self, job):
       qtask_id = job.id.split('_')[0]
       job.qtask_id = qtask_id
@@ -390,4 +387,3 @@ class QarnotNodeSched(BatsimScheduler):
         self.logger.info("- QNode now dispatched {} instances of {}".format(qtask.nb_dispatched_instances, qtask.id))
       #End for qtasks in queue
     #End of doDispatch function
-

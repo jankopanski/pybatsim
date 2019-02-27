@@ -82,7 +82,6 @@ class QarnotBoxSched():
     def onNoMoreEvents(self):
         pass
 
-
     def onTargetTemperatureChanged(machine_id, new_temperature):
         #self.diffTemp[machine_id] = self.diffTemp[machine_id] + self.targetTemp[machine_id] - new_temperature
         self.diffTemp[machine_id] = self.bs.air_temeratures[machine_id] - new_temperature
@@ -97,7 +96,6 @@ class QarnotBoxSched():
     def onNotifyMachineAvailable(machine_id):
         # Put the machine back available
         pass
-
 
 
     def updateAndReportState(self):
@@ -126,7 +124,6 @@ class QarnotBoxSched():
 
         WARNING!!! Only kill the already running instance once the datasets have arrived.
         '''
-
         pass
 
     def onJobCompletion(self, job, direct_job = -1):
@@ -147,5 +144,3 @@ class QarnotBoxSched():
         A datastaging job has finished, check if we can launch instances.
         If instances are launched on some mobos, kill already running instances before.
         '''
-
-
