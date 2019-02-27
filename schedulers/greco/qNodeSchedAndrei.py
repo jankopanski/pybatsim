@@ -1,7 +1,10 @@
 from batsim.batsim import BatsimScheduler, Batsim, Job
 from batsim.tools.launcher import launch_scheduler, instanciate_scheduler
 from StorageController import *
+from procset import ProcSet
 from collections import defaultdict
+from qarnotUtils import QTask, PriorityGroup
+from qarnotBoxSched import QarnotBoxSched
 
 import sys
 import os
@@ -45,20 +48,30 @@ class QNodeSched(BatsimScheduler):
     def __init__(self, options):
         super().__init__(options)
         
-        if not "qbox_sched" in options:
-            print("No qbox_sched provided in json options, using qBoxSched by default.")
-            self.qbox_sched_name = "schedulers/greco/qBoxSched.py"
-        else:
-            self.qbox_sched_name = options["qbox_sched"]
+        # For the manager
+        self.dict_qboxes = {}    # Maps the QBox id to the QarnotBoxSched object
+        self.dict_resources = {} # Maps the Batsim resource id to the QarnotBoxSched object
 
-        self.dict_qboxes = {}    # Maps the QBox id to the QBoxSched object
-        self.dict_resources = {} # Maps the batsim resource id to the QBoxSched object
-        self.heat_requirements = {}
-        self.jobs_mapping = {}        # Maps the job id to the qbox id where it has been sent to
-        self.waiting_jobs = []
-        self.candidates_qb = {}
+        # Dispatcher
+        self.qtasks_queue = {}   # Maps the QTask id to the QTask object that is waiting to be scheduled
+        self.jobs_mapping = {}   # Maps the batsim job id to the QBox Object where it has been sent to
+        
+        self.lists_available_mobos = [] # List of [qbox_id, slots bkgd, slots low, slots high]
+                                         # This list is updated every 30 seconds from the reports of the QBoxes
+        
 
-    def initQBoxesAndStrorageController(self):
+        #NOT USED AT THE MOMENT:
+        #self.qboxes_free_disk_space = {} # Maps the QBox id to the free disk space (in GB)
+        #self.qboes_queued_upload_size = {} # Maps the QBox id to the queued upload size (in GB)
+
+        self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
+        self.time_next_update = 0.0 # The next time the scheduler should be woken up
+        self.ask_next_update = False # Whether to ask for next update in onNoMoreEvents function
+
+        self.nb_rejected_jobs_by_qboxes = 0 # Just to keep track of the count
+
+
+    def initQBoxesAndStorageController(self):
         print("------- Initializing the QBoxes and the StorageController -------\n")
         # Read the platform file to have the architecture.
         dict_ids = defaultdict(list)
@@ -107,6 +120,10 @@ class QNodeSched(BatsimScheduler):
         self.storage_controller.add_dataset(self.dict_qboxes['0'].disk_id, Dataset("ds2", 175))
         self.storage_controller.add_dataset(self.dict_qboxes['1'].disk_id, Dataset("ds2", 150))
         self.storage_controller.add_dataset(self.dict_qboxes['1'].disk_id, Dataset("ds3", 150))
+        
+        self.storage_controller.add_dataset(self.dict_qboxes['0'].disk_id, Dataset("QJOB-0206-0100-da09-6ceed368695c:user-input:41428146", 17))
+        self.storage_controller.add_dataset(self.dict_qboxes['0'].disk_id, Dataset("QJOB-0206-0100-da09-6ceed368695c:docker:0", 17))
+        self.storage_controller.add_dataset(self.dict_qboxes['0'].disk_id, Dataset("QJOB-0206-0100-da09-6ceed368695c:user-input:0", 17))
         print("---Qboxes have a life :) ")
 
         self.nb_qboxes = len(self.dict_qboxes)
@@ -115,46 +132,20 @@ class QNodeSched(BatsimScheduler):
                     self.nb_qboxes, self.nb_resources, self.bs.nb_resources))
 
     # TODO: At the end, put it on the StoraController.py 
-    def list_qboxes_with_datasets(self, job):
+    def list_qboxes_with_dataset(self, job):
         """ Lists all QBoxes that has the required list of datasets from the job """
 
-        required_datasets = {} # To get the list of datasets requireds by the job
-        candidadate_qb = {} # The dict of all qboxes with the required dataset
+        required_dataset = {} # To get the list of datasets requireds by the job
+        if (self.bs.profiles.get(job.profile) != None) :
+            required_datasets = self.bs.profiles[job.profile]['datasets']
+        if (len(required_datasets) > 0):
+            qboxes_list = self.storage_controller.get_storages_by_dataset(required_dataset)
+        else:
+            qboxes_list = []
 
-        # To get the datasets required per a job, we need to search the profile in the bs.profiles.
-        # So, we search in the bs.profiles the job.profile.
-        # The bs.profile is the format: {ID : {pf1: "descrip. pf1", pf2: "descrip. pf2, ...}}
-        for key in self.bs.profiles:
-            # Here we are in the ID level, so, now we have a dict as {pf1: "descrip. pf1", pf2: "descrip. pf2, ...}
-            if (self.bs.profiles[key].get(job.profile) != None) :
-                # To save like : required_datasets = {"job.profile" : "datasets"}
-                required_datasets[job.profile] = self.bs.profiles[key][job.profile]['datasets']
         print("--------------------------------------------------------------------------")
-        print("Job: {} Requires (profile, dataset): {}" .format(job.id.split("!")[1], required_datasets))
-
-        # To check the storages
-        for storage in self.storage_controller.get_storages():
-            # At this point, storage is an ID. Let's take the storage (Class) with this ID.
-            storage = self.storage_controller.get_storage(storage)
-            print("{} storages: {} " .format(storage._name, storage._datasets))
-            hasDataset = True
-            # To check if this storage has all the datasets required.
-            for dataset in required_datasets[job.profile]:
-                if (storage._datasets.get(dataset) == None):
-                    hasDataset = False
-                    break
-            # Here, the storage has all required datasets
-            # candidate_qb = {storage : datasets}
-            if(hasDataset):
-                print("     This QBOX has the required dataset. QBOX: ", self.storage_controller.mappingQBoxes[storage._id])
-                candidadate_qb[self.storage_controller.mappingQBoxes[storage._id]] = required_datasets[job.profile]
-        
-        # candidates_qb = {job: {storage : datasets}}
-        if (len(candidadate_qb) != 0) : 
-            self.candidates_qb[job] = candidadate_qb
-            print("--------------------------------------------------------------------------")
-            print("List of candidate qboxes: ", self.candidates_qb[job])
-            print("--------------------------------------------------------------------------")
+        print("List of candidate qboxes: ", self.candidates_qb[job])
+        print("--------------------------------------------------------------------------")
     
     def getMaxHeatingReq(self):
         maxh = 0.0
@@ -195,6 +186,9 @@ class QNodeSched(BatsimScheduler):
         
         # To check if there is some qbox to run the job, if more than one, select the best one.
         print(" 2 ==================================")
+        #self.getTasksFromJob()
+
+        #print(" 2.1 ==================================")
         if (self.candidates_qb.get(job) != None):
             print(" >>>> Can run ")
             selected_qbox = self.getMaxHeatingReq_inList(job)
@@ -203,7 +197,7 @@ class QNodeSched(BatsimScheduler):
                 self.jobs_mapping[selected_qbox] = job # To map the Job on the QBox
                 # Dispatching the jobs
                 print(" 3 ==================================")
-                self.dict_qboxes[selected_qbox].onJobSubmission(job)
+                #self.dict_qboxes[selected_qbox].onJobSubmission(job)
             else:
                 # Dispatch on the first Qbox of the list L
                 selected_qbox = list(self.candidates_qb.get(job).keys())[0]
@@ -211,24 +205,28 @@ class QNodeSched(BatsimScheduler):
                 self.jobs_mapping[selected_qbox] = job # To map the Job on the QBox
                 # Dispatching the jobs
                 print(" 3 ==================================")
-                self.dict_qboxes[selected_qbox.qbox_id].onJobSubmission(job)
+                #self.dict_qboxes[selected_qbox.qbox_id].onJobSubmission(job)
 
     def onSimulationBegins(self):
-        #self.bs.logger.setLevel(logging.ERROR)
-        profile = {
-            "burn" : {'type' : 'parallel_homogeneous', 'cpu' : 1e10, 'com' : 0}
-        }
-        self.bs.register_profiles("dyn", profile)
-        self.bs.wake_me_up_at(1000)
+        assert self.bs.dynamic_job_registration_enabled, "Registration of dynamic jobs must be enabled for this scheduler to work"
+        assert self.bs.allow_storage_sharing, "Storage sharing must be enabled for this scheduler to work"
+        assert self.bs.ack_of_dynamic_jobs == False, "Acknowledgment of dynamic jobs must be disabled for this scheduler to work"
+        assert len(self.bs.air_temperatures) > 0, "Temperature option '-T 1' of Batsim should be set for this scheduler to work"
+        # TODO maybe change the option to send every 30 seconds instead of every message of Batsim (see TODO list)
 
-        self.dynamic_submission_enabled = self.bs.dynamic_job_registration_enabled
+        # Register the profile of the cpu-burn jobs. CPU value is 1e20 because it's supposed to be endless and killed when needed.
+        self.bs.register_profiles("dyn-burn", {"burn":"parallel_homogeneous", "cpu":1e20, "com":0})
 
-        self.initQBoxesAndStrorageController()
+        self.initQBoxesAndStorageController()
         for qb in self.dict_qboxes.values():
             qb.onBeforeEvents()
             qb.onSimulationBegins()
-        #pass
-        #TODO
+
+        self.storage_controller.onSimulationBegins()
+
+        self.logger.info("- QNode: End of SimulationBegins")
+
+        self.end_of_simulation = False
 
     def onSimulationEnds(self):
         for qb in self.dict_qboxes.values():
