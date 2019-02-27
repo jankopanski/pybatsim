@@ -141,7 +141,7 @@ class StorageController:
                     break
             # If true, the storage has all required datasets. So, candidate_qb = {storages}
             if(hasDataset):
-                print("     This QBOX has the required dataset. QBOX: ", self.storage_controller.mappingQBoxes[storage._id])
+                print("     This QBOX has the required dataset. QBOX: ", self.mappingQBoxes[storage._id])
                 qboxes_list.append(self.mappingQBoxes[storage._id])
         
         return qboxes_list
