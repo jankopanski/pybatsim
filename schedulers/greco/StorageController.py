@@ -106,6 +106,17 @@ class StorageController:
             if res["name"] == "storage_server":
                 self._ceph_id = res["id"]
 
+        '''
+        Clement: I think the filename holding all the datasets in a simulation will
+        be directly passed as argument of the scheduler in pybatsim (and forwarded here).
+        So yet another TODO:
+        Need to read the list of the datasets (one JSON object per line corresponding to one dataset)
+        that are assumed to be available in the CEPH at t=0 (since the CEPH has an 'infinite' storage capacity)
+
+        In reality, the datasets are available at the submission time of the QTask that needs it,
+        but for the case of Qarnot schedulers it does not change anything (I guess).
+        '''
+
         self._logger.info("- StorageController initialization completed, CEPH id is {} and there are {} QBox disks".format(self._ceph_id, len(self._storages)-1))
 
 
@@ -222,11 +233,25 @@ class StorageController:
         qbox_disk_name = qbox_name + "_disk"
         for disk in self._storages.values():
             if (disk._name == qbox_disk_name):
+                #TODO we will also need king of the inverse mapping from the qbox_id to the storage
                 self.mappingQBoxes[disk._id] = qbox
                 return
                 #return disk._id #TODO clement: Not sure it will be used by the QBox sched
 
         assert False, "QBox {} registered but no corresponding disk was found".format(qbox_name)
+
+
+    def onReleaseHardLink(self, qbox_name, dataset_ids):
+        '''
+        This function is called from a QBox scheduler when there are no more
+        instances of a QTask that uses their input datasets.
+
+        I think a hard link should be created when a dowload of dataset(s) is asked by a QBox.
+        Then this hard link is released in this function (and the datasets in the disk can be
+        removed when space is needed if there are no other hard links from other QTasks).
+        '''
+        pass
+
 
 # Handlers of Batsim-related events
 
@@ -240,17 +265,6 @@ class StorageController:
         self.get_storage(dest_id).add_dataset(dataset, job.finish_time)
 
         self.mappingQBoxes[dest_id].onDatasetArrived(dataset_id)
-
-    def onDataStagingKilled(self, job):
-        #TODO
-        '''
-        A data staging has been stopped, probably due to the QRad where the job was to be executed
-        became too hot and the job is not planned to execute here anymore.
-        The job has been rejected back to the QNode and the data staging was stopped.
-
-        I think you just need to clean in the list of current jobs of data staging
-        and don't do anything about the content of the storages
-        '''
 
 
     def onSimulationBegins(self):
