@@ -296,7 +296,7 @@ class Batsim(object):
         return job, profile
 
 
-    def request_consumed_energy(self): #TODO CHANGE NAME 
+    def request_consumed_energy(self): #TODO CHANGE NAME
         self._events_to_send.append(
             {
                 "timestamp": self.time(),
@@ -422,7 +422,8 @@ class Batsim(object):
             if msg is None:
                 self.scheduler.onDeadlock()
                 continue
-        self.logger.info("Message Received from Batsim: {}".format(msg))
+        self.logger.info("Message Received from Batsim")
+        #self.logger.info("Message received from Batsim: {}".format(msg))
 
         self._current_time = msg["now"]
 
@@ -535,7 +536,7 @@ class Batsim(object):
                 killed_jobs = []
                 for jid in event_data["job_ids"]:
                     j = self.jobs[jid]
-                    # The job_progress can only be empty if the has completed
+                    # The job_progress can only be empty if the job has completed
                     # between the order of killing and the killing itself.
                     # So in that case just dont put it in the killed jobs
                     # because it was already mark as complete.

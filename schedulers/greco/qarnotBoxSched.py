@@ -117,10 +117,16 @@ class QarnotBoxSched():
         Instances is a list of Batsim jobs corresponding to the instances dispatched to this QBox.
         Priority_group is either bkgd/low/high and tells in which list of available
         mobos we should execute the instances.
+
+        Datasets are shared between the instances of the same QTask. So we only need to retrive the datasets once for all instances
+        WARNING!!! The list of datasets in a job profile can be 'null'
+
+        Execute an instance HIGH on the coolest QRad (if possible without preempting LOW instance, don't care about BKGD)
+        Execute an instance BKGD/LOW on the warmest QRad (preempt BKGD task if any)
+
+        WARNING!!! Only kill the already running instance once the datasets have arrived.
         '''
-        # TODO we need to think about the datasets which should be shared between the instances of the same qtask in a QBox
-        # Maybe just ask for the datasets of the first instance and consider it's the same for the others?
-        # BUT apparently it's already the same dataset-id shared between the instances, TODO check that
+
         pass
 
     def onJobCompletion(self, job, direct_job = -1):
@@ -133,4 +139,13 @@ class QarnotBoxSched():
 
 
     def onJobKilled(self, job):
-        pass
+        pass #TODO pass?
+
+
+    def onDatasetArrived(self, dataset_id):
+        '''
+        A datastaging job has finished, check if we can launch instances.
+        If instances are launched on some mobos, kill already running instances before.
+        '''
+
+

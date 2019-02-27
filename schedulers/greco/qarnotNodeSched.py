@@ -46,7 +46,7 @@ class QarnotNodeSched(BatsimScheduler):
         self.jobs_mapping = {}   # Maps the batsim job id to the QBox Object where it has been sent to
         
         self.lists_available_mobos = [] # List of [qbox_id, slots bkgd, slots low, slots high]
-                                         # This list is updated every 30 seconds from the reports of the QBoxes
+                                        # This list is updated every 30 seconds from the reports of the QBoxes
         
 
         #NOT USED AT THE MOMENT:
@@ -228,10 +228,12 @@ class QarnotNodeSched(BatsimScheduler):
 
           #Check if direct dispatch is possible
           if len(qtask.waiting_instances) > 0 and not self.existsHigherPriority(qtask.priority):
+            ''' DIRECT DISPATCH '''
             #This Qtask still has instances to dispatch and it has the highest priority in the queue
             direct_job = qtask.instance_poped_and_dispatched()
             self.jobs_mapping[direct_job.id] = qb
             qb.onJobCompletion(job, direct_job)
+
           else:
             qb.onJobCompletion(job)
             # A slot should be available, do a general dispatch
