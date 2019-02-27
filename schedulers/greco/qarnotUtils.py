@@ -13,7 +13,7 @@ class QTask:
         self.nb_terminated_instances = 0  # Number of jobs that have finished correctly (not killed)
 
         self.priority = int(priority)
-        #self.priority_group = PriorityGroup.BKGD
+        self.priority_group = self.priority >= 0 ? PriorityGroup.HIGH :(self.priority < -10 ? PriorityGroup.BKGD : PriorityGroup.LOW)
 
         #TODO
         ''' At some point we'll need to re-submit dynamic jobs that have been killed
