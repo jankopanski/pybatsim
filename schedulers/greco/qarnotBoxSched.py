@@ -1,5 +1,5 @@
 from batsim.batsim import Batsim, Job
-from qarnotUtils import QTask, FrequencyRegulator
+from qarnotUtils import *
 
 from procset import ProcSet
 from collections import defaultdict
@@ -39,11 +39,11 @@ wait for all the datasets to arrive before stopping the execution of the current
 '''
 
 class QarnotBoxSched():
-    def __init__(self, name, list_mobos, bs, qn, storage_controller):
+    def __init__(self, name, dict_qrads, bs, qn, storage_controller):
         ''' WARNING!!!
         The init of the QBox Schedulers is done upon receiving
         the SimulationBegins in the QNode Scheduler 
-        Thus the init of QBox and onSimulationBegins of QBox is quite the same
+        Thus there is no onSimulationBegins called for a QBox sched
         '''
         self.bs = bs
         self.qn = qn
@@ -51,21 +51,41 @@ class QarnotBoxSched():
         self.logger = bs.logger
         self.name = name
 
-        self.dict_mobos = {} # Maps the batsim ids of the mobos to the properties
+        self.dict_qrads = {}     # Maps the qrad_names to list of (batid of mobo, mobo name, mobo properties)
+        self.dict_ids = {}       # Maps the batids of the mobos to the QRad object that contains it
 
-        for (index, properties) in list_mobos:
-            watts = (properties["watt_per_state"]).split(', ')
-            properties["nb_pstates"] = len(watts)
-            properties["watt_per_state"] = [float((x.split(':'))[-1]) for x in watts]
-            self.dict_mobos[index] = properties
-        self.nb_mobos = len(self.dict_mobos)
-
+        # Global counts of all mobos under my watch
+        self.mobosAvailable = ProcSet()       # Whether the mobos are available or not (from the QRAd hotness and external events point of view)
+        self.mobosUnavailable = ProcSet()     # Mobos unavailable due to the QRad being too warm (or from external events)
         self.availBkgd = ProcSet()
         self.availLow = ProcSet()
         self.availHigh = ProcSet()
 
-        self.targetTemp = {}
-        self.diffTemp = {}
+        for qr_name, mobos_list in dict_qrads.items():
+            qr = QRad(qr_name, bs)
+            self.dict_qrads[qr_name] = qr
+
+            dict_mobos = {}
+            for (batid, mobo_name,_) in mobos_list:
+                dict_mobos[batid] = QMobo(mobo_name)
+                self.dict_ids[batid] = qr
+
+                # Assume all mobos are available for LOW tasks at the beginning (and not BKGD to not start a cpu burn on every resource at t=0)
+                #self.mobosAvailable |= ProcSet(batid)
+                #self.availLow |= ProcSet(batid)
+
+            # Get properties of the first mobo, since all mobos should be identical
+            properties = mobos_list[0][2]
+            watts = (properties["watt_per_state"]).split(', ')
+            properties["watt_per_state"] = [float((x.split(':'))[-1]) for x in watts]
+            properties["nb_pstates"] = len(watts)
+
+            qr.properties = properties
+            qr.dict_mobos = dict_mobos
+
+        self.mobosAvailable = ProcSet(*self.dict_ids.keys())
+        self.availLow = ProcSet(*self.dict_ids.keys())
+        self.nb_mobos = len(self.dict_ids)
 
         # Tells the StorageController who we are
         self.storage_controller.onQBoxRegistration(self.name, self)
@@ -83,9 +103,8 @@ class QarnotBoxSched():
         pass
 
     def onTargetTemperatureChanged(machine_id, new_temperature):
-        #self.diffTemp[machine_id] = self.diffTemp[machine_id] + self.targetTemp[machine_id] - new_temperature
-        self.diffTemp[machine_id] = self.bs.air_temeratures[machine_id] - new_temperature
-        self.targetTemp[machine_id] = new_temperature
+        self.dict_ids[machine_id].diffTemp = self.bs.air_temeratures[machine_id] - new_temperature
+        self.dict_ids[machine_id].targetTemp = new_temperature
 
 
     def onNotifyMachineUnavailable(machine_id):
@@ -106,9 +125,9 @@ class QarnotBoxSched():
          - Whether to change the frequencies of the mobos
         Then, the list of mobos available for each priority group is updated
         and returned back to the QNode.
-        Returns a list [qbox_id, slots bkgd, slots low, slots high]
+        Returns a list [qbox_name, slots bkgd, slots low, slots high]
         '''
-        pass
+        return [self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)]
 
     def onDispatchedInstance(self, instances, priority_group):
         '''

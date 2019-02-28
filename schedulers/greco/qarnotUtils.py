@@ -61,13 +61,41 @@ class QTask:
         self.nb_dispatched_instances -= 1
 
 
+class QMoboState:
+    OFF, RUNBKGD, RUNLOW, RUNHIGH = range(4)
+    '''
+    When in OFF, the batsim host should be in the last pstate or marked as unavailable
+    '''
 
+
+class QRad:
+    def __init__(self, name, bs):
+        self.name = name
+        self.bs = bs
+        self.dict_mobos = {} # Maps the batid of the mobo to the QMobo object
+        self.targetTemp = 20
+        self.diffTemp = 0
+        self.properties = {} # The simgrid properties of the first mobo (should be the same for all mobos)
+        #self.regulator = regulator
+
+
+class QMobo:
+    def __init__(self, name):
+        self.name = name
+        self.pstate = 0
+        self.state = QMoboState.OFF
+
+
+
+
+
+'''
 class FrequencyRegulator:
     def __init__(self, qbox, qrad_properties, bs):
-        self.bs = bs                                # PyBatsim
-        self.qbox = qbox                            # The QBoxSched
-        self.qrad_properties = qrad_properties      # The dict of qrad properties, keys are batsim resource ids
+        #self.bs = bs                                # PyBatsim
+        #self.qbox = qbox                            # The QBoxSched
+        #self.qrad_properties = qrad_properties      # The dict of qrad properties, keys are batsim resource ids
                                                     # and values are dicts of properties ("watt_per_state", "nb_pstates", temperature-related properties)
 
     #TODO TODO TODO
-
+'''

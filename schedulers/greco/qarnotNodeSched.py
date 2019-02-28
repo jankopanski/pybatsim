@@ -45,7 +45,7 @@ class QarnotNodeSched(BatsimScheduler):
         self.qtasks_queue = {}   # Maps the QTask id to the QTask object that is waiting to be scheduled
         self.jobs_mapping = {}   # Maps the batsim job id to the QBox Object where it has been sent to
         
-        self.lists_available_mobos = [] # List of [qbox_id, slots bkgd, slots low, slots high]
+        self.lists_available_mobos = [] # List of [qbox_name, slots bkgd, slots low, slots high]
                                         # This list is updated every 30 seconds from the reports of the QBoxes
         
 
@@ -59,16 +59,18 @@ class QarnotNodeSched(BatsimScheduler):
 
         self.nb_rejected_jobs_by_qboxes = 0 # Just to keep track of the count
 
+        self.max_simulation_time = 1000
+
 
     def onSimulationBegins(self):
       assert self.bs.dynamic_job_registration_enabled, "Registration of dynamic jobs must be enabled for this scheduler to work"
       assert self.bs.allow_storage_sharing, "Storage sharing must be enabled for this scheduler to work"
       assert self.bs.ack_of_dynamic_jobs == False, "Acknowledgment of dynamic jobs must be disabled for this scheduler to work"
-      assert len(self.bs.air_temperatures) > 0, "Temperature option '-T 1' of Batsim should be set for this scheduler to work"
+      #assert len(self.bs.air_temperatures) > 0, "Temperature option '-T 1' of Batsim should be set for this scheduler to work"
       # TODO maybe change the option to send every 30 seconds instead of every message of Batsim (see TODO list)
 
       # Register the profile of the cpu-burn jobs. CPU value is 1e20 because it's supposed to be endless and killed when needed.
-      self.bs.register_profiles("dyn-burn", {"burn":"parallel_homogeneous", "cpu":1e20, "com":0})
+      self.bs.register_profiles("dyn-burn", {"burn":{"type":"parallel_homogeneous", "cpu":1e20, "com":0}})
 
       self.initQBoxesAndStorageController()
       for qb in self.dict_qboxes.values():
@@ -87,7 +89,7 @@ class QarnotNodeSched(BatsimScheduler):
 
       self.storage_controller.onSimulationEnds()
 
-      self.logger.info("Number of rejected instances by QBoxes during dispatch:", self.nb_rejected_jobs_by_qboxes)
+      self.logger.info("Number of rejected instances by QBoxes during dispatch: %s", self.nb_rejected_jobs_by_qboxes)
 
 
     def initQBoxesAndStorageController(self):
@@ -96,32 +98,43 @@ class QarnotNodeSched(BatsimScheduler):
 
 
       # Retrieve the QBox ids and the associated list of QMobos Batsim ids
-      dict_ids = defaultdict(list) # Maps the QBox name to a list of (batsim_id of the mobo and properties)
+      dict_ids = defaultdict(lambda: defaultdict(list))
+      # A dict where keys are qb_names
+      # and values are dict where keys are qr_names
+      #            and values are lists of (mobo batid, mobo name, mobo properties)
       for res in self.bs.machines["compute"]:
-        batsim_id = res["id"]
-        names = res["name"].split("_") # Name of a resource is of the form "QBOX-XXXX_QRAD-YYYY_qmZ"
-        qb_name = names[0]
-        qr_name = names[1]
-        qm_name = names[2]
+        batid = res["id"]
+        qm_name = res["name"]
+        qr_name = res["properties"]["qrad"]
+        qb_name = res["properties"]["qbox"]
         properties = res["properties"]
+        properties["speeds"] = res["speeds"]
 
-        dict_ids[qb_name].append((batsim_id, properties))
+        dict_ids[qb_name][qr_name].append((batid, qm_name, properties))
 
       # Let's create the QBox Schedulers
-      for (qb_name, list_mobos) in dict_ids.items():
-        qb = QarnotBoxSched(qb_name, list_mobos, self.bs, self, self.storage_controller)
+      for (qb_name, dict_qrads) in dict_ids.items():
+        qb = QarnotBoxSched(qb_name, dict_qrads, self.bs, self, self.storage_controller)
 
         self.dict_qboxes[qb_name] = qb
 
-      # Populate the mapping between batsim resource ids and the associated QarnotBoxSched
-      for mobo_tuple in list_mobos:
-        self.dict_resources[mobo_tuple[0]] = qb
+        # Populate the mapping between batsim resource ids and the associated QarnotBoxSched
+        for mobos_list in dict_qrads.values():
+          for (batid, _, _) in mobos_list:
+            self.dict_resources[batid] = qb
 
       self.nb_qboxes = len(self.dict_qboxes)
       self.nb_computing_resources = len(self.dict_resources)
 
 
+    def onRequestedCall(self):
+      pass
+
     def onBeforeEvents(self):
+
+      #TODO see if we need to delay the very first pass in this function (at t=0)
+
+
       if self.bs.time() >= self.time_next_update:
         # It's time to ask QBoxes to update and report their state
         self.lists_available_mobos = []
@@ -248,8 +261,11 @@ class QarnotNodeSched(BatsimScheduler):
 
 
     def isSimulationFinished(self):
-      if self.bs.no_more_static_jobs and self.bs.no_more_external_events and len(self.job_queue) == 0 and len(self.jobs_mapping) == 0:
+      # TODO This is a guard to avoid infinite loops.
+      if (self.bs.time() > self.max_simulation_time or
+          (self.bs.no_more_static_jobs and self.bs.no_more_external_events and len(self.job_queue) == 0 and len(self.jobs_mapping) == 0) ):
         self.end_of_simulation = True
+        self.bs.notify_registration_finished() # TODO this may not have its place here
         return True
       else:
         return False
