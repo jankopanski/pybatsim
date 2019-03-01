@@ -116,7 +116,7 @@ class StorageController:
         but for the case of Qarnot schedulers it does not change anything (I guess).
         '''
 
-        self._logger.info("- StorageController initialization completed, CEPH id is {} and there are {} QBox disks".format(self._ceph_id, len(self._storages)-1))
+        self._logger.info("[{}]- StorageController initialization completed, CEPH id is {} and there are {} QBox disks".format(self._bs.time(),self._ceph_id, len(self._storages)-1))
 
 
     def get_storage(self, storage_id):
@@ -256,23 +256,37 @@ class StorageController:
             if (disk._name == qbox_disk_name):
                 #TODO we will also need king of the inverse mapping from the qbox_id to the storage
                 self.mappingQBoxes[disk._id] = qbox
-                return
-                #return disk._id #TODO clement: Not sure it will be used by the QBox sched
+                return disk._id
 
         assert False, "QBox {} registered but no corresponding disk was found".format(qbox_name)
 
 
-    def onReleaseHardLink(self, qbox_name, dataset_ids):
+    def onQBoxAskHardLink(self, qb_disk_id, dataset_id):
         '''
-        This function is called from a QBox scheduler when there are no more
-        instances of a QTask that uses their input datasets.
-
-        I think a hard link should be created when a dowload of dataset(s) is asked by a QBox.
-        Then this hard link is released in this function (and the datasets in the disk can be
-        removed when space is needed if there are no other hard links from other QTasks).
+        TODO
+        This function is called from a QBox scheduler when new instances of a QTask starts running
+        A hard link should be created for all the datasets that are inputs of the QTask
         '''
         pass
 
+    def onQBoxReleaseHardLinks(self, qb_disk_id, dataset_ids):
+        '''
+        TODO
+        This function is called from a QBox scheduler when there are no more
+        instances of a QTask that uses their input datasets.
+        Multiple hardlink are released
+        '''
+        pass
+
+    def onQBoxAskDataset(self, qb_disk_id, dataset_id):
+        '''
+        TODO
+        This function is called from a QBox scheduler and asks for a dataset to be on disk.
+        If the dataset is already on disk, return True
+        If not, start data staging job and return False
+        WARNING! If the data staging of that dataset on this qbox disk was already asked, return False but don't start another data staging job.
+        '''
+        return True
 
 # Handlers of Batsim-related events
 
