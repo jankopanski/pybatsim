@@ -325,8 +325,26 @@ class QarnotNodeSched(BatsimScheduler):
                 qboxes_list = []
 
             print("--------------------------------------------------------------------------")
-            print("List of candidate qboxes: ", qboxes_list)
+            print("List of candidate qboxes by data sets location: ", qboxes_list)
             print("--------------------------------------------------------------------------")
+            return qboxes_list
+
+        def list_qboxes_by_download_time(self, qtask):
+            ''' Lists QBoxes ordered by the predicted download time of the datasets '''
+
+            required_dataset = {} # To get the list of datasets requireds by the job
+            if (self.bs.profiles.get(qtask.profile) != None) :
+                required_datasets = self.bs.profiles[qtask.profile]['datasets']
+            if (len(required_datasets) > 0):
+                # TODO
+                qboxes_list = [] # self.storage_controller.get_storages_by_download_time(required_dataset)
+            else:
+                qboxes_list = []
+
+            print("--------------------------------------------------------------------------")
+            print("List of candidate qboxes by download time: ", qboxes_list)
+            print("--------------------------------------------------------------------------")
+            return qboxes_list
         
         def next_profile_index(self):
             ''' Return the start index for the next profiles '''
@@ -341,7 +359,7 @@ class QarnotNodeSched(BatsimScheduler):
                 last_profile = task.profile
             return index
 
-        def list_available_mobos_by_dataset(sef, qboxes_list):
+        def list_available_mobos(sef, qboxes_list):
             ''' It receives the qboxes_list and returns a list wich all qmobos available from each qbox '''
             
             available_mobos_by_dataset = []
@@ -376,11 +394,11 @@ class QarnotNodeSched(BatsimScheduler):
                 if nb_instances_left > 0:
                     # Dispatch as many instances as possible on mobos available for bkgd, no matter the priority of the qtask
                     self.sortAvailableMobos("bkgd")
-                    list_qboxes_by_dataset = list_qboxes_with_dataset(qtask)
-                    if (len(list_qboxes_by_dataset) > 0):
-                        list_available_mobos = list_available_mobos_by_dataset(sef, list_qboxes_by_dataset)
-                    else:
-                        list_available_mobos = self.lists_available_mobos
+                    
+                    list_qboxes = self.list_qboxes_with_dataset(qtask)                  # Build the list of Qboxes by dataset location
+                    if(len(list_qboxes) == 0):                                          # No one Qbox has the dataset
+                        list_qboxes = self.list_qboxes_by_download_time(qtask)          # Build the list of Qboxes by the predicted download time of the datasets
+                    list_available_mobos = self.list_available_mobos(list_qboxes)
                     
                     for tup in list_available_mobos:
                         qb = self.dict_qboxes[tup[0]]
@@ -408,11 +426,11 @@ class QarnotNodeSched(BatsimScheduler):
                     if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.BKGD):
                         # There are more instances to dispatch and the qtask is either low or high priority
                         self.sortAvailableMobos("low")
-                        list_qboxes_by_dataset = list_qboxes_with_dataset(qtask)
-                        if (len(list_qboxes_by_dataset) > 0):
-                            list_available_mobos = list_available_mobos_by_dataset(sef, list_qboxes_by_dataset)
-                        else:
-                            list_available_mobos = self.lists_available_mobos
+                        
+                        list_qboxes = self.list_qboxes_with_dataset(qtask)                  # Build the list of Qboxes by dataset location
+                        if(len(list_qboxes) == 0):                                          # No one Qbox has the dataset
+                            list_qboxes = self.list_qboxes_by_download_time(qtask)          # Build the list of Qboxes by the predicted download time of the datasets
+                        list_available_mobos = self.list_available_mobos(list_qboxes)
                         
                         for tup in list_available_mobos:
                             qb = self.dict_qboxes[tup[0]]
@@ -440,11 +458,11 @@ class QarnotNodeSched(BatsimScheduler):
                         if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.LOW):
                             # There are more instances to dispatch and the qtask is high priority
                             self.sortAvailableMobos("high")
-                            list_qboxes_by_dataset = list_qboxes_with_dataset(qtask)
-                            if (len(list_qboxes_by_dataset) > 0):
-                                list_available_mobos = list_available_mobos_by_dataset(sef, list_qboxes_by_dataset)
-                            else:
-                                list_available_mobos = self.lists_available_mobos
+                            
+                            list_qboxes = self.list_qboxes_with_dataset(qtask)                  # Build the list of Qboxes by dataset location
+                            if(len(list_qboxes) == 0):                                          # No one Qbox has the dataset
+                                list_qboxes = self.list_qboxes_by_download_time(qtask)          # Build the list of Qboxes by the predicted download time of the datasets
+                            list_available_mobos = self.list_available_mobos(list_qboxes)
                             
                             for tup in list_available_mobos:
                                 qb = self.dict_qboxes[tup[0]]
