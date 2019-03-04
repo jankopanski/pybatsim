@@ -279,7 +279,7 @@ class QarnotNodeSched(BatsimScheduler):
     def isSimulationFinished(self):
       # TODO This is a guard to avoid infinite loops.
       if (self.bs.time() > self.max_simulation_time or
-          (self.bs.no_more_static_jobs and self.bs.no_more_external_events and len(self.job_queue) == 0 and len(self.jobs_mapping) == 0) ):
+          (self.bs.no_more_static_jobs and self.bs.no_more_external_events and len(self.qtasks_queue) == 0 and len(self.jobs_mapping) == 0) ):
         self.end_of_simulation = True
         self.bs.notify_registration_finished() # TODO this may not have its place here
         return True
@@ -352,7 +352,7 @@ class QarnotNodeSched(BatsimScheduler):
               nb_instances_left = 0
               # No more instances are waiting, stop the dispatch for this qtask
               break
-            else:
+            elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
               # Schedule instances for all slots of this QBox
               jobs = qtask.waiting_instances[0:nb_slots]
               self.addJobsToMapping(jobs, qb)
@@ -378,7 +378,7 @@ class QarnotNodeSched(BatsimScheduler):
                 nb_instances_left = 0
                 # No more instances are waiting, stop the dispatch for this qtask
                 break
-              else:
+              elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
                 # Schedule instances for all slots of this QBox
                 jobs = qtask.waiting_instances[0:nb_slots]
                 self.addJobsToMapping(jobs, qb)
@@ -404,7 +404,7 @@ class QarnotNodeSched(BatsimScheduler):
                   nb_instances_left = 0
                   # No more instances are waiting, stop the dispatch for this qtask
                   break
-                else:
+                elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
                   # Schedule instances for all slots of this QBox
                   jobs = qtask.waiting_instances[0:nb_slots]
                   self.addJobsToMapping(jobs, qb)
