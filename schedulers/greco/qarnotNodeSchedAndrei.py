@@ -291,7 +291,7 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
         def isSimulationFinished(self):
             # TODO This is a guard to avoid infinite loops.
             if (self.bs.time() > self.max_simulation_time or
-                    (self.bs.no_more_static_jobs and self.bs.no_more_external_events and len(self.job_queue) == 0 and len(self.jobs_mapping) == 0) ):
+                              (self.bs.no_more_static_jobs and self.bs.no_more_external_events and len(self.qtasks_queue) == 0 and len(self.jobs_mapping) == 0) ):
                 self.end_of_simulation = True
                 self.bs.notify_registration_finished() # TODO this may not have its place here
                 return True
@@ -439,26 +439,25 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                         qb = self.dict_qboxes[tup[0]]
                         nb_slots = tup[1]
                         print("     ---> This tup offers: ", nb_slots)
-                        if(nb_slots > 0):
-                            print("     ---> We will dispatch the task here: ")
-                            if nb_slots >= nb_instances_left:
-                                # There are more available slots than instances, gotta dispatch'em all!
-                                jobs = qtask.waiting_instances.copy()
-                                self.addJobsToMapping(jobs, qb)                     # Add the Jobs to the internal mapping
-                                qtask.instances_dispatched(jobs)                    # Update the QTask
-                                qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id) # Dispatch the instances
-                                tup[1] -= nb_instances_left                             # Update the number of slots in the list
-                                nb_instances_left = 0
-                                # No more instances are waiting, stop the dispatch for this qtask
-                                break
-                            else:
-                                # Schedule instances for all slots of this QBox
-                                jobs = qtask.waiting_instances[0:nb_slots]
-                                self.addJobsToMapping(jobs, qb)
-                                qtask.instances_dispatched(jobs)
-                                qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id)
-                                tup[1] = 0
-                                nb_instances_left -= nb_slots
+                        print("     ---> We will dispatch the task here: ")
+                        if nb_slots >= nb_instances_left:
+                            # There are more available slots than instances, gotta dispatch'em all!
+                            jobs = qtask.waiting_instances.copy()
+                            self.addJobsToMapping(jobs, qb)                     # Add the Jobs to the internal mapping
+                            qtask.instances_dispatched(jobs)                    # Update the QTask
+                            qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id) # Dispatch the instances
+                            tup[1] -= nb_instances_left                             # Update the number of slots in the list
+                            nb_instances_left = 0
+                            # No more instances are waiting, stop the dispatch for this qtask
+                            break
+                        elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
+                            # Schedule instances for all slots of this QBox
+                            jobs = qtask.waiting_instances[0:nb_slots]
+                            self.addJobsToMapping(jobs, qb)
+                            qtask.instances_dispatched(jobs)
+                            qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id)
+                            tup[1] = 0
+                            nb_instances_left -= nb_slots
                     #End for bkgd slots
 
                     if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.BKGD):
@@ -475,30 +474,29 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                             qb = self.dict_qboxes[tup[0]]
                             nb_slots = tup[2]
                             print("     ---> This tup offers: ", nb_slots)
-                            if(nb_slots > 0):
-                                print("     ---> We will dispatch the task here: ")
-                                print("     ---> We need: ", nb_instances_left)
+                            print("     ---> We will dispatch the task here: ")
+                            print("     ---> We need: ", nb_instances_left)
 
-                                if nb_slots >= nb_instances_left:
-                                    print("     ---> Dispatch all ")
-                                    # There are more available slots than instances, gotta dispatch'em all!
-                                    jobs = qtask.waiting_instances.copy()
-                                    self.addJobsToMapping(jobs, qb)
-                                    qtask.instances_dispatched(jobs)
-                                    qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
-                                    tup[2] -= nb_instances_left
-                                    nb_instances_left = 0
-                                    print("     ---> Dispatched! ")
-                                    # No more instances are waiting, stop the dispatch for this qtask
-                                    break
-                                else:
-                                    # Schedule instances for all slots of this QBox
-                                    jobs = qtask.waiting_instances[0:nb_slots]
-                                    self.addJobsToMapping(jobs, qb)
-                                    qtask.instances_dispatched(jobs)
-                                    qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
-                                    tup[2] = 0
-                                    nb_instances_left -= nb_slots
+                            if nb_slots >= nb_instances_left:
+                                print("     ---> Dispatch all ")
+                                # There are more available slots than instances, gotta dispatch'em all!
+                                jobs = qtask.waiting_instances.copy()
+                                self.addJobsToMapping(jobs, qb)
+                                qtask.instances_dispatched(jobs)
+                                qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+                                tup[2] -= nb_instances_left
+                                nb_instances_left = 0
+                                print("     ---> Dispatched! ")
+                                # No more instances are waiting, stop the dispatch for this qtask
+                                break
+                            elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
+                                # Schedule instances for all slots of this QBox
+                                jobs = qtask.waiting_instances[0:nb_slots]
+                                self.addJobsToMapping(jobs, qb)
+                                qtask.instances_dispatched(jobs)
+                                qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+                                tup[2] = 0
+                                nb_instances_left -= nb_slots
                         #End for low slots
 
                         if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.LOW):
@@ -515,26 +513,25 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                                 qb = self.dict_qboxes[tup[0]]
                                 nb_slots = tup[3]
                                 print("     ---> This tup offers: ", nb_slots)
-                                if(nb_slots > 0):
-                                    if nb_slots >= nb_instances_left:
-                                        print("     ---> We will dispatch the task here: ")
-                                        # There are more available slots than wild instances, gotta catch'em all!
-                                        jobs = qtask.waiting_instances.copy()
-                                        self.addJobsToMapping(jobs, qb)
-                                        qtask.instances_dispatched(jobs)
-                                        qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
-                                        tup[3] -= nb_instances_left
-                                        nb_instances_left = 0
-                                        # No more instances are waiting, stop the dispatch for this qtask
-                                        break
-                                    else:
-                                        # Schedule instances for all slots of this QBox
-                                        jobs = qtask.waiting_instances[0:nb_slots]
-                                        self.addJobsToMapping(jobs, qb)
-                                        qtask.instances_dispatched(jobs)
-                                        qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
-                                        tup[3] = 0
-                                        nb_instances_left -= nb_slots
+                                if nb_slots >= nb_instances_left:
+                                    print("     ---> We will dispatch the task here: ")
+                                    # There are more available slots than wild instances, gotta catch'em all!
+                                    jobs = qtask.waiting_instances.copy()
+                                    self.addJobsToMapping(jobs, qb)
+                                    qtask.instances_dispatched(jobs)
+                                    qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
+                                    tup[3] -= nb_instances_left
+                                    nb_instances_left = 0
+                                    # No more instances are waiting, stop the dispatch for this qtask
+                                    break
+                                elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
+                                    # Schedule instances for all slots of this QBox
+                                    jobs = qtask.waiting_instances[0:nb_slots]
+                                    self.addJobsToMapping(jobs, qb)
+                                    qtask.instances_dispatched(jobs)
+                                    qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
+                                    tup[3] = 0
+                                    nb_instances_left -= nb_slots
                             #End for high slots
                         #End if high priority and nb_instances_left > 0
                     #End if low/high priority and nb_instances_left > 0
