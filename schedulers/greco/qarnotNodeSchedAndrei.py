@@ -1,7 +1,7 @@
 from batsim.batsim import BatsimScheduler, Batsim, Job
-from StorageController import StorageController
-from qarnotUtils import *
-from qarnotBoxSched import QarnotBoxSched
+from StorageController import *
+from qarnotUtilsAndrei import *
+from qarnotBoxSchedAndrei import QarnotBoxSchedAndrei as QarnotBoxSched
 
 from procset import ProcSet
 from collections import defaultdict
@@ -33,7 +33,7 @@ A job refers to a Batsim job (see batsim.batsim.Job)
 A task or QTask refers to a Qarnot QTask (see qarnotUtils.QTask)
 '''
 
-class QarnotNodeSched(BatsimScheduler):
+class QarnotNodeSchedAndrei(BatsimScheduler):
         def __init__(self, options):
                 super().__init__(options)
 
@@ -128,6 +128,14 @@ class QarnotNodeSched(BatsimScheduler):
             self.nb_qboxes = len(self.dict_qboxes)
             self.nb_computing_resources = len(self.dict_resources)
 
+            #Adding Data sets to test
+            self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:540624", 17))
+            self.storage_controller.add_dataset(12, Dataset("QJOB-first:docker:162852561", 18))
+            self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:41428146", 19))
+
+            self.storage_controller.add_dataset(12, Dataset("QJOB-second:user-input:41428146", 17))
+            self.storage_controller.add_dataset(12, Dataset("QJOB-second:docker:67221727", 17))
+            print("---Qboxes have a life :) ")
 
         def onRequestedCall(self):
             pass
@@ -192,13 +200,16 @@ class QarnotNodeSched(BatsimScheduler):
 
 
         def onJobSubmission(self, job):
-            qtask_id = job.id.split('_')[0]
+            print('     ---> Submitting job: ', job.id)
+            qtask_id = job.id.split('_')[0] # It is the formar workload_id!name_of_job. For example: 278891!QJOB-second_0
+            qtask_profile = job.profile
             job.qtask_id = qtask_id
+
 
             # Retrieve or create the corresponding QTask
             if not qtask_id in self.qtasks_queue:
                 #TODO, add the job.profile as parameter
-                qtask = QTask(qtask_id, job.profile_dict["priority"])
+                qtask = QTask(qtask_id, qtask_profile, job.profile_dict["priority"])
                 self.qtasks_queue[qtask_id] = qtask
             else:
                 qtask = self.qtasks_queue[qtask_id]
@@ -315,12 +326,16 @@ class QarnotNodeSched(BatsimScheduler):
 
         def list_qboxes_with_dataset(self, qtask):
             ''' Lists all QBoxes that have the required list of datasets from the job '''
-
-            required_dataset = {} # To get the list of datasets requireds by the job
-            if (self.bs.profiles.get(qtask.profile) != None) :
-                required_datasets = self.bs.profiles[qtask.profile]['datasets']
+            print("         ---> Searching qboxes by datasets")
+            required_datasets = {} # To get the list of datasets requireds by the job
+            print("         ---> Profiles on system",self.bs.profiles)
+            profile = self.bs.profiles[qtask.id.split('!')[0]]
+            if (profile.get(qtask.profile) != None) :
+                print("         ---> It is in the system")
+                required_datasets = self.bs.profiles[qtask.id.split('!')[0]][qtask.profile]['datasets']
             if (len(required_datasets) > 0):
-                qboxes_list = self.storage_controller.get_storages_by_dataset(required_dataset)
+                print("         ---> The required Data Sets:", required_datasets)
+                qboxes_list = self.storage_controller.get_storages_by_dataset(required_datasets)
             else:
                 qboxes_list = []
 
@@ -332,7 +347,7 @@ class QarnotNodeSched(BatsimScheduler):
         def list_qboxes_by_download_time(self, qtask):
             ''' Lists QBoxes ordered by the predicted download time of the datasets '''
 
-            required_dataset = {} # To get the list of datasets requireds by the job
+            required_datasets = {} # To get the list of datasets requireds by the job
             if (self.bs.profiles.get(qtask.profile) != None) :
                 required_datasets = self.bs.profiles[qtask.profile]['datasets']
             if (len(required_datasets) > 0):
@@ -359,13 +374,20 @@ class QarnotNodeSched(BatsimScheduler):
                 last_profile = task.profile
             return index
 
-        def list_available_mobos(sef, qboxes_list):
+        def list_available_mobos(self, qboxes_list):
             ''' It receives the qboxes_list and returns a list wich all qmobos available from each qbox '''
-            
+            print("         ---> Searching for the availale Mobos: ")
+            print("             ---> The big list: ", self.lists_available_mobos)
+            for item in self.lists_available_mobos:
+                print ("                ---> Item: ", item)
             available_mobos_by_dataset = []
+            #mobos_names = self.lists_available_mobos['names']
             for qb in qboxes_list:
-                if(self.lists_available_mobos.get(qb)):
-                    available_mobos_by_dataset.append(qb)
+                print("              ---> Seaching for: ", qb.name)
+                for mobo in self.lists_available_mobos:
+                    if (qb.name == mobo[0]):
+                        print("                 ---> QMobo found")
+                        available_mobos_by_dataset.append(mobo)
             return available_mobos_by_dataset
 
         def doDispatch(self):
@@ -391,40 +413,57 @@ class QarnotNodeSched(BatsimScheduler):
             for qtask in sorted(self.qtasks_queue.values(),key=lambda qtask:(-qtask.priority, qtask.nb_dispatched_instances)):
                 self.logger.info("[{}]- QNode trying to dispatch {} of priority {} having {} dispatched instances".format(self.bs.time(),qtask.id, qtask.priority, qtask.nb_dispatched_instances))
                 nb_instances_left = len(qtask.waiting_instances)
+                print(" ---> {} Instances left", nb_instances_left)
                 if nb_instances_left > 0:
                     # Dispatch as many instances as possible on mobos available for bkgd, no matter the priority of the qtask
+                    print("****************************************************\n Bkgd")
                     self.sortAvailableMobos("bkgd")
-                    
+                    print("     ---> Searching Qboxes with the required Data sets")
                     list_qboxes = self.list_qboxes_with_dataset(qtask)                  # Build the list of Qboxes by dataset location
-                    if(len(list_qboxes) == 0):                                          # No one Qbox has the dataset
+                    if(len(list_qboxes) == 0):
+                        print("     ---> No one Qboxes with the data sets, lets check the download time")                                          # No one Qbox has the dataset
                         list_qboxes = self.list_qboxes_by_download_time(qtask)          # Build the list of Qboxes by the predicted download time of the datasets
-                    list_available_mobos = self.list_available_mobos(list_qboxes)
+                    else:
+                        print("     ---> We found some Qboxes")
+                    if(len(list_qboxes) == 0):
+                        print("     ---> No prediction of time") 
+                        list_available_mobos = self.lists_available_mobos
+                    else:
+                        print("     ---> Getting the available mobos")
+                        list_available_mobos = self.list_available_mobos(list_qboxes)
+                        print("         ---> The available mobos: ", list_available_mobos)
                     
+
                     for tup in list_available_mobos:
+                        print("     ---> Into tups")
                         qb = self.dict_qboxes[tup[0]]
                         nb_slots = tup[1]
-                        if nb_slots >= nb_instances_left:
-                            # There are more available slots than instances, gotta dispatch'em all!
-                            jobs = qtask.waiting_instances.copy()
-                            self.addJobsToMapping(jobs, qb)                     # Add the Jobs to the internal mapping
-                            qtask.instances_dispatched(jobs)                    # Update the QTask
-                            qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id) # Dispatch the instances
-                            tup[1] -= nb_instances_left                             # Update the number of slots in the list
-                            nb_instances_left = 0
-                            # No more instances are waiting, stop the dispatch for this qtask
-                            break
-                        else:
-                            # Schedule instances for all slots of this QBox
-                            jobs = qtask.waiting_instances[0:nb_slots]
-                            self.addJobsToMapping(jobs, qb)
-                            qtask.instances_dispatched(jobs)
-                            qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id)
-                            tup[1] = 0
-                            nb_instances_left -= nb_slots
+                        print("     ---> This tup offers: ", nb_slots)
+                        if(nb_slots > 0):
+                            print("     ---> We will dispatch the task here: ")
+                            if nb_slots >= nb_instances_left:
+                                # There are more available slots than instances, gotta dispatch'em all!
+                                jobs = qtask.waiting_instances.copy()
+                                self.addJobsToMapping(jobs, qb)                     # Add the Jobs to the internal mapping
+                                qtask.instances_dispatched(jobs)                    # Update the QTask
+                                qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id) # Dispatch the instances
+                                tup[1] -= nb_instances_left                             # Update the number of slots in the list
+                                nb_instances_left = 0
+                                # No more instances are waiting, stop the dispatch for this qtask
+                                break
+                            else:
+                                # Schedule instances for all slots of this QBox
+                                jobs = qtask.waiting_instances[0:nb_slots]
+                                self.addJobsToMapping(jobs, qb)
+                                qtask.instances_dispatched(jobs)
+                                qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id)
+                                tup[1] = 0
+                                nb_instances_left -= nb_slots
                     #End for bkgd slots
 
                     if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.BKGD):
                         # There are more instances to dispatch and the qtask is either low or high priority
+                        print("****************************************************\n Low")
                         self.sortAvailableMobos("low")
                         
                         list_qboxes = self.list_qboxes_with_dataset(qtask)                  # Build the list of Qboxes by dataset location
@@ -435,28 +474,36 @@ class QarnotNodeSched(BatsimScheduler):
                         for tup in list_available_mobos:
                             qb = self.dict_qboxes[tup[0]]
                             nb_slots = tup[2]
-                            if nb_slots >= nb_instances_left:
-                                # There are more available slots than instances, gotta dispatch'em all!
-                                jobs = qtask.waiting_instances.copy()
-                                self.addJobsToMapping(jobs, qb)
-                                qtask.instances_dispatched(jobs)
-                                qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
-                                tup[2] -= nb_instances_left
-                                nb_instances_left = 0
-                                # No more instances are waiting, stop the dispatch for this qtask
-                                break
-                            else:
-                                # Schedule instances for all slots of this QBox
-                                jobs = qtask.waiting_instances[0:nb_slots]
-                                self.addJobsToMapping(jobs, qb)
-                                qtask.instances_dispatched(jobs)
-                                qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
-                                tup[2] = 0
-                                nb_instances_left -= nb_slots
+                            print("     ---> This tup offers: ", nb_slots)
+                            if(nb_slots > 0):
+                                print("     ---> We will dispatch the task here: ")
+                                print("     ---> We need: ", nb_instances_left)
+
+                                if nb_slots >= nb_instances_left:
+                                    print("     ---> Dispatch all ")
+                                    # There are more available slots than instances, gotta dispatch'em all!
+                                    jobs = qtask.waiting_instances.copy()
+                                    self.addJobsToMapping(jobs, qb)
+                                    qtask.instances_dispatched(jobs)
+                                    qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+                                    tup[2] -= nb_instances_left
+                                    nb_instances_left = 0
+                                    print("     ---> Dispatched! ")
+                                    # No more instances are waiting, stop the dispatch for this qtask
+                                    break
+                                else:
+                                    # Schedule instances for all slots of this QBox
+                                    jobs = qtask.waiting_instances[0:nb_slots]
+                                    self.addJobsToMapping(jobs, qb)
+                                    qtask.instances_dispatched(jobs)
+                                    qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+                                    tup[2] = 0
+                                    nb_instances_left -= nb_slots
                         #End for low slots
 
                         if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.LOW):
                             # There are more instances to dispatch and the qtask is high priority
+                            print("****************************************************\n High")
                             self.sortAvailableMobos("high")
                             
                             list_qboxes = self.list_qboxes_with_dataset(qtask)                  # Build the list of Qboxes by dataset location
@@ -467,24 +514,27 @@ class QarnotNodeSched(BatsimScheduler):
                             for tup in list_available_mobos:
                                 qb = self.dict_qboxes[tup[0]]
                                 nb_slots = tup[3]
-                                if nb_slots >= nb_instances_left:
-                                    # There are more available slots than wild instances, gotta catch'em all!
-                                    jobs = qtask.waiting_instances.copy()
-                                    self.addJobsToMapping(jobs, qb)
-                                    qtask.instances_dispatched(jobs)
-                                    qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
-                                    tup[3] -= nb_instances_left
-                                    nb_instances_left = 0
-                                    # No more instances are waiting, stop the dispatch for this qtask
-                                    break
-                                else:
-                                    # Schedule instances for all slots of this QBox
-                                    jobs = qtask.waiting_instances[0:nb_slots]
-                                    self.addJobsToMapping(jobs, qb)
-                                    qtask.instances_dispatched(jobs)
-                                    qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
-                                    tup[3] = 0
-                                    nb_instances_left -= nb_slots
+                                print("     ---> This tup offers: ", nb_slots)
+                                if(nb_slots > 0):
+                                    if nb_slots >= nb_instances_left:
+                                        print("     ---> We will dispatch the task here: ")
+                                        # There are more available slots than wild instances, gotta catch'em all!
+                                        jobs = qtask.waiting_instances.copy()
+                                        self.addJobsToMapping(jobs, qb)
+                                        qtask.instances_dispatched(jobs)
+                                        qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
+                                        tup[3] -= nb_instances_left
+                                        nb_instances_left = 0
+                                        # No more instances are waiting, stop the dispatch for this qtask
+                                        break
+                                    else:
+                                        # Schedule instances for all slots of this QBox
+                                        jobs = qtask.waiting_instances[0:nb_slots]
+                                        self.addJobsToMapping(jobs, qb)
+                                        qtask.instances_dispatched(jobs)
+                                        qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
+                                        tup[3] = 0
+                                        nb_instances_left -= nb_slots
                             #End for high slots
                         #End if high priority and nb_instances_left > 0
                     #End if low/high priority and nb_instances_left > 0
