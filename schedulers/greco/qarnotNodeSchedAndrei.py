@@ -129,28 +129,37 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
             self.nb_computing_resources = len(self.dict_resources)
 
             #Adding Data sets to test
-            #print(" &&&&&&&&& Storages: ", self.storage_controller.get_storages())
-            
+            print(" &&&&&&&&& Storages: ", self.storage_controller.get_storages())
+
             # Data sets for the simple workload
+            self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:540624", 17))
+            self.storage_controller.add_dataset(12, Dataset("QJOB-first:docker:162852561", 18))
+            self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:41428146", 19))
+
+            self.storage_controller.add_dataset(12, Dataset("QJOB-second:user-input:41428146", 17))
+            self.storage_controller.add_dataset(12, Dataset("QJOB-second:docker:67221727", 18))
+
+            self.storage_controller.add_dataset(13, Dataset("QJOB-triplet:user-input:0", 17))
+
             #self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:540624", 17))
             #self.storage_controller.add_dataset(12, Dataset("QJOB-first:docker:162852561", 18))
             #self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:41428146", 19))
 
             # Data sets for the 1-day-qarnot-samples
-            self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:user-input:540624", 17))
-            self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:docker:162852561", 17))
-            self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:user-input:41428146", 17))
+            #self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:user-input:540624", 17))
+            #self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:docker:162852561", 17))
+            #self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:user-input:41428146", 17))
 
-            self.storage_controller.add_dataset(980, Dataset("QJOB-0225-0908-c466-4492ab4e86f3:docker:54384684", 30))
-            self.storage_controller.add_dataset(980, Dataset("QJOB-0225-0908-c466-4492ab4e86f3:user-input:41428146", 30))
+            #self.storage_controller.add_dataset(980, Dataset("QJOB-0225-0908-c466-4492ab4e86f3:docker:54384684", 30))
+            #self.storage_controller.add_dataset(980, Dataset("QJOB-0225-0908-c466-4492ab4e86f3:user-input:41428146", 30))
 
-            self.storage_controller.add_dataset(989, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:docker:1305968769", 15))
-            self.storage_controller.add_dataset(989, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:user-input:41428146", 15))
-            self.storage_controller.add_dataset(989, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:user-input:0", 15))
+            #self.storage_controller.add_dataset(989, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:docker:1305968769", 15))
+            #self.storage_controller.add_dataset(989, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:user-input:41428146", 15))
+            #self.storage_controller.add_dataset(989, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:user-input:0", 15))
 
-            self.storage_controller.add_dataset(989, Dataset("QJOB-0225-1136-6d83-95be917ac327:user-input:41428146", 20))
-            self.storage_controller.add_dataset(989, Dataset("QJOB-0225-1136-6d83-95be917ac327:user-input:0", 20))
-            self.storage_controller.add_dataset(989, Dataset("QJOB-0225-1136-6d83-95be917ac327:docker:162852561", 20))
+            #self.storage_controller.add_dataset(989, Dataset("QJOB-0225-1136-6d83-95be917ac327:user-input:41428146", 20))
+            #self.storage_controller.add_dataset(989, Dataset("QJOB-0225-1136-6d83-95be917ac327:user-input:0", 20))
+            #self.storage_controller.add_dataset(989, Dataset("QJOB-0225-1136-6d83-95be917ac327:docker:162852561", 20))
             #print("---Qboxes have a life :) ")
 
         def onRequestedCall(self):
@@ -396,17 +405,17 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
 
         def list_available_mobos(self, qboxes_list):
             ''' It receives the qboxes_list and returns a list wich all qmobos available from each qbox '''
-            print("         ---> Searching for the availale Mobos: ")
-            print("             ---> The big list: ", self.lists_available_mobos)
-            for item in self.lists_available_mobos:
-                print ("                ---> Item: ", item)
+            #print("         ---> Searching for the availale Mobos: ")
+            #print("             ---> The big list: ", self.lists_available_mobos)
+            #for item in self.lists_available_mobos:
+                #print ("                ---> Item: ", item)
             available_mobos_by_dataset = []
             #mobos_names = self.lists_available_mobos['names']
             for qb in qboxes_list:
-                print("              ---> Seaching for: ", qb.name)
+                #print("              ---> Seaching for: ", qb.name)
                 for mobo in self.lists_available_mobos:
                     if (qb.name == mobo[0]):
-                        print("                 ---> QMobo found")
+                        #print("                 ---> QMobo found")
                         available_mobos_by_dataset.append(mobo)
             return available_mobos_by_dataset
 
@@ -458,7 +467,10 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                         print("     ---> Into tups")
                         qb = self.dict_qboxes[tup[0]]
                         nb_slots = tup[1]
+                        print("     ---> TUP: ", qb)
                         print("     ---> This tup offers: ", nb_slots)
+                        print("     ---> We will dispatch the task here: ")
+                        print("     ---> We need: ", nb_instances_left)
                         if nb_slots >= nb_instances_left:
                             # There are more available slots than instances, gotta dispatch'em all!
                             jobs = qtask.waiting_instances.copy()
@@ -467,6 +479,7 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                             qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id) # Dispatch the instances
                             tup[1] -= nb_instances_left                             # Update the number of slots in the list
                             nb_instances_left = 0
+                            print("     ---> Dispatched ALL! ")
                             # No more instances are waiting, stop the dispatch for this qtask
                             break
                         elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
@@ -477,6 +490,7 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                             qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id)
                             tup[1] = 0
                             nb_instances_left -= nb_slots
+                            print("     ---> Dispatched SOME! ")
                     #End for bkgd slots
 
                     if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.BKGD):
@@ -501,12 +515,11 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                         for tup in list_available_mobos:
                             qb = self.dict_qboxes[tup[0]]
                             nb_slots = tup[2]
+                            print("     ---> TUP: ", qb)
                             print("     ---> This tup offers: ", nb_slots)
                             print("     ---> We will dispatch the task here: ")
                             print("     ---> We need: ", nb_instances_left)
-
                             if nb_slots >= nb_instances_left:
-                                print("     ---> Dispatch all ")
                                 # There are more available slots than instances, gotta dispatch'em all!
                                 jobs = qtask.waiting_instances.copy()
                                 self.addJobsToMapping(jobs, qb)
@@ -514,17 +527,18 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                                 qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
                                 tup[2] -= nb_instances_left
                                 nb_instances_left = 0
-                                print("     ---> Dispatched! ")
+                                print("     ---> Dispatched ALL! ")
                                 # No more instances are waiting, stop the dispatch for this qtask
                                 break
                             elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
                                 # Schedule instances for all slots of this QBox
-                                jobs = qtask.waiting_instances[0:nb_slots]
+                                jobs = qtask.waiting_instances[0:nb_slots].copy()
                                 self.addJobsToMapping(jobs, qb)
                                 qtask.instances_dispatched(jobs)
                                 qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
                                 tup[2] = 0
                                 nb_instances_left -= nb_slots
+                                print("     ---> Dispatched SOME! ")
                         #End for low slots
 
                         if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.LOW):
@@ -549,9 +563,11 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                             for tup in list_available_mobos:
                                 qb = self.dict_qboxes[tup[0]]
                                 nb_slots = tup[3]
+                                print("     ---> TUP: ", qb)                            
                                 print("     ---> This tup offers: ", nb_slots)
+                                print("     ---> We will dispatch the task here: ")
+                                print("     ---> We need: ", nb_instances_left)
                                 if nb_slots >= nb_instances_left:
-                                    print("     ---> We will dispatch the task here: ")
                                     # There are more available slots than wild instances, gotta catch'em all!
                                     jobs = qtask.waiting_instances.copy()
                                     self.addJobsToMapping(jobs, qb)
@@ -559,6 +575,7 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                                     qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
                                     tup[3] -= nb_instances_left
                                     nb_instances_left = 0
+                                    print("     ---> Dispatched ALL! ")
                                     # No more instances are waiting, stop the dispatch for this qtask
                                     break
                                 elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
@@ -569,6 +586,7 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                                     qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
                                     tup[3] = 0
                                     nb_instances_left -= nb_slots
+                                    print("     ---> Dispatched SOME! ")
                             #End for high slots
                         #End if high priority and nb_instances_left > 0
                     #End if low/high priority and nb_instances_left > 0
