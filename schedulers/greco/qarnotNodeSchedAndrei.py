@@ -129,13 +129,29 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
             self.nb_computing_resources = len(self.dict_resources)
 
             #Adding Data sets to test
-            self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:540624", 17))
-            self.storage_controller.add_dataset(12, Dataset("QJOB-first:docker:162852561", 18))
-            self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:41428146", 19))
+            #print(" &&&&&&&&& Storages: ", self.storage_controller.get_storages())
+            
+            # Data sets for the simple workload
+            #self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:540624", 17))
+            #self.storage_controller.add_dataset(12, Dataset("QJOB-first:docker:162852561", 18))
+            #self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:41428146", 19))
 
-            self.storage_controller.add_dataset(12, Dataset("QJOB-second:user-input:41428146", 17))
-            self.storage_controller.add_dataset(12, Dataset("QJOB-second:docker:67221727", 17))
-            print("---Qboxes have a life :) ")
+            # Data sets for the 1-day-qarnot-samples
+            self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:user-input:540624", 17))
+            self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:docker:162852561", 17))
+            self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:user-input:41428146", 17))
+
+            self.storage_controller.add_dataset(980, Dataset("QJOB-0225-0908-c466-4492ab4e86f3:docker:54384684", 30))
+            self.storage_controller.add_dataset(980, Dataset("QJOB-0225-0908-c466-4492ab4e86f3:user-input:41428146", 30))
+
+            self.storage_controller.add_dataset(989, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:docker:1305968769", 15))
+            self.storage_controller.add_dataset(989, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:user-input:41428146", 15))
+            self.storage_controller.add_dataset(989, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:user-input:0", 15))
+
+            self.storage_controller.add_dataset(989, Dataset("QJOB-0225-1136-6d83-95be917ac327:user-input:41428146", 20))
+            self.storage_controller.add_dataset(989, Dataset("QJOB-0225-1136-6d83-95be917ac327:user-input:0", 20))
+            self.storage_controller.add_dataset(989, Dataset("QJOB-0225-1136-6d83-95be917ac327:docker:162852561", 20))
+            #print("---Qboxes have a life :) ")
 
         def onRequestedCall(self):
             pass
