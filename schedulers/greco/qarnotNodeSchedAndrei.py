@@ -136,10 +136,10 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
             self.storage_controller.add_dataset(12, Dataset("QJOB-first:docker:162852561", 18))
             self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:41428146", 19))
 
-            self.storage_controller.add_dataset(12, Dataset("QJOB-second:user-input:41428146", 17))
-            self.storage_controller.add_dataset(12, Dataset("QJOB-second:docker:67221727", 18))
+            #self.storage_controller.add_dataset(12, Dataset("QJOB-second:user-input:41428146", 17))
+            #self.storage_controller.add_dataset(12, Dataset("QJOB-second:docker:67221727", 18))
 
-            self.storage_controller.add_dataset(13, Dataset("QJOB-triplet:user-input:0", 17))
+            self.storage_controller.add_dataset(12, Dataset("QJOB-triplet:user-input:0", 17))
 
             #self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:540624", 17))
             #self.storage_controller.add_dataset(12, Dataset("QJOB-first:docker:162852561", 18))
@@ -498,12 +498,12 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                         print("****************************************************\n Low")
                         self.sortAvailableMobos("low")
                         
-                        list_qboxes = self.list_qboxes_with_dataset(qtask)                  # Build the list of Qboxes by dataset location
-                        if(len(list_qboxes) == 0):
-                            print("     ---> No one Qboxes with the data sets, lets check the download time")                                          # No one Qbox has the dataset
-                            list_qboxes = self.list_qboxes_by_download_time(qtask)          # Build the list of Qboxes by the predicted download time of the datasets
-                        else:
-                            print("     ---> We found some Qboxes")
+                        #list_qboxes = self.list_qboxes_with_dataset(qtask)                  # Build the list of Qboxes by dataset location
+                        #if(len(list_qboxes) == 0):
+                        #    print("     ---> No one Qboxes with the data sets, lets check the download time")                                          # No one Qbox has the dataset
+                        #    list_qboxes = self.list_qboxes_by_download_time(qtask)          # Build the list of Qboxes by the predicted download time of the datasets
+                        #else:
+                        #    print("     ---> We found some Qboxes")
                         if(len(list_qboxes) == 0):
                             print("     ---> No prediction of time") 
                             list_available_mobos = self.lists_available_mobos
@@ -546,12 +546,12 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                             print("****************************************************\n High")
                             self.sortAvailableMobos("high")
                             
-                            list_qboxes = self.list_qboxes_with_dataset(qtask)                  # Build the list of Qboxes by dataset location
-                            if(len(list_qboxes) == 0):
-                                print("     ---> No one Qboxes with the data sets, lets check the download time")                                          # No one Qbox has the dataset
-                                list_qboxes = self.list_qboxes_by_download_time(qtask)          # Build the list of Qboxes by the predicted download time of the datasets
-                            else:
-                                print("     ---> We found some Qboxes")
+                            #list_qboxes = self.list_qboxes_with_dataset(qtask)                  # Build the list of Qboxes by dataset location
+                            #if(len(list_qboxes) == 0):
+                            #    print("     ---> No one Qboxes with the data sets, lets check the download time")                                          # No one Qbox has the dataset
+                            #    list_qboxes = self.list_qboxes_by_download_time(qtask)          # Build the list of Qboxes by the predicted download time of the datasets
+                            #else:
+                            #    print("     ---> We found some Qboxes")
                             if(len(list_qboxes) == 0):
                                 print("     ---> No prediction of time") 
                                 list_available_mobos = self.lists_available_mobos
