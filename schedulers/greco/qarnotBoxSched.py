@@ -39,17 +39,18 @@ wait for all the datasets to arrive before stopping the execution of the current
 '''
 
 class QarnotBoxSched():
-    def __init__(self, name, dict_qrads, bs, qn, storage_controller):
+    def __init__(self, name, dict_qrads, site, bs, qn, storage_controller):
         ''' WARNING!!!
         The init of the QBox Schedulers is done upon receiving
         the SimulationBegins in the QNode Scheduler 
         Thus there is no onSimulationBegins called for a QBox sched
         '''
-        self.bs = bs
-        self.qn = qn
-        self.storage_controller = storage_controller
-        self.logger = bs.logger
-        self.name = name
+        self.bs = bs                                    # Batsim
+        self.qn = qn                                    # The QarnotNodeSched
+        self.storage_controller = storage_controller    # The StorageController
+        self.logger = bs.logger                         # The logger
+        self.name = name                                # QBox qguid
+        self.site = site                                # Location of the QBox, either "paris" or "bordeaux"
 
         self.dict_qrads = {}     # Maps the qrad_names to QRad object
         self.dict_ids = {}       # Maps the batids of the mobos to the QRad object that contains it
@@ -121,9 +122,14 @@ class QarnotBoxSched():
         for pstate, resources in self.stateChanges.items():
             self.bs.set_resource_state(resources, pstate)
 
-    def onTargetTemperatureChanged(self, machine_batid, new_temperature):
-        self.dict_ids[machine_batid].diffTemp = new_temperature - self.bs.air_temperatures[str(machine_batid)]
-        self.dict_ids[machine_batid].targetTemp = new_temperature
+    def onTargetTemperatureChanged(self, qrad_name, new_temperature):
+        qr = self.dict_qrads[qrad_name]
+        qr.targetTemp = new_temperature
+        qr.diffTemp = new_temperature - self.bs.air_temperatures[str(qr.pset_mobos[0])]
+
+    '''def onOutsideTemperatureChanged(self, new_temperature):
+        pass # This is not used by the qarnot schedulers
+    '''
 
 
     def onNotifyMachineUnavailable(self, machine_batid):

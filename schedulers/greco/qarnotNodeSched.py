@@ -40,6 +40,8 @@ class QarnotNodeSched(BatsimScheduler):
         # For the manager
         self.dict_qboxes = {}    # Maps the QBox id to the QarnotBoxSched object
         self.dict_resources = {} # Maps the Batsim resource id to the QarnotBoxSched object
+        self.dict_qrads = {}     # Maps the QRad name to the QarnotBoxSched object
+        self.dict_sites = defaultdict(list) # Maps the site name ("paris" or "bordeaux" for now) to a list of QarnotBoxSched object
 
         # Dispatcher
         self.qtasks_queue = {}   # Maps the QTask id to the QTask object that is waiting to be scheduled
@@ -116,9 +118,13 @@ class QarnotNodeSched(BatsimScheduler):
 
       # Let's create the QBox Schedulers
       for (qb_name, dict_qrads) in dict_ids.items():
-        qb = QarnotBoxSched(qb_name, dict_qrads, self.bs, self, self.storage_controller)
+        site = self.site_from_qb_name(qb_name)
+        qb = QarnotBoxSched(qb_name, dict_qrads, site, self.bs, self, self.storage_controller)
 
         self.dict_qboxes[qb_name] = qb
+        self.dict_sites[site].append(qb)
+        for qr_name in dict_ids[qb_name].keys():
+          self.dict_qrads[qr_name] = qb
 
         # Populate the mapping between batsim resource ids and the associated QarnotBoxSched
         for mobos_list in dict_qrads.values():
@@ -128,6 +134,12 @@ class QarnotNodeSched(BatsimScheduler):
       self.nb_qboxes = len(self.dict_qboxes)
       self.nb_computing_resources = len(self.dict_resources)
 
+
+    def site_from_qb_name(self, qb_name):
+      if qb_name.split('-')[1] == "2000":
+        return "bordeaux"
+      else:
+        return "paris"
 
     def onRequestedCall(self):
       pass
@@ -172,23 +184,24 @@ class QarnotNodeSched(BatsimScheduler):
         self.bs.wake_me_up_at(self.time_next_update)
 
 
-    def onNotifyEventTargetTemperatureChanged(self, machines, new_temperature):
-      for machine_id in machines:
-        self.dict_resources[machine_id].onTargetTemperatureChanged(machine_id, new_temperature)
+    def onNotifyEventTargetTemperatureChanged(self, qrad_name, new_temperature):
+      self.dict_qrads[qrad_name].onTargetTemperatureChanged(qrad_name, new_temperature)
 
-    def onNotifyEventOutsideTemperatureChanged(self, machines, new_temperature):
+
+    def onNotifyEventOutsideTemperatureChanged(self, site, new_temperature):
       pass
-
-    #def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
-    #  self.storage_controller.onNotifyEventNewDatasetOnStorage(machines, dataset_id, dataset_size)
+      ''' This is not used by the qarnot schedulers
+      for qb in self.dict_sites[site]:
+        qb.onOutsideTemperatureChanged(new_temperature)
+      '''
 
     def onNotifyEventMachineUnavailable(self, machines):
-        for machine_id in machines:
-            self.dict_resources[machine_id].onNotifyMachineUnavailable(machine_id)
+      for machine_id in machines:
+        self.dict_resources[machine_id].onNotifyMachineUnavailable(machine_id)
 
     def onNotifyEventMachineAvailable(self, machines):
-        for machine_id in machines:
-            self.dict_resources[machine_id].onNotifyMachineAvailable(machine_id)
+      for machine_id in machines:
+        self.dict_resources[machine_id].onNotifyMachineAvailable(machine_id)
 
 
     def onJobSubmission(self, job):

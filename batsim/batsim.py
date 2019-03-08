@@ -620,12 +620,10 @@ class Batsim(object):
                     self.scheduler.onNotifyEventMachineUnavailable(ProcSet.from_str(event_data["resources"]))
                 elif notify_type == "event_machine_available":
                     self.scheduler.onNotifyEventMachineAvailable(ProcSet.from_str(event_data["resources"]))
-                elif notify_type == "target_temperature_changed":
-                    self.scheduler.onNotifyEventTargetTemperatureChanged(ProcSet.from_str(event_data["resources"]), event_data["temperature"])
-                elif notify_type == "machine_set_outside_temperature":
-                    pass#ssself.scheduler.onNotifyEventOutsideTemperatureChanged(ProcSet.from_str(event_data["resources"]), event_data["temperature"])
-                elif notify_type == "new_dataset_on_storage":
-                    self.scheduler.onNotifyEventNewDatasetOnStorage(ProcSet.from_str(event_data["resources"]), event_data["id"], event_data["size"])
+                elif notify_type == "qrad_set_target_temperature":
+                    self.scheduler.onNotifyEventTargetTemperatureChanged(event_data["qrad"], event_data["new_temperature"])
+                elif notify_type == "site_set_outside_temperature":
+                    self.scheduler.onNotifyEventOutsideTemperatureChanged(event_data["site"], event_data["new_temperature"])
                 else:
                     raise Exception("Unknown NOTIFY type {}".format(notify_type))
             else:
@@ -823,13 +821,10 @@ class BatsimScheduler(object):
     def onNotifyEventMachineAvailable(self, machines:ProcSet):
         raise NotImplementedError()
 
-    def onNotifyEventTargetTemperatureChanged(self, machines:ProcSet, new_temperature:float):
+    def onNotifyEventTargetTemperatureChanged(self, qrad:str, new_temperature:float):
         raise NotImplementedError()
 
-    def onNotifyEventOutsideTemperatureChanged(self, machines:ProcSet, new_temperature:float):
-        pass#raise NotImplementedError()
-
-    def onNotifyEventNewDatasetOnStorage(self, machines:ProcSet, dataset_id:str, dataset_size:str):
+    def onNotifyEventOutsideTemperatureChanged(self, site:str, new_temperature:float):
         raise NotImplementedError()
 
     def onBeforeEvents(self):
