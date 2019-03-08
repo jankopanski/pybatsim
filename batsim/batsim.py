@@ -622,8 +622,8 @@ class Batsim(object):
                     self.scheduler.onNotifyEventMachineAvailable(ProcSet.from_str(event_data["resources"]))
                 elif notify_type == "target_temperature_changed":
                     self.scheduler.onNotifyEventTargetTemperatureChanged(ProcSet.from_str(event_data["resources"]), event_data["temperature"])
-                elif notify_type == "outside_temperature_changed":
-                    self.scheduler.onNotifyEventOutsideTemperatureChanged(ProcSet.from_str(event_data["resources"]), event_data["temperature"])
+                elif notify_type == "machine_set_outside_temperature":
+                    pass#ssself.scheduler.onNotifyEventOutsideTemperatureChanged(ProcSet.from_str(event_data["resources"]), event_data["temperature"])
                 elif notify_type == "new_dataset_on_storage":
                     self.scheduler.onNotifyEventNewDatasetOnStorage(ProcSet.from_str(event_data["resources"]), event_data["id"], event_data["size"])
                 else:
