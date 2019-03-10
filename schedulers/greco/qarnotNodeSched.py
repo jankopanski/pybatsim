@@ -133,8 +133,6 @@ class QarnotNodeSched(BatsimScheduler):
       pass
 
     def onBeforeEvents(self):
-      print("\n")
-
       if self.bs.time() >= self.time_next_update:
         self.logger.info("[{}]- QNode calling update on QBoxes".format(self.bs.time()))
         # It's time to ask QBoxes to update and report their state
@@ -194,7 +192,6 @@ class QarnotNodeSched(BatsimScheduler):
     def onJobSubmission(self, job):
       qtask_id = job.id.split('_')[0]
       job.qtask_id = qtask_id
-
       # Retrieve or create the corresponding QTask
       if not qtask_id in self.qtasks_queue:
         qtask = QTask(qtask_id, job.profile_dict["priority"])
@@ -206,12 +203,13 @@ class QarnotNodeSched(BatsimScheduler):
       self.do_dispatch = True
 
 
-    '''def onRejectedInstance(self, job):
+    def onRejectedInstance(self, jobs):
       #Should not happen a lot of times
-      self.nb_rejected_jobs_by_qboxes += 1
-      qb = self.jobs_mapping.pop(job.id)
-      self.logger.info("The job {} was rejected by QBox {}".format(job.id, qb.name))
-      self.qtasks_queue[job.qtask_id].instance_rejected(job)'''
+      for job in jobs:
+        self.nb_rejected_jobs_by_qboxes += 1
+        qb = self.jobs_mapping.pop(job.id)
+        self.logger.info("The job {} was rejected by QBox {}".format(job.id, qb.name))
+        self.qtasks_queue[job.qtask_id].instance_rejected(job)
 
 
     def onJobCompletion(self, job):
@@ -251,7 +249,7 @@ class QarnotNodeSched(BatsimScheduler):
             #This Qtask still has instances to dispatch and it has the highest priority in the queue
             direct_job = qtask.instance_poped_and_dispatched()
             self.jobs_mapping[direct_job.id] = qb
-            self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(direct_job.id, qb.name))
+            self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(self.bs.time(), direct_job.id, qb.name))
             qb.onJobCompletion(job, direct_job)
 
           else:
@@ -279,7 +277,7 @@ class QarnotNodeSched(BatsimScheduler):
     def isSimulationFinished(self):
       # TODO This is a guard to avoid infinite loops.
       if (self.bs.time() > self.max_simulation_time or
-          (self.bs.no_more_static_jobs and self.bs.no_more_external_events and len(self.job_queue) == 0 and len(self.jobs_mapping) == 0) ):
+          (self.bs.no_more_static_jobs and self.bs.no_more_external_events and len(self.qtasks_queue) == 0 and len(self.jobs_mapping) == 0) ):
         self.end_of_simulation = True
         self.bs.notify_registration_finished() # TODO this may not have its place here
         return True
@@ -300,6 +298,11 @@ class QarnotNodeSched(BatsimScheduler):
       for job in jobs:
         self.jobs_mapping[job.id] = qb
 
+    def removeJobsFromMapping(self, jobs, qb):
+      for job in jobs:
+        #self.jobs_mapping[qb].pop(job)
+        self.jobs_mapping.pop(job.id)
+
 
     def existsHigherPriority(self, priority):
       '''
@@ -312,6 +315,12 @@ class QarnotNodeSched(BatsimScheduler):
           return True
       return False
 
+    def identify_rejectd_jobs(self, dispatched_jobs, waiting_instances):
+      rejectted_jobs = []
+      for job in dispatched_jobs:
+        if(job in waiting_instances):
+          rejectted_jobs.append(job)
+      return rejectted_jobs
 
     def doDispatch(self):
       '''For the dispatch of a task:
@@ -347,19 +356,33 @@ class QarnotNodeSched(BatsimScheduler):
               jobs = qtask.waiting_instances.copy()
               self.addJobsToMapping(jobs, qb)           # Add the Jobs to the internal mapping
               qtask.instances_dispatched(jobs)          # Update the QTask
-              qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id) # Dispatch the instances
-              tup[1] -= nb_instances_left               # Update the number of slots in the list
-              nb_instances_left = 0
+              size_qtask_waiting_instances_before_dispatch = len(qtask.waiting_instances)
+              qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+              size_qtask_waiting_instances_after_dispatch = len(qtask.waiting_instances)
+              nb_rejected_instances = size_qtask_waiting_instances_after_dispatch - size_qtask_waiting_instances_before_dispatch
+              if(nb_rejected_instances > 0):
+                tup[2] = tup[2] - nb_instances_left + nb_rejected_instances
+                nb_instances_left = nb_rejected_instances
+              else:
+                tup[2] -= nb_instances_left
+                nb_instances_left =  0
               # No more instances are waiting, stop the dispatch for this qtask
               break
-            else:
+            elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
               # Schedule instances for all slots of this QBox
               jobs = qtask.waiting_instances[0:nb_slots]
               self.addJobsToMapping(jobs, qb)
               qtask.instances_dispatched(jobs)
-              qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id)
-              tup[1] = 0
-              nb_instances_left -= nb_slots
+              size_qtask_waiting_instances_before_dispatch = len(qtask.waiting_instances)
+              qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+              size_qtask_waiting_instances_after_dispatch = len(qtask.waiting_instances)
+              nb_rejected_instances = size_qtask_waiting_instances_after_dispatch - size_qtask_waiting_instances_before_dispatch
+              if(nb_rejected_instances > 0):
+                tup[2] = nb_rejected_instances
+                nb_instances_left = nb_instances_left - nb_slots + nb_rejected_instances
+              else:
+                tup[2] =  0
+                nb_instances_left -=  nb_slots
           #End for bkgd slots
 
           if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.BKGD):
@@ -373,19 +396,33 @@ class QarnotNodeSched(BatsimScheduler):
                 jobs = qtask.waiting_instances.copy()
                 self.addJobsToMapping(jobs, qb)
                 qtask.instances_dispatched(jobs)
+                size_qtask_waiting_instances_before_dispatch = len(qtask.waiting_instances)
                 qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
-                tup[2] -= nb_instances_left
-                nb_instances_left = 0
+                size_qtask_waiting_instances_after_dispatch = len(qtask.waiting_instances)
+                nb_rejected_instances = size_qtask_waiting_instances_after_dispatch - size_qtask_waiting_instances_before_dispatch
+                if(nb_rejected_instances > 0):
+                  tup[2] = tup[2] - nb_instances_left + nb_rejected_instances
+                  nb_instances_left = nb_rejected_instances
+                else:
+                  tup[2] -= nb_instances_left
+                  nb_instances_left =  0
                 # No more instances are waiting, stop the dispatch for this qtask
                 break
-              else:
+              elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
                 # Schedule instances for all slots of this QBox
                 jobs = qtask.waiting_instances[0:nb_slots]
                 self.addJobsToMapping(jobs, qb)
                 qtask.instances_dispatched(jobs)
+                size_qtask_waiting_instances_before_dispatch = len(qtask.waiting_instances)
                 qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
-                tup[2] = 0
-                nb_instances_left -= nb_slots
+                size_qtask_waiting_instances_after_dispatch = len(qtask.waiting_instances)
+                nb_rejected_instances = size_qtask_waiting_instances_after_dispatch - size_qtask_waiting_instances_before_dispatch
+                if(nb_rejected_instances > 0):
+                  tup[2] = nb_rejected_instances
+                  nb_instances_left = nb_instances_left - nb_slots + nb_rejected_instances
+                else:
+                  tup[2] =  0
+                  nb_instances_left -=  nb_slots
             #End for low slots
 
             if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.LOW):
@@ -399,19 +436,33 @@ class QarnotNodeSched(BatsimScheduler):
                   jobs = qtask.waiting_instances.copy()
                   self.addJobsToMapping(jobs, qb)
                   qtask.instances_dispatched(jobs)
-                  qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
-                  tup[3] -= nb_instances_left
-                  nb_instances_left = 0
+                  size_qtask_waiting_instances_before_dispatch = len(qtask.waiting_instances)
+                  qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+                  size_qtask_waiting_instances_after_dispatch = len(qtask.waiting_instances)
+                  nb_rejected_instances = size_qtask_waiting_instances_after_dispatch - size_qtask_waiting_instances_before_dispatch
+                  if(nb_rejected_instances > 0):
+                    tup[2] = tup[2] - nb_instances_left + nb_rejected_instances
+                    nb_instances_left = nb_rejected_instances
+                  else:
+                    tup[2] -= nb_instances_left
+                    nb_instances_left =  0
                   # No more instances are waiting, stop the dispatch for this qtask
                   break
-                else:
+                elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
                   # Schedule instances for all slots of this QBox
                   jobs = qtask.waiting_instances[0:nb_slots]
                   self.addJobsToMapping(jobs, qb)
                   qtask.instances_dispatched(jobs)
-                  qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
-                  tup[3] = 0
-                  nb_instances_left -= nb_slots
+                  size_qtask_waiting_instances_before_dispatch = len(qtask.waiting_instances)
+                  qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+                  size_qtask_waiting_instances_after_dispatch = len(qtask.waiting_instances)
+                  nb_rejected_instances = size_qtask_waiting_instances_after_dispatch - size_qtask_waiting_instances_before_dispatch
+                  if(nb_rejected_instances > 0):
+                    tup[2] = nb_rejected_instances
+                    nb_instances_left = nb_instances_left - nb_slots + nb_rejected_instances
+                  else:
+                    tup[2] =  0
+                    nb_instances_left -=  nb_slots
               #End for high slots
             #End if high priority and nb_instances_left > 0
           #End if low/high priority and nb_instances_left > 0
