@@ -132,23 +132,34 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
             print(" &&&&&&&&& Storages: ", self.storage_controller.get_storages())
 
             # Data sets for the simple workload
-            self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:540624", 17))
-            self.storage_controller.add_dataset(12, Dataset("QJOB-first:docker:162852561", 18))
-            self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:41428146", 19))
+            #self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:540624", 17))
+            #elf.storage_controller.add_dataset(12, Dataset("QJOB-first:docker:162852561", 18))
+            #self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:41428146", 19))
 
             #self.storage_controller.add_dataset(12, Dataset("QJOB-second:user-input:41428146", 17))
             #self.storage_controller.add_dataset(12, Dataset("QJOB-second:docker:67221727", 18))
 
-            self.storage_controller.add_dataset(12, Dataset("QJOB-triplet:user-input:0", 17))
+            #self.storage_controller.add_dataset(12, Dataset("QJOB-triplet:user-input:0", 17))
 
             #self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:540624", 17))
             #self.storage_controller.add_dataset(12, Dataset("QJOB-first:docker:162852561", 18))
             #self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:41428146", 19))
 
+            # Data sets for the simple_more workload
+            #self.storage_controller.add_dataset(5, Dataset("QJOB-first:user-input:540624", 17))
+            #self.storage_controller.add_dataset(5, Dataset("QJOB-first:docker:162852561", 18))
+            #self.storage_controller.add_dataset(5, Dataset("QJOB-first:user-input:41428146", 19))
+
+            #self.storage_controller.add_dataset(4, Dataset("QJOB-second:user-input:41428146", 17))
+            #self.storage_controller.add_dataset(4, Dataset("QJOB-second:docker:67221727", 18))
+
+            #self.storage_controller.add_dataset(5, Dataset("QJOB-triplet:user-input:0", 18))
+            
+
             # Data sets for the 1-day-qarnot-samples
-            #self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:user-input:540624", 17))
-            #self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:docker:162852561", 17))
-            #self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:user-input:41428146", 17))
+            self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:user-input:540624", 17))
+            self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:docker:162852561", 17))
+            self.storage_controller.add_dataset(978, Dataset("QJOB-0225-1136-8f76-62245c536189:user-input:41428146", 17))
 
             #self.storage_controller.add_dataset(980, Dataset("QJOB-0225-0908-c466-4492ab4e86f3:docker:54384684", 30))
             #self.storage_controller.add_dataset(980, Dataset("QJOB-0225-0908-c466-4492ab4e86f3:user-input:41428146", 30))
@@ -161,6 +172,18 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
             #self.storage_controller.add_dataset(989, Dataset("QJOB-0225-1136-6d83-95be917ac327:user-input:0", 20))
             #self.storage_controller.add_dataset(989, Dataset("QJOB-0225-1136-6d83-95be917ac327:docker:162852561", 20))
             #print("---Qboxes have a life :) ")
+
+            # Data sets for the 1-day_more 
+            #self.storage_controller.add_dataset(724, Dataset("QJOB-0225-1136-8f76-62245c536189:user-input:540624", 17))
+            #self.storage_controller.add_dataset(724, Dataset("QJOB-0225-1136-8f76-62245c536189:docker:162852561", 17))
+            #self.storage_controller.add_dataset(724, Dataset("QJOB-0225-1136-8f76-62245c536189:user-input:41428146", 17))
+
+            #self.storage_controller.add_dataset(726, Dataset("QJOB-0225-0908-c466-4492ab4e86f3:docker:54384684", 30))
+            #self.storage_controller.add_dataset(726, Dataset("QJOB-0225-0908-c466-4492ab4e86f3:user-input:41428146", 30))
+
+            #self.storage_controller.add_dataset(728, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:docker:1305968769", 15))
+            #self.storage_controller.add_dataset(728, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:user-input:41428146", 15))
+            #self.storage_controller.add_dataset(728, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:user-input:0", 15))
 
         def onRequestedCall(self):
             pass
@@ -288,7 +311,7 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                         #This Qtask still has instances to dispatch and it has the highest priority in the queue
                         direct_job = qtask.instance_poped_and_dispatched()
                         self.jobs_mapping[direct_job.id] = qb
-                        self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(direct_job.id, qb.name))
+                        self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(self.bs.time(), direct_job.id, qb.name))
                         qb.onJobCompletion(job, direct_job)
 
                     else:
