@@ -175,17 +175,31 @@ class QarnotBoxSched():
                         job = qm.pop_job()
                         jobs_to_kill.append(job)
 
+
+            #self.logger.info("[{}]--- QBox {} reporting  BEFORE UPDATE diffTMP -Unavailable the available slots for bkgd/low/high: {}/{}/{}".format(self.bs.time(),self.name,len(self.availBkgd), len(self.availLow), len(self.availHigh)))
+
+            # Update the list of available mobos
             # Update the list of available mobos
             if qr.diffTemp >= 1:
                 self.availBkgd |= ProcSet(*qr.dict_mobos.keys())
             elif qr.diffTemp >= -1:
-                self.availLow |= ProcSet(*qr.dict_mobos.keys())
+                for qmobo in qr.dict_mobos.values():
+                    if qmobo.state < QMoboState.RUNLOW: # This mobo is available for LOW instances
+                        self.availLow.insert(qmobo.batid)
+                #self.availLow |= ProcSet(*qr.dict_mobos.keys())
             elif qr.diffTemp >= -4:
-                self.availHigh |= ProcSet(*qr.dict_mobos.keys())
+                for qmobo in qr.dict_mobos.values():
+                    if qmobo.state < QMoboState.RUNHIGH: # This mobo is available for HIGH
+                        self.availHigh.insert(qmobo.batid)
+                    #self.availHigh |= ProcSet(*qr.dict_mobos.keys())
+            #self.logger.info("[{}]--- QBox {} reporting  AFTER  UPDATE diffTMP -Unavailable the available slots for bkgd/low/high: {}/{}/{}".format(self.bs.time(),self.name,len(self.availBkgd), len(self.availLow), len(self.availHigh)))
+
 
         if len(jobs_to_kill) > 0:
             self.logger.info("[{}]--- QBox {} asked to kill the following jobs during updateAndReportState: {}".format(self.bs.time(),self.name, jobs_to_kill))
             self.jobs_to_kill.extend(jobs_to_kill)
+
+        #self.logger.info("[{}]--- QBox {} reporting  before -Unavailable the available slots for bkgd/low/high: {}/{}/{}".format(self.bs.time(),self.name,len(self.availBkgd), len(self.availLow), len(self.availHigh)))
 
         # Filter out mobos that are marked as unavailable
         self.availBkgd -= self.mobosUnavailable
@@ -208,7 +222,7 @@ class QarnotBoxSched():
         if qtask_id in self.dict_subqtasks:
             # Some instances of this QTask have already been received by this QBox
             qtask = self.dict_subqtasks[qtask_id]
-            qtask.waiting_instances.extend(instances.copy()) #TODO maybe don't need this copy since we do extend
+            qtask.waiting_instances.extend(instances)
             if len(qtask.waiting_datasets) == 0:
                 self.scheduleInstances(qtask)
         else:
@@ -216,7 +230,6 @@ class QarnotBoxSched():
             # Create and add the SubQTask to the dict
             qtask = SubQTask(qtask_id, priority_group, instances.copy())
             self.dict_subqtasks[qtask_id] = qtask
-
             # Then ask for the data staging of the required datasets
             for dataset_id in qtask.datasets:
                 if self.storage_controller.onQBoxAskDataset(self.disk_batid, dataset_id):
@@ -300,6 +313,7 @@ class QarnotBoxSched():
             # Find warmest QRad among the availLow and availBkgd
             available_slots = self.availBkgd | self.availLow # Get all mobos in which we can start a LOW instance
             qr_list = sorted(self.dict_qrads.values(), key=lambda qr:qr.diffTemp) # Take QRads by increasing temperature difference (i.e., decreasing heat capacity)
+            #TODO if ( len(available_slots) < 0 or len(qr_list) < 0)
             for qr in qr_list:
                 for batid in (qr.pset_mobos & available_slots):
                     if qr.dict_mobos[batid].state <= QMoboState.RUNBKGD: # Either OFF/IDLE or running BKGD
@@ -309,9 +323,9 @@ class QarnotBoxSched():
                         n-=1
                         if n == 0:
                             return # All instances have been started
-
         self.logger.info("[{}]--- QBox {} still have {} instances of {} to start, this should not happen.".format(self.bs.time(),self.name, len(qtask.waiting_instances), qtask.id))
-        assert False
+        self.qn.onRejectedInstance(qtask.waiting_instances.copy()) #assert False
+        #qtask.waiting_instances
         #TODO need to reject the remaining instances of the SubQTask?
 
 
@@ -345,11 +359,13 @@ class QarnotBoxSched():
         qm = self.dict_ids[job.allocation[0]].dict_mobos[job.allocation[0]]
         if direct_job != -1:
             # Another instance of the same qtask has to be started immediately
+            self.dict_subqtasks[direct_job.qtask_id].running_instances.append(direct_job)
+            #self.dict_subqtasks[direct_job.qtask_id].waiting_instances.remove(direct_job)
             qm.push_direct_job(direct_job)
+
         else:
             qm.pop_job()
             self.checkCleanSubQTask(job)
-
 
     def onJobKilled(self, job):
         '''
