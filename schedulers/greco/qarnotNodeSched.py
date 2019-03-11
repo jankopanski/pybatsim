@@ -206,11 +206,10 @@ class QarnotNodeSched(BatsimScheduler):
     def onRejectedInstance(self, jobs):
       #Should not happen a lot of times
       for job in jobs:
-        self.nb_rejected_jobs_by_qboxes += 1
+        #self.nb_rejected_jobs_by_qboxes += 1
         qb = self.jobs_mapping.pop(job.id)
         self.logger.info("The job {} was rejected by QBox {}".format(job.id, qb.name))
         self.qtasks_queue[job.qtask_id].instance_rejected(job)
-
 
     def onJobCompletion(self, job):
       if job.workload == "dyn-burn":
@@ -242,7 +241,6 @@ class QarnotNodeSched(BatsimScheduler):
         elif job.job_state == Job.State.COMPLETED_SUCCESSFULLY:
           qtask.instance_finished()
           qb = self.jobs_mapping.pop(job.id)
-
           #Check if direct dispatch is possible
           if len(qtask.waiting_instances) > 0 and not self.existsHigherPriority(qtask.priority):
             ''' DIRECT DISPATCH '''
@@ -251,7 +249,6 @@ class QarnotNodeSched(BatsimScheduler):
             self.jobs_mapping[direct_job.id] = qb
             self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(self.bs.time(), direct_job.id, qb.name))
             qb.onJobCompletion(job, direct_job)
-
           else:
             qb.onJobCompletion(job)
             # A slot should be available, do a general dispatch
@@ -463,6 +460,7 @@ class QarnotNodeSched(BatsimScheduler):
                   else:
                     tup[2] =  0
                     nb_instances_left -=  nb_slots
+
               #End for high slots
             #End if high priority and nb_instances_left > 0
           #End if low/high priority and nb_instances_left > 0
