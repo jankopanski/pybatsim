@@ -20,12 +20,12 @@ class QTask:
         self.priority = int(priority)
         self.priority_group = PriorityGroup.HIGH if self.priority >= 0 else ( PriorityGroup.BKGD if self.priority < -10 else PriorityGroup.LOW )
 
+        self.metadata = None
 
         #TODO
         ''' At some point we'll need to re-submit dynamic jobs that have been killed
         due to a rad too hot or a higher priority jobs scheduled on the mobo.
         '''
-
 
     def is_complete(self):
         #TODO make sure all instances of a task arrives at the same time in the workload
@@ -50,10 +50,13 @@ class QTask:
 
     def instance_poped_and_dispatched(self):
         # A quick dispatch of an instance of this QTask is required
+        self.instance_finished()
         self.nb_dispatched_instances += 1
         return self.waiting_instances.pop()
+        #TODO pop from subqtask??
 
     def instance_finished(self):
+        print("##################### Instance finished +1", self.id)
         # An instance finished successfully
         self.nb_dispatched_instances -= 1
         self.nb_terminated_instances += 1
@@ -125,7 +128,12 @@ class QMobo:
         return job
 
     def push_direct_job(self, job):
-        assert self.running_job.qtask.id == job.qtask.id, "Direct restart of instance {} on mobo {} but previous instance is of different QTask ({})".format(job.id, self.name, self.running_job.id)
-        self.running_job = job
+        #if (self.running_job == -1):
+        #    assert self.running_job == job.qtask.id, "Direct restart of instance {} on mobo {} but previous instance is of different QTask ({})".format( self.name, self.running_job.id)
+        #else:
+        #    assert self.running_job.qtask.id == job.qtask.id, "Direct restart of instance {} on mobo {} but previous instance is of different QTask ({})".format(self.name, self.running_job.id)
+        #    self.running_job = job
 
+        assert self.running_job.qtask_id == job.qtask_id, "Direct restart of instance {} on mobo {} but previous instance is of different QTask ({})".format(job.id, self.name, self.running_job.id)
+        self.running_job = job
 

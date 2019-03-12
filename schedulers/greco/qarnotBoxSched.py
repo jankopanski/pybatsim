@@ -362,6 +362,7 @@ class QarnotBoxSched():
             self.dict_subqtasks[direct_job.qtask_id].running_instances.append(direct_job)
             #self.dict_subqtasks[direct_job.qtask_id].waiting_instances.remove(direct_job)
             qm.push_direct_job(direct_job)
+            self.checkCleanSubQTask(direct_job)
 
         else:
             qm.pop_job()

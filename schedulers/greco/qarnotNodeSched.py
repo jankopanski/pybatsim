@@ -242,22 +242,26 @@ class QarnotNodeSched(BatsimScheduler):
           qtask.instance_finished()
           qb = self.jobs_mapping.pop(job.id)
           #Check if direct dispatch is possible
-          if len(qtask.waiting_instances) > 0 and not self.existsHigherPriority(qtask.priority):
-            ''' DIRECT DISPATCH '''
+          '''if len(qtask.waiting_instances) > 0 and not self.existsHigherPriority(qtask.priority):
+            # DIRECT DISPATCH
             #This Qtask still has instances to dispatch and it has the highest priority in the queue
+            self.logger.info("[{}]- QNode trying to dispatch directly {} of priority {} having {} dispatched instances".format(self.bs.time(),qtask.id, qtask.priority, qtask.nb_dispatched_instances))
             direct_job = qtask.instance_poped_and_dispatched()
             self.jobs_mapping[direct_job.id] = qb
             self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(self.bs.time(), direct_job.id, qb.name))
             qb.onJobCompletion(job, direct_job)
-          else:
-            qb.onJobCompletion(job)
-            # A slot should be available, do a general dispatch
-            self.do_dispatch = True
+            #self.logger.info("[{}]- QNode trying to dispatch {} of priority {} having {} dispatched instances".format(self.bs.time(),qtask.id, qtask.priority, qtask.nb_dispatched_instances))
+          '''
+          
+          #else:
+          qb.onJobCompletion(job)
+          # A slot should be available, do a general dispatch
+          self.do_dispatch = True
 
-            #Check if the QTask is complete
-            if qtask.is_complete():
-              self.logger.info("[{}]  All instances of QTask {} have terminated".format(self.bs.time(), qtask.id))
-              del self.qtasks_queue[qtask.id]
+          #Check if the QTask is complete
+          if qtask.is_complete():
+            self.logger.info("[{}]  All instances of QTask {} have terminated".format(self.bs.time(), qtask.id))
+            del self.qtasks_queue[qtask.id]
 
 
         else:
