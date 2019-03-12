@@ -620,10 +620,10 @@ class Batsim(object):
                     self.scheduler.onNotifyEventMachineUnavailable(ProcSet.from_str(event_data["resources"]))
                 elif notify_type == "event_machine_available":
                     self.scheduler.onNotifyEventMachineAvailable(ProcSet.from_str(event_data["resources"]))
-                elif notify_type == "qrad_set_target_temperature":
-                    self.scheduler.onNotifyEventTargetTemperatureChanged(event_data["qrad"], event_data["new_temperature"])
-                elif notify_type == "site_set_outside_temperature":
-                    self.scheduler.onNotifyEventOutsideTemperatureChanged(event_data["site"], event_data["new_temperature"])
+                elif notify_type == "qrad_target_temperature_changed":
+                    self.scheduler.onNotifyEventTargetTemperatureChanged(event_data["qrad"], event_data["temperature"])
+                elif notify_type == "outside_temperature_changed":
+                    self.scheduler.onNotifyEventOutsideTemperatureChanged(event_data["resources"], event_data["temperature"])
                 else:
                     raise Exception("Unknown NOTIFY type {}".format(notify_type))
             else:
