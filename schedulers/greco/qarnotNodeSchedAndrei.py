@@ -1,7 +1,7 @@
 from batsim.batsim import BatsimScheduler, Batsim, Job
 from StorageController import *
 from qarnotUtilsAndrei import *
-from qarnotBoxSchedAndrei import QarnotBoxSchedAndrei as QarnotBoxSched
+from qarnotBoxSched import QarnotBoxSched
 
 from procset import ProcSet
 from collections import defaultdict
@@ -129,11 +129,11 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
             self.nb_computing_resources = len(self.dict_resources)
 
             #Adding Data sets to test
-            #print(" &&&&&&&&& Storages: ", self.storage_controller.get_storages())
+            print(" &&&&&&&&& Storages: ", self.storage_controller.get_storages())
 
             # Data sets for the simple workload
             #self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:540624", 17))
-            #elf.storage_controller.add_dataset(12, Dataset("QJOB-first:docker:162852561", 18))
+            #self.storage_controller.add_dataset(12, Dataset("QJOB-first:docker:162852561", 18))
             #self.storage_controller.add_dataset(12, Dataset("QJOB-first:user-input:41428146", 19))
 
             #self.storage_controller.add_dataset(12, Dataset("QJOB-second:user-input:41428146", 17))
@@ -185,6 +185,22 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
             #self.storage_controller.add_dataset(728, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:user-input:41428146", 15))
             #self.storage_controller.add_dataset(728, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:user-input:0", 15))
 
+            # Data sets for the 1-week
+            #self.storage_controller.add_dataset(993, Dataset("QJOB-0219-1821-d767-c010c616a981:docker:162852561", 17))
+            #self.storage_controller.add_dataset(993, Dataset("QJOB-0219-1821-d767-c010c616a981:user-input:41428146", 17))
+            #self.storage_controller.add_dataset(993, Dataset("QJOB-0219-1821-d767-c010c616a981:user-input:0", 17))
+
+            #self.storage_controller.add_dataset(997, Dataset("QJOB-0223-1651-35bf-e93ab86a72ef:user-input:786432", 30))
+            #self.storage_controller.add_dataset(997, Dataset("QJOB-0223-1651-35bf-e93ab86a72ef:docker:1317138749", 30))
+            #self.storage_controller.add_dataset(997, Dataset("QJOB-0223-1651-35bf-e93ab86a72ef:user-input:41428146", 30))
+            #self.storage_controller.add_dataset(997, Dataset("QJOB-0223-1651-35bf-e93ab86a72ef:user-input:1572864", 30))
+            #elf.storage_controller.add_dataset(997, Dataset("QJOB-0223-1651-35bf-e93ab86a72ef:user-input:201264116", 30))
+            #self.storage_controller.add_dataset(997, Dataset("QJOB-0223-1651-35bf-e93ab86a72ef:user-input:0", 30))
+
+            #self.storage_controller.add_dataset(1003, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:docker:1305968769", 15))
+            #self.storage_controller.add_dataset(1003, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:user-input:41428146", 15))
+            #self.storage_controller.add_dataset(1003, Dataset("QJOB-0225-0912-c5a0-3528fd7b7c12:user-input:0", 15))
+
             # Data sets for the 1-week_more 
             #self.storage_controller.add_dataset(659, Dataset("QJOB-0219-1821-d767-c010c616a981:docker:162852561", 17))
             #self.storage_controller.add_dataset(659, Dataset("QJOB-0219-1821-d767-c010c616a981:user-input:41428146", 17))
@@ -205,8 +221,6 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
             pass
 
         def onBeforeEvents(self):
-            print("\n")
-
             if self.bs.time() >= self.time_next_update:
                 self.logger.info("[{}]- QNode calling update on QBoxes".format(self.bs.time()))
                 # It's time to ask QBoxes to update and report their state
@@ -268,7 +282,6 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
             qtask_profile = job.profile
             job.qtask_id = qtask_id
 
-
             # Retrieve or create the corresponding QTask
             if not qtask_id in self.qtasks_queue:
                 #TODO, add the job.profile as parameter
@@ -279,14 +292,14 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
 
             qtask.instance_submitted(job)
             self.do_dispatch = True
-
-
-        '''def onRejectedInstance(self, job):
+        
+        def onRejectedInstance(self, jobs):
             #Should not happen a lot of times
-            self.nb_rejected_jobs_by_qboxes += 1
-            qb = self.jobs_mapping.pop(job.id)
-            self.logger.info("The job {} was rejected by QBox {}".format(job.id, qb.name))
-            self.qtasks_queue[job.qtask_id].instance_rejected(job)'''
+            for job in jobs:
+                #self.nb_rejected_jobs_by_qboxes += 1
+                qb = self.jobs_mapping.pop(job.id)
+                self.logger.info("The job {} was rejected by QBox {}".format(job.id, qb.name))
+                self.qtasks_queue[job.qtask_id].instance_rejected(job)
 
 
         def onJobCompletion(self, job):
@@ -467,10 +480,11 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                     # Dispatch as many instances as possible on mobos available for bkgd, no matter the priority of the qtask
                     self.sortAvailableMobos("bkgd")
                     list_qboxes = self.list_qboxes_with_dataset(qtask)                  # Build the list of Qboxes by dataset location
-                    if(len(list_qboxes) == 0):
-                        # No one Qbox has the dataset
-                        list_qboxes = self.list_qboxes_by_download_time(qtask)          # Build the list of Qboxes by the predicted download time of the datasets
-                    else:
+                    #if(len(list_qboxes) == 0):
+                    #    # No one Qbox has the dataset
+                    #    list_qboxes = self.list_qboxes_by_download_time(qtask)          # Build the list of Qboxes by the predicted download time of the datasets
+                    #else:
+
                     if(len(list_qboxes) == 0):
                         list_available_mobos = self.lists_available_mobos
                     else:
@@ -483,11 +497,18 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                         if nb_slots >= nb_instances_left:
                             # There are more available slots than instances, gotta dispatch'em all!
                             jobs = qtask.waiting_instances.copy()
-                            self.addJobsToMapping(jobs, qb)                     # Add the Jobs to the internal mapping
-                            qtask.instances_dispatched(jobs)                    # Update the QTask
-                            qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id) # Dispatch the instances
-                            tup[1] -= nb_instances_left                             # Update the number of slots in the list
-                            nb_instances_left = 0
+                            self.addJobsToMapping(jobs, qb)
+                            qtask.instances_dispatched(jobs)                     # Add the Jobs to the internal mapping
+                            size_qtask_waiting_instances_before_dispatch = len(qtask.waiting_instances)
+                            qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+                            size_qtask_waiting_instances_after_dispatch = len(qtask.waiting_instances)
+                            nb_rejected_instances = size_qtask_waiting_instances_after_dispatch - size_qtask_waiting_instances_before_dispatch
+                            if(nb_rejected_instances > 0):
+                                tup[1] = tup[1] - nb_instances_left + nb_rejected_instances
+                                nb_instances_left = nb_rejected_instances
+                            else:
+                                tup[1] -= nb_instances_left
+                                nb_instances_left =  0
                             # No more instances are waiting, stop the dispatch for this qtask
                             break
                         elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
@@ -495,9 +516,16 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                             jobs = qtask.waiting_instances[0:nb_slots]
                             self.addJobsToMapping(jobs, qb)
                             qtask.instances_dispatched(jobs)
-                            qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id)
-                            tup[1] = 0
-                            nb_instances_left -= nb_slots
+                            size_qtask_waiting_instances_before_dispatch = len(qtask.waiting_instances)
+                            qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+                            size_qtask_waiting_instances_after_dispatch = len(qtask.waiting_instances)
+                            nb_rejected_instances = size_qtask_waiting_instances_after_dispatch - size_qtask_waiting_instances_before_dispatch
+                            if(nb_rejected_instances > 0):
+                                tup[1] = nb_rejected_instances
+                                nb_instances_left = nb_instances_left - nb_slots + nb_rejected_instances
+                            else:
+                                tup[1] =  0
+                                nb_instances_left -=  nb_slots
                     #End for bkgd slots
 
                     if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.BKGD):
@@ -523,9 +551,16 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                                 jobs = qtask.waiting_instances.copy()
                                 self.addJobsToMapping(jobs, qb)
                                 qtask.instances_dispatched(jobs)
+                                size_qtask_waiting_instances_before_dispatch = len(qtask.waiting_instances)
                                 qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
-                                tup[2] -= nb_instances_left
-                                nb_instances_left = 0
+                                size_qtask_waiting_instances_after_dispatch = len(qtask.waiting_instances)
+                                nb_rejected_instances = size_qtask_waiting_instances_after_dispatch - size_qtask_waiting_instances_before_dispatch
+                                if(nb_rejected_instances > 0):
+                                    tup[2] = tup[2] - nb_instances_left + nb_rejected_instances
+                                    nb_instances_left = nb_rejected_instances
+                                else:
+                                    tup[2] -= nb_instances_left
+                                    nb_instances_left =  0
                                 # No more instances are waiting, stop the dispatch for this qtask
                                 break
                             elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
@@ -533,9 +568,16 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                                 jobs = qtask.waiting_instances[0:nb_slots].copy()
                                 self.addJobsToMapping(jobs, qb)
                                 qtask.instances_dispatched(jobs)
+                                size_qtask_waiting_instances_before_dispatch = len(qtask.waiting_instances)
                                 qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
-                                tup[2] = 0
-                                nb_instances_left -= nb_slots
+                                size_qtask_waiting_instances_after_dispatch = len(qtask.waiting_instances)
+                                nb_rejected_instances = size_qtask_waiting_instances_after_dispatch - size_qtask_waiting_instances_before_dispatch
+                                if(nb_rejected_instances > 0):
+                                    tup[2] = nb_rejected_instances
+                                    nb_instances_left = nb_instances_left - nb_slots + nb_rejected_instances
+                                else:
+                                    tup[2] =  0
+                                    nb_instances_left -=  nb_slots
                         #End for low slots
 
                         if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.LOW):
@@ -549,7 +591,6 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                             #else:
                             #    print("     ---> We found some Qboxes")
                             if(len(list_qboxes) == 0):
-
                                 list_available_mobos = self.lists_available_mobos
                             else:
                                 list_available_mobos = self.list_available_mobos(list_qboxes)
@@ -562,9 +603,16 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                                     jobs = qtask.waiting_instances.copy()
                                     self.addJobsToMapping(jobs, qb)
                                     qtask.instances_dispatched(jobs)
-                                    qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
-                                    tup[3] -= nb_instances_left
-                                    nb_instances_left = 0
+                                    size_qtask_waiting_instances_before_dispatch = len(qtask.waiting_instances)
+                                    qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+                                    size_qtask_waiting_instances_after_dispatch = len(qtask.waiting_instances)
+                                    nb_rejected_instances = size_qtask_waiting_instances_after_dispatch - size_qtask_waiting_instances_before_dispatch
+                                    if(nb_rejected_instances > 0):
+                                        tup[3] = tup[3] - nb_instances_left + nb_rejected_instances
+                                        nb_instances_left = nb_rejected_instances
+                                    else:
+                                        tup[2] -= nb_instances_left
+                                        nb_instances_left =  0
                                     # No more instances are waiting, stop the dispatch for this qtask
                                     break
                                 elif nb_slots > 0: # 0 < nb_slots < nb_instances_left
@@ -572,9 +620,16 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                                     jobs = qtask.waiting_instances[0:nb_slots]
                                     self.addJobsToMapping(jobs, qb)
                                     qtask.instances_dispatched(jobs)
-                                    qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
-                                    tup[3] = 0
-                                    nb_instances_left -= nb_slots
+                                    size_qtask_waiting_instances_before_dispatch = len(qtask.waiting_instances)
+                                    qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+                                    size_qtask_waiting_instances_after_dispatch = len(qtask.waiting_instances)
+                                    nb_rejected_instances = size_qtask_waiting_instances_after_dispatch - size_qtask_waiting_instances_before_dispatch
+                                    if(nb_rejected_instances > 0):
+                                        tup[3] = nb_rejected_instances
+                                        nb_instances_left = nb_instances_left - nb_slots + nb_rejected_instances
+                                    else:
+                                        tup[3] =  0
+                                        nb_instances_left -=  nb_slots
                             #End for high slots
                         #End if high priority and nb_instances_left > 0
                     #End if low/high priority and nb_instances_left > 0
