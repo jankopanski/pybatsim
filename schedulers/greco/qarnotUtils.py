@@ -26,13 +26,16 @@ class QTask:
         due to a rad too hot or a higher priority jobs scheduled on the mobo.
         '''
 
+    def print_infos(self, logger):
+        logger.info("QTask: {}, {} received, {} waiting, {} dispatched, {} terminated.".format(
+            self.id, self.nb_received_instances, len(self.waiting_instances), self.nb_dispatched_instances, self.nb_terminated_instances))
 
     def is_complete(self):
         #TODO make sure all instances of a task arrives at the same time in the workload
         return (len(self.waiting_instances) == 0) and (self.nb_received_instances == self.nb_terminated_instances)
 
     def instance_rejected(self, job):
-        # The instance was rejected by the QBox it was dispatched to
+        # This instance was rejected by the QBox it was dispatched to
         self.waiting_instances.append(job)
         self.nb_dispatched_instances -= 1
 
@@ -79,6 +82,15 @@ class SubQTask:
         else:
             self.datasets = []'''
 
+    def pop_waiting_instance(self):
+        return self.waiting_instances.pop()
+
+    def mark_running_instance(self, job):
+        self.running_instances.append(job)
+
+    def instance_finished(self, job):
+        self.running_instances.remove(job)
+
 
 
 class QMoboState:
@@ -98,7 +110,8 @@ class QRad:
         self.targetTemp = 20 # Temperature required in the room
         self.diffTemp = 0    # targetTemp - airTemp: If positive, we need to heat! (This can be viewed as heating capacity)
         self.properties = {} # The simgrid properties of the first mobo (should be the same for all mobos)
-        self.pset_mobos = ProcSet()
+        self.pset_mobos = ProcSet() # The ProcSet of all mobos
+        self.temperature_master = -1 # The batid of the temperature_master mobo
 
 
 class QMobo:
@@ -117,7 +130,7 @@ class QMobo:
         self.state = QMoboState.fromPriority[job.priority_group]
 
     def pop_job(self):
-        assert self.running_job != -1, "Kill required on mobo {} but it is not running any job".format(self.name)
+        assert self.running_job != -1, "Pop_job required on mobo {} but it is not running any job (current state is {})".format(self.name, self.state)
         job = self.running_job
         self.running_job = -1
         self.state = QMoboState.IDLE
@@ -125,7 +138,7 @@ class QMobo:
         return job
 
     def push_direct_job(self, job):
-        assert self.running_job.qtask.id == job.qtask.id, "Direct restart of instance {} on mobo {} but previous instance is of different QTask ({})".format(job.id, self.name, self.running_job.id)
+        assert self.running_job.qtask_id == job.qtask_id, "Direct restart of instance {} on mobo {} but previous instance is of different QTask ({})".format(job.id, self.name, self.running_job.id)
         self.running_job = job
 
 

@@ -7,7 +7,7 @@ from procset import ProcSet
 from collections import defaultdict
 
 import logging
-
+import sys
 '''
 This is the scheduler instanciated by Pybatsim for a simulation of the Qarnot platform and has two roles:
 - It does the interface between Batsim/Pybatsim API and the QNode/QBox schedulers (manager)
@@ -37,6 +37,8 @@ class QarnotNodeSched(BatsimScheduler):
     def __init__(self, options):
         super().__init__(options)
 
+        #self.logger.setLevel(logging.CRITICAL)
+
         # For the manager
         self.dict_qboxes = {}    # Maps the QBox id to the QarnotBoxSched object
         self.dict_resources = {} # Maps the Batsim resource id to the QarnotBoxSched object
@@ -55,14 +57,19 @@ class QarnotNodeSched(BatsimScheduler):
         #self.qboxes_free_disk_space = {} # Maps the QBox id to the free disk space (in GB)
         #self.qboes_queued_upload_size = {} # Maps the QBox id to the queued upload size (in GB)
 
-        self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
+        #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
+        self.update_period = 600 # TODO every 10 minutes for testing
         self.time_next_update = 1.0 # The next time the scheduler should be woken up
         self.ask_next_update = False # Whether to ask for next update in onNoMoreEvents function
+        #self.next_update_asked = False   # Whether the 'call_me_later' has been sent or not
         self.very_first_update = True
 
         self.nb_rejected_jobs_by_qboxes = 0 # Just to keep track of the count
 
-        self.max_simulation_time = 500
+        #self.max_simulation_time = 86500 # 1 day
+        self.max_simulation_time = 1207000 # 1 week
+        self.simu_ends_received = False
+        self.flag = False
 
 
     def onSimulationBegins(self):
@@ -88,6 +95,7 @@ class QarnotNodeSched(BatsimScheduler):
 
 
     def onSimulationEnds(self):
+      self.simu_ends_received = True
       for qb in self.dict_qboxes.values():
         qb.onSimulationEnds()
 
@@ -144,8 +152,27 @@ class QarnotNodeSched(BatsimScheduler):
     def onRequestedCall(self):
       pass
 
+    def onNoMoreJobsInWorkloads(self):
+      self.logger.info("There is no more static jobs in the workload")
+      self.logger.info("[{}] Info from QNode:".format(self.bs.time()))
+      for qtask in self.qtasks_queue.values():
+        qtask.print_infos(self.logger)
+
+    def onNoMoreExternalEvent(self):
+      self.logger.info("There is no more external evetns to occur")
+      self.logger.info("[{}] Info from QNode:".format(self.bs.time()))
+      for qtask in self.qtasks_queue.values():
+        qtask.print_infos(self.logger)
+
+
     def onBeforeEvents(self):
-      print("\n")
+      if self.bs.time() > self.max_simulation_time:
+        sys.exit(1)
+
+      self.logger.info("\n")
+      
+      for qb in self.dict_qboxes.values():
+        qb.onBeforeEvents()
 
       if self.bs.time() >= self.time_next_update:
         self.logger.info("[{}]- QNode calling update on QBoxes".format(self.bs.time()))
@@ -168,31 +195,33 @@ class QarnotNodeSched(BatsimScheduler):
       else:
         self.do_dispatch = False # We may not have to dispatch, depending on the events in this message
 
-      for qb in self.dict_qboxes.values():
-        qb.onBeforeEvents()
-
 
     def onNoMoreEvents(self):
-      if self.do_dispatch:
+      if self.flag and (self.bs.time() > self.event_end_simu_received_at) and not self.simu_ends_received:
+        sys.exit(1)
+      if (self.bs.time() >= 1.0) and self.do_dispatch:
         self.doDispatch()
 
       for qb in self.dict_qboxes.values():
         qb.onNoMoreEvents()
 
       # If the simulation is not finished and we need to ask Batsim for the next waking up
-      if not self.isSimulationFinished() and self.ask_next_update:
+      self.checkNoMoreInstances()
+      self.checkSimulationFinished()
+      if not self.end_of_simulation and self.ask_next_update:
         self.bs.wake_me_up_at(self.time_next_update)
+        self.ask_next_update = False
 
 
     def onNotifyEventTargetTemperatureChanged(self, qrad_name, new_temperature):
       self.dict_qrads[qrad_name].onTargetTemperatureChanged(qrad_name, new_temperature)
 
 
-    def onNotifyEventOutsideTemperatureChanged(self, site, new_temperature):
+    def onNotifyEventOutsideTemperatureChanged(self, machines, new_temperature):
       pass
       ''' This is not used by the qarnot schedulers
-      for qb in self.dict_sites[site]:
-        qb.onOutsideTemperatureChanged(new_temperature)
+      for machine_id in machines:
+        self.dict_resources[machine_id].onOutsideTemperatureChanged(new_temperature)
       '''
 
     def onNotifyEventMachineUnavailable(self, machines):
@@ -202,6 +231,27 @@ class QarnotNodeSched(BatsimScheduler):
     def onNotifyEventMachineAvailable(self, machines):
       for machine_id in machines:
         self.dict_resources[machine_id].onNotifyMachineAvailable(machine_id)
+
+
+
+    def onNotifyGenericEvent(self, event_data):
+      if event_data["type"] == "stop_simulation":
+        self.logger.info("[{}] Simulation STOP asked by an event".format(self.bs.time()))
+        to_reject = []
+        for qtask in self.qtasks_queue.values():
+          qtask.print_infos(self.logger)
+          if len(qtask.waiting_instances) > 0:
+            to_reject.extend(qtask.waiting_instances)
+
+        to_reject.extend(self.jobs_mapping.values())
+        if len(to_reject) > 0:
+          self.bs.reject_jobs(to_reject)
+        self.bs.notify_registration_finished()
+        self.event_end_simu_received_at = self.bs.time() + 60.0
+        self.end_of_simulation = True
+        self.flag = True
+        self.logger.info("Now Batsim should stop the simulation")
+
 
 
     def onJobSubmission(self, job):
@@ -217,14 +267,17 @@ class QarnotNodeSched(BatsimScheduler):
 
       qtask.instance_submitted(job)
       self.do_dispatch = True
+      #TODO maybe we'll need to disable this dispatch, same reason as when a job completes
 
 
-    '''def onRejectedInstance(self, job):
+    def onQBoxRejectedInstances(self, instances, qb_name):
       #Should not happen a lot of times
-      self.nb_rejected_jobs_by_qboxes += 1
-      qb = self.jobs_mapping.pop(job.id)
-      self.logger.info("The job {} was rejected by QBox {}".format(job.id, qb.name))
-      self.qtasks_queue[job.qtask_id].instance_rejected(job)'''
+      self.logger.info("The instances {} were rejected by QBox {}".format(instances, qb_name))
+      self.nb_rejected_jobs_by_qboxes += len(instances)
+      qtask = self.qtasks_queue[instances[0].qtask_id]
+      for job in instances:
+        self.jobs_mapping.pop(job.id)
+        qtask.instance_rejected(job)
 
 
     def onJobCompletion(self, job):
@@ -262,19 +315,30 @@ class QarnotNodeSched(BatsimScheduler):
           if len(qtask.waiting_instances) > 0 and not self.existsHigherPriority(qtask.priority):
             ''' DIRECT DISPATCH '''
             #This Qtask still has instances to dispatch and it has the highest priority in the queue
+            
+
+
+
+
             direct_job = qtask.instance_poped_and_dispatched()
             self.jobs_mapping[direct_job.id] = qb
-            self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(direct_job.id, qb.name))
+            self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(self.bs.time(),direct_job.id, qb.name))
             qb.onJobCompletion(job, direct_job)
+            #
+            #pass
+
+
+            
 
           else:
             qb.onJobCompletion(job)
             # A slot should be available, do a general dispatch
-            self.do_dispatch = True
+            # TODO well actually that's not true since the slots are not updated...
+            #self.do_dispatch = True
 
             #Check if the QTask is complete
             if qtask.is_complete():
-              self.logger.info("[{}]  All instances of QTask {} have terminated".format(self.bs.time(), qtask.id))
+              self.logger.info("[{}]  All instances of QTask {} have terminated, removing it from the queue".format(self.bs.time(), qtask.id))
               del self.qtasks_queue[qtask.id]
 
 
@@ -289,7 +353,14 @@ class QarnotNodeSched(BatsimScheduler):
       #TODO pass?
 
 
-    def isSimulationFinished(self):
+    def checkNoMoreInstances(self):
+      if (len(self.qtasks_queue) == 0) and (len(self.jobs_mapping) == 0) and self.bs.no_more_static_jobs:
+        self.logger.info("[{}] All static jobs seems to have finished. We could stop the simulation right now!".format(self.bs.time()))
+        return True
+      else:
+        return False
+
+    def checkSimulationFinished(self):
       # TODO This is a guard to avoid infinite loops.
       if (self.bs.time() > self.max_simulation_time or
           (self.bs.no_more_static_jobs and self.bs.no_more_external_events and len(self.qtasks_queue) == 0 and len(self.jobs_mapping) == 0) ):
@@ -344,12 +415,16 @@ class QarnotNodeSched(BatsimScheduler):
 
       # TODO here we take care only of "regular" tasks with instances and not cluster tasks
 
+      if len(self.qtasks_queue) == 0:
+        self.logger.info("[{}]- QNode has nothing to dispatch".format(self.bs.time()))
+        return
+
       # Sort the jobs by decreasing priority (hence the '-' sign) and then by increasing number of running instances
       self.logger.info("[{}]- QNode starting doDispatch".format(self.bs.time()))
       for qtask in sorted(self.qtasks_queue.values(),key=lambda qtask:(-qtask.priority, qtask.nb_dispatched_instances)):
-        self.logger.info("[{}]- QNode trying to dispatch {} of priority {} having {} dispatched instances".format(self.bs.time(),qtask.id, qtask.priority, qtask.nb_dispatched_instances))
         nb_instances_left = len(qtask.waiting_instances)
         if nb_instances_left > 0:
+          self.logger.debug("[{}]- QNode trying to dispatch {} of priority {} having {} waiting and {} dispatched instances".format(self.bs.time(),qtask.id, qtask.priority, len(qtask.waiting_instances), qtask.nb_dispatched_instances))
           # Dispatch as many instances as possible on mobos available for bkgd, no matter the priority of the qtask
           self.sortAvailableMobos("bkgd")
           for tup in self.lists_available_mobos:
@@ -428,8 +503,8 @@ class QarnotNodeSched(BatsimScheduler):
               #End for high slots
             #End if high priority and nb_instances_left > 0
           #End if low/high priority and nb_instances_left > 0
+          self.logger.debug("[{}]- QNode now dispatched a total of {} instances of {}, {} are still waiting.".format(self.bs.time(),qtask.nb_dispatched_instances, qtask.id, len(qtask.waiting_instances)))
         #End if nb_instances_left > 0
-        self.logger.info("[{}]- QNode now dispatched a total of {} instances of {}".format(self.bs.time(),qtask.nb_dispatched_instances, qtask.id))
       #End for qtasks in queue
       self.logger.info("[{}]- QNode end of doDispatch".format(self.bs.time()))
     #End of doDispatch function
