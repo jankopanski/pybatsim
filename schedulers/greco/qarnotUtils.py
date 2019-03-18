@@ -27,8 +27,8 @@ class QTask:
         '''
 
     def print_infos(self, logger):
-        logger.info("QTask: {}, {} received, {} waiting, {} dispatched, {} terminated.".format(
-            self.id, self.nb_received_instances, len(self.waiting_instances), self.nb_dispatched_instances, self.nb_terminated_instances))
+        logger.info("QTask: {}, {} received, {} waiting, {} dispatched, {} terminated, {} killed.".format(
+            self.id, self.nb_received_instances, len(self.waiting_instances), self.nb_dispatched_instances, self.nb_terminated_instances, self.nb_killed_instances))
 
     def is_complete(self):
         #TODO make sure all instances of a task arrives at the same time in the workload

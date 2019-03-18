@@ -204,7 +204,7 @@ class QarnotBoxSched():
                 #self.availHigh |= ProcSet(*qr.dict_mobos.keys())
 
         if len(jobs_to_kill) > 0:
-            self.logger.info("[{}]--- QBox {} asked to kill the following jobs during updateAndReportState: {}".format(self.bs.time(), self.name, jobs_to_kill))
+            self.logger.info("[{}]--- {} asked to kill the following jobs during updateAndReportState: {}".format(self.bs.time(), self.name, jobs_to_kill))
             for qr in self.dict_qrads.values():
                 self.logger.info("[{}]----- QRad {} {} target: {}, air: {}, diff: {}".format(self.bs.time(), qr.name, qr.temperature_master, qr.targetTemp, self.bs.air_temperatures[str(qr.temperature_master)], qr.diffTemp))
             self.jobs_to_kill.extend(jobs_to_kill)
@@ -216,7 +216,7 @@ class QarnotBoxSched():
         self.availHigh -= self.mobosUnavailable
 
 
-        self.logger.info("[{}]--- QBox {} reporting the available slots for bkgd/low/high: {}/{}/{}".format(self.bs.time(), self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)))
+        self.logger.info("[{}]--- {} reporting the available slots for bkgd/low/high: {}/{}/{}".format(self.bs.time(), self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)))
         return [self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)]
 
 
@@ -228,7 +228,7 @@ class QarnotBoxSched():
 
         Datasets are shared between the instances of the same QTask. So we only need to retrive the datasets once for all instances
         '''
-        self.logger.info("[{}]--- QBox {} received {} instances of {} for the priority group {}".format(self.bs.time(), self.name, len(instances), qtask_id, priority_group))
+        self.logger.info("[{}]--- {} received {} instances of {} for the priority group {}".format(self.bs.time(), self.name, len(instances), qtask_id, priority_group))
         if qtask_id in self.dict_subqtasks:
             # Some instances of this QTask have already been received by this QBox
             sub_qtask = self.dict_subqtasks[qtask_id]
@@ -335,7 +335,9 @@ class QarnotBoxSched():
                             return # All instances have been started
 
         # Some instances were dispatched by cannot be started yet, return them to the QNode
-        self.logger.info("[{}]--- QBox {} still has {} instances of {} to start, rejecting these instances back to the QNode but this should not happen.".format(self.bs.time(), self.name, len(sub_qtask.waiting_instances), sub_qtask.id))
+        self.logger.info("[{}]--- {} still has {} instances of {} to start, rejecting these instances back to the QNode but this should not happen.".format(self.bs.time(), self.name, len(sub_qtask.waiting_instances), sub_qtask.id))
+        self.logger.info("[{}]--- {} has available slots for bkgd/low/high: {}/{}/{}".format(self.bs.time(), self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)))
+
         assert len(sub_qtask.waiting_instances) > 0, "QBox wants to reject 0 instances to the QNode..."
         self.qn.onQBoxRejectedInstances(sub_qtask.waiting_instances.copy(), self.name) # TODO maybe we don't need to copy this
         sub_qtask.waiting_instances = []

@@ -272,7 +272,6 @@ class QarnotNodeSched(BatsimScheduler):
 
     def onQBoxRejectedInstances(self, instances, qb_name):
       #Should not happen a lot of times
-      self.logger.info("The instances {} were rejected by QBox {}".format(instances, qb_name))
       self.nb_rejected_jobs_by_qboxes += len(instances)
       qtask = self.qtasks_queue[instances[0].qtask_id]
       for job in instances:
@@ -315,20 +314,10 @@ class QarnotNodeSched(BatsimScheduler):
           if len(qtask.waiting_instances) > 0 and not self.existsHigherPriority(qtask.priority):
             ''' DIRECT DISPATCH '''
             #This Qtask still has instances to dispatch and it has the highest priority in the queue
-            
-
-
-
-
             direct_job = qtask.instance_poped_and_dispatched()
             self.jobs_mapping[direct_job.id] = qb
             self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(self.bs.time(),direct_job.id, qb.name))
             qb.onJobCompletion(job, direct_job)
-            #
-            #pass
-
-
-            
 
           else:
             qb.onJobCompletion(job)
@@ -348,7 +337,7 @@ class QarnotNodeSched(BatsimScheduler):
       #End if/else on job.workload
     #End onJobCompletion
 
-    def onJobsKilled(self,job):
+    def onJobsKilled(self, job):
       pass
       #TODO pass?
 
