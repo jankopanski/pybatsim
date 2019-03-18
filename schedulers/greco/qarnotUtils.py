@@ -16,6 +16,7 @@ class QTask:
         self.nb_received_instances = 0    # Number of jobs submitted by Batsim
         self.nb_dispatched_instances = 0  # Number of jobs disatched to the QBoxes
         self.nb_terminated_instances = 0  # Number of jobs that have finished correctly (not killed)
+        self.nb_killed_instances = 0
 
         self.priority = int(priority)
         self.priority_group = PriorityGroup.HIGH if self.priority >= 0 else ( PriorityGroup.BKGD if self.priority < -10 else PriorityGroup.LOW )
@@ -64,6 +65,7 @@ class QTask:
     def instance_killed(self):
         # An instance was killed by the QBox scheduler
         self.nb_dispatched_instances -= 1
+        self.nb_killed_instances += 1
 
 
 class SubQTask:

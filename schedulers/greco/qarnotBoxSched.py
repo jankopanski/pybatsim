@@ -303,8 +303,8 @@ class QarnotBoxSched():
             for qr in qr_list:
                 for batid in (qr.pset_mobos & available_slots):
                     if qr.dict_mobos[batid].state <= QMoboState.RUNBKGD: # Either OFF/IDLE or running BKGD
-                        job = sub_qtask.waiting_instances.pop()
-                        sub_qtask.running_instances.append(job)
+                        job = sub_qtask.pop_waiting_instance()
+                        sub_qtask.mark_running_instance(job)
                         self.startInstance(qr.dict_mobos[batid], job)
                         n-=1
                         if n == 0:
@@ -313,9 +313,9 @@ class QarnotBoxSched():
                         running_low.append(batid)
             # There are still instances to start, take mobos that are running LOW instances.
             for batid in running_low: # Mobos in this list are already sorted by coolest QRad first
-                job = sub_qtask.waiting_instances.pop()
-                sub_qtask.running_instances.append(job)
-                self.startInstance(qr.dict_mobos[batid], job)
+                job = sub_qtask.pop_waiting_instance()
+                sub_qtask.mark_running_instance(job)
+                self.startInstance(self.dict_ids[batid].dict_mobos[batid], job)
                 n-=1
                 if n == 0:
                     return # All instances have been started
@@ -351,8 +351,9 @@ class QarnotBoxSched():
         '''
         if qm.running_job != -1:
             # A job is running
-            self.bs.kill_jobs([qm.running_job])
             self.logger.info("[{}]------- Mobo {} killed Job {} because another instance arrived".format(self.bs.time(), qm.name, qm.running_job.id))
+            self.bs.kill_jobs([qm.running_job])
+            qm.pop_job()
 
         job.allocation = ProcSet(qm.batid)
         qm.push_job(job)
@@ -379,8 +380,11 @@ class QarnotBoxSched():
         if direct_job != -1:
             # Another instance of the same qtask has to be started immediately
             assert direct_job not in sub_qtask.running_instances and direct_job not in sub_qtask.waiting_instances, "Direct dispatch of instance {} already received/running in {}.".format(direct_job.id, self.name)
+            direct_job.allocation = ProcSet(qm.batid)
+            assert direct_job.allocation == job.allocation
             qm.push_direct_job(direct_job)
             sub_qtask.mark_running_instance(direct_job)
+            self.jobs_to_execute.append(direct_job)
         else:
             self.logger.info("[{}] {} just completed with job_state {} on alloc {} on mobo {} {}".format(self.bs.time(), job.id, job.job_state, str(job.allocation), qm.name, qm.batid))
             qm.pop_job()
@@ -413,6 +417,7 @@ class QarnotBoxSched():
 
     def doFrequencyRegulation(self):
         pass
-        # TODO Need to check for all mobos if there is one IDLE. If so, turn it off and ask for pstate change
+        # TODO Need to check for all mobos if there is one IDLE.
+        # If so, put CPU burn if heating required or turn it off and ask for pstate change
         # For mobos that are still computing something, need to check if a change in pstate is needed
 

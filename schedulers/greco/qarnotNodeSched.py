@@ -6,6 +6,7 @@ from qarnotBoxSched import QarnotBoxSched
 from procset import ProcSet
 from collections import defaultdict
 
+import math
 import logging
 import sys
 '''
@@ -61,15 +62,14 @@ class QarnotNodeSched(BatsimScheduler):
         self.update_period = 600 # TODO every 10 minutes for testing
         self.time_next_update = 1.0 # The next time the scheduler should be woken up
         self.ask_next_update = False # Whether to ask for next update in onNoMoreEvents function
-        #self.next_update_asked = False   # Whether the 'call_me_later' has been sent or not
+        self.next_update_asked = False   # Whether the 'call_me_later' has been sent or not
         self.very_first_update = True
 
         self.nb_rejected_jobs_by_qboxes = 0 # Just to keep track of the count
 
-        #self.max_simulation_time = 86500 # 1 day
-        self.max_simulation_time = 1207000 # 1 week
-        self.simu_ends_received = False
-        self.flag = False
+        #self.max_simulation_time = 87100 # 1 day
+        self.max_simulation_time = 1211000 # 1 week TODO remove this guard?
+        self.end_of_simulation_asked = False
 
 
     def onSimulationBegins(self):
@@ -80,7 +80,7 @@ class QarnotNodeSched(BatsimScheduler):
       # TODO maybe change the option to send every 30 seconds instead of every message of Batsim (see TODO list)
 
       # Register the profile of the cpu-burn jobs. CPU value is 1e20 because it's supposed to be endless and killed when needed.
-      self.bs.register_profiles("dyn-burn", {"burn":{"type":"parallel_homogeneous", "cpu":1e20, "com":0}})
+      self.bs.register_profiles("dyn-burn", {"burn":{"type":"parallel_homogeneous", "cpu":1e20, "com":0, "priority": -23}})
       self.bs.wake_me_up_at(1)
 
       self.initQBoxesAndStorageController()
@@ -91,11 +91,9 @@ class QarnotNodeSched(BatsimScheduler):
 
       self.logger.info("[{}]- QNode: End of SimulationBegins".format(self.bs.time()))
 
-      self.end_of_simulation = False
-
 
     def onSimulationEnds(self):
-      self.simu_ends_received = True
+      #self.simu_ends_received = True
       for qb in self.dict_qboxes.values():
         qb.onSimulationEnds()
 
@@ -142,15 +140,16 @@ class QarnotNodeSched(BatsimScheduler):
       self.nb_qboxes = len(self.dict_qboxes)
       self.nb_computing_resources = len(self.dict_resources)
 
-
     def site_from_qb_name(self, qb_name):
       if qb_name.split('-')[1] == "2000":
         return "bordeaux"
       else:
         return "paris"
 
+
     def onRequestedCall(self):
-      pass
+      self.ask_next_update = True#pass
+
 
     def onNoMoreJobsInWorkloads(self):
       self.logger.info("There is no more static jobs in the workload")
@@ -167,6 +166,7 @@ class QarnotNodeSched(BatsimScheduler):
 
     def onBeforeEvents(self):
       if self.bs.time() > self.max_simulation_time:
+        self.logger.info(str(self.bs.time()), "SYS EXIT")
         sys.exit(1)
 
       self.logger.info("\n")
@@ -183,13 +183,12 @@ class QarnotNodeSched(BatsimScheduler):
           tup = qb.updateAndReportState()
           self.lists_available_mobos.append(tup)
 
-        self.time_next_update = self.bs.time() + self.update_period
+        self.time_next_update = math.floor(self.bs.time()) + self.update_period
 
         if self.very_first_update: # First update at t=1, next updates every 30 seconds starting at t=30
           self.time_next_update -= 1
           self.very_first_update = False
-
-        self.ask_next_update = True # We will ask for the next wake up in onNoMoreEvents if the simulation is not finished yet
+          self.ask_next_update = True # We will ask for the next wake up in onNoMoreEvents if the simulation is not finished yet
 
         self.do_dispatch = True # We will do a dispatch anyway
       else:
@@ -197,8 +196,9 @@ class QarnotNodeSched(BatsimScheduler):
 
 
     def onNoMoreEvents(self):
-      if self.flag and (self.bs.time() > self.event_end_simu_received_at) and not self.simu_ends_received:
-        sys.exit(1)
+      if self.end_of_simulation_asked:
+        return
+
       if (self.bs.time() >= 1.0) and self.do_dispatch:
         self.doDispatch()
 
@@ -208,7 +208,7 @@ class QarnotNodeSched(BatsimScheduler):
       # If the simulation is not finished and we need to ask Batsim for the next waking up
       self.checkNoMoreInstances()
       self.checkSimulationFinished()
-      if not self.end_of_simulation and self.ask_next_update:
+      if not self.end_of_simulation_asked and self.ask_next_update:
         self.bs.wake_me_up_at(self.time_next_update)
         self.ask_next_update = False
 
@@ -233,26 +233,15 @@ class QarnotNodeSched(BatsimScheduler):
         self.dict_resources[machine_id].onNotifyMachineAvailable(machine_id)
 
 
-
     def onNotifyGenericEvent(self, event_data):
       if event_data["type"] == "stop_simulation":
         self.logger.info("[{}] Simulation STOP asked by an event".format(self.bs.time()))
-        to_reject = []
-        for qtask in self.qtasks_queue.values():
-          qtask.print_infos(self.logger)
-          if len(qtask.waiting_instances) > 0:
-            to_reject.extend(qtask.waiting_instances)
-
-        to_reject.extend(self.jobs_mapping.values())
-        if len(to_reject) > 0:
-          self.bs.reject_jobs(to_reject)
+        self.killOrRejectAllJobs()
         self.bs.notify_registration_finished()
-        self.event_end_simu_received_at = self.bs.time() + 60.0
-        self.end_of_simulation = True
-        self.flag = True
+        self.end_of_simulation_asked = True
         self.logger.info("Now Batsim should stop the simulation")
-
-
+      else:
+        pass # TODO need to handle jobs already running somewhere here (with dynamic jobs?)
 
     def onJobSubmission(self, job):
       qtask_id = job.id.split('_')[0]
@@ -330,7 +319,6 @@ class QarnotNodeSched(BatsimScheduler):
               self.logger.info("[{}]  All instances of QTask {} have terminated, removing it from the queue".format(self.bs.time(), qtask.id))
               del self.qtasks_queue[qtask.id]
 
-
         else:
           # "Regular" instances are not supposed to have a walltime nor fail
           assert False, "Job {} reached the state {}, this should not happen.".format(job.id, job.job_state)
@@ -351,13 +339,28 @@ class QarnotNodeSched(BatsimScheduler):
 
     def checkSimulationFinished(self):
       # TODO This is a guard to avoid infinite loops.
-      if (self.bs.time() > self.max_simulation_time or
-          (self.bs.no_more_static_jobs and self.bs.no_more_external_events and len(self.qtasks_queue) == 0 and len(self.jobs_mapping) == 0) ):
-        self.end_of_simulation = True
-        self.bs.notify_registration_finished() # TODO this may not have its place here
+      if self.bs.no_more_static_jobs and self.bs.no_more_external_events:
+        self.logger.info("The simulation seems to be finished (no more static jobs or external events)."
+          " Killing or rejecting all remaining jobs.")
+        self.end_of_simulation_asked = True
+        self.killOrRejectAllJobs() # For Batsim to finish the simulation
+        self.bs.notify_registration_finished()
         return True
       else:
         return False
+
+    def killOrRejectAllJobs(self):
+      to_reject = []
+      for qtask in self.qtasks_queue.values():
+        qtask.print_infos(self.logger)
+        if len(qtask.waiting_instances) > 0:
+          to_reject.extend(qtask.waiting_instances)
+
+      to_reject.extend(self.jobs_mapping.values())
+      if len(to_reject) > 0:
+        self.bs.reject_jobs(to_reject)
+
+      self.logger.info("Now Batsim should stop the simulation on next message (or after next REQUESTED_CALL)")
 
 
     def sortAvailableMobos(self, priority):
