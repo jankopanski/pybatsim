@@ -59,7 +59,8 @@ class QarnotNodeSched(BatsimScheduler):
         #self.qboes_queued_upload_size = {} # Maps the QBox id to the queued upload size (in GB)
 
         #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
-        self.update_period = 600 # TODO every 10 minutes for testing
+        #self.update_period = 600 # TODO every 10 minutes for testing
+        self.update_period = 300 # TODO every 5 minutes for testing
         self.time_next_update = 1.0 # The next time the scheduler should be woken up
         self.ask_next_update = False # Whether to ask for next update in onNoMoreEvents function
         self.next_update_asked = False   # Whether the 'call_me_later' has been sent or not
@@ -152,16 +153,18 @@ class QarnotNodeSched(BatsimScheduler):
 
 
     def onNoMoreJobsInWorkloads(self):
-      self.logger.info("There is no more static jobs in the workload")
+      pass
+      '''self.logger.info("There is no more static jobs in the workload")
       self.logger.info("[{}] Info from QNode:".format(self.bs.time()))
       for qtask in self.qtasks_queue.values():
-        qtask.print_infos(self.logger)
+        qtask.print_infos(self.logger)'''
 
     def onNoMoreExternalEvent(self):
-      self.logger.info("There is no more external evetns to occur")
+      pass
+      '''self.logger.info("There is no more external events to occur")
       self.logger.info("[{}] Info from QNode:".format(self.bs.time()))
       for qtask in self.qtasks_queue.values():
-        qtask.print_infos(self.logger)
+        qtask.print_infos(self.logger)'''
 
 
     def onBeforeEvents(self):
@@ -337,6 +340,7 @@ class QarnotNodeSched(BatsimScheduler):
       else:
         return False
 
+
     def checkSimulationFinished(self):
       # TODO This is a guard to avoid infinite loops.
       if self.bs.no_more_static_jobs and self.bs.no_more_external_events:
@@ -349,16 +353,24 @@ class QarnotNodeSched(BatsimScheduler):
       else:
         return False
 
+
     def killOrRejectAllJobs(self):
+      self.logger.info("Killing all running jobs and rejecting all waiting ones.")
       to_reject = []
       for qtask in self.qtasks_queue.values():
         qtask.print_infos(self.logger)
         if len(qtask.waiting_instances) > 0:
           to_reject.extend(qtask.waiting_instances)
-
-      to_reject.extend(self.jobs_mapping.values())
       if len(to_reject) > 0:
+        self.logger.info("Rejecting jobs:{}".format(to_reject))
         self.bs.reject_jobs(to_reject)
+
+      to_kill = []
+      for job_id in self.jobs_mapping.keys():
+        to_kill.append(self.bs.jobs[job_id])
+      if len(to_kill) > 0:
+        self.logger.info("Killing jobs:{}".format(to_kill))
+        self.bs.kill_jobs(to_kill)
 
       self.logger.info("Now Batsim should stop the simulation on next message (or after next REQUESTED_CALL)")
 
