@@ -31,7 +31,7 @@ class Batsim(object):
         self.logger = logging.getLogger(__name__)
 
         self.running_simulation = False
-        self.network = NetworkHandler(network_endpoint, timeout=timeout)
+        self.network = NetworkHandler(network_endpoint, timeout=20000)#timeout)
         self.network.bind()
 
         # event hendler is optional
@@ -456,6 +456,7 @@ class Batsim(object):
                 self.profiles_forwarded_on_submission = self.batconf["profiles-forwarded-on-submission"]
                 self.dynamic_job_registration_enabled = self.batconf["dynamic-jobs-enabled"]
                 self.ack_of_dynamic_jobs = self.batconf["dynamic-jobs-acknowledged"]
+                self.forward_unknown_events = self.batconf["forward-unknown-events"]
 
                 if self.dynamic_job_registration_enabled:
                     self.logger.warning("Dynamic registration of jobs is ENABLED. The scheduler must send a NOTIFY event of type 'registration_finished' to let Batsim end the simulation.")
@@ -620,12 +621,12 @@ class Batsim(object):
                     self.scheduler.onNotifyEventMachineUnavailable(ProcSet.from_str(event_data["resources"]))
                 elif notify_type == "event_machine_available":
                     self.scheduler.onNotifyEventMachineAvailable(ProcSet.from_str(event_data["resources"]))
-                elif notify_type == "target_temperature_changed":
-                    self.scheduler.onNotifyEventTargetTemperatureChanged(ProcSet.from_str(event_data["resources"]), event_data["temperature"])
+                elif notify_type == "qrad_target_temperature_changed":
+                    self.scheduler.onNotifyEventTargetTemperatureChanged(event_data["qrad"], event_data["temperature"])
                 elif notify_type == "outside_temperature_changed":
-                    self.scheduler.onNotifyEventOutsideTemperatureChanged(ProcSet.from_str(event_data["resources"]), event_data["temperature"])
-                elif notify_type == "new_dataset_on_storage":
-                    self.scheduler.onNotifyEventNewDatasetOnStorage(ProcSet.from_str(event_data["resources"]), event_data["id"], event_data["size"])
+                    self.scheduler.onNotifyEventOutsideTemperatureChanged(event_data["resources"], event_data["temperature"])
+                elif self.forward_unknown_events:
+                    self.scheduler.onNotifyGenericEvent(event_data)
                 else:
                     raise Exception("Unknown NOTIFY type {}".format(notify_type))
             else:
@@ -823,13 +824,13 @@ class BatsimScheduler(object):
     def onNotifyEventMachineAvailable(self, machines:ProcSet):
         raise NotImplementedError()
 
-    def onNotifyEventTargetTemperatureChanged(self, machines:ProcSet, new_temperature:float):
+    def onNotifyEventTargetTemperatureChanged(self, qrad:str, new_temperature:float):
         raise NotImplementedError()
 
-    def onNotifyEventOutsideTemperatureChanged(self, machines:ProcSet, new_temperature:float):
-        pass#raise NotImplementedError()
+    def onNotifyEventOutsideTemperatureChanged(self, site:str, new_temperature:float):
+        raise NotImplementedError()
 
-    def onNotifyEventNewDatasetOnStorage(self, machines:ProcSet, dataset_id:str, dataset_size:str):
+    def onNotifyGenericEvent(self, event_data):
         raise NotImplementedError()
 
     def onBeforeEvents(self):

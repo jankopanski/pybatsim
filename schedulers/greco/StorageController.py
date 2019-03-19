@@ -137,7 +137,7 @@ class StorageController:
         for storage in self.get_storages():
             # At this point, storage is an ID. Let's take the storage (Class) with this ID.
             storage = self.get_storage(storage)
-            print("{} storages: {} " .format(storage._name, storage._datasets))
+            self._logger.info("{} storages: {} " .format(storage._name, storage._datasets))
             hasDataset = True
             # To check if this storage has all the datasets required.
             for dataset in required_dataset:
@@ -146,7 +146,7 @@ class StorageController:
                     break
             # If true, the storage has all required datasets. So, candidate_qb = {storages}
             if(hasDataset):
-                print("     This QBOX has the required dataset. QBOX: ", self.mappingQBoxes[storage._id])
+                self._logger.info("     This QBOX has the required dataset. QBOX: ", self.mappingQBoxes[storage._id])
                 qboxes_list.append(self.mappingQBoxes[storage._id])
         
         return qboxes_list
@@ -196,7 +196,7 @@ class StorageController:
         assert dest.get_storage_capacity() >= dataset.get_size(), "The dataset %r is larger than the storage capacity, aborting." % dataset._id
         
         if dest.get_dataset(dataset_id) is not None:
-            print("Dataset already in dest")
+            self._logger.info("Dataset already in dest")
             return
 
         # Clear storage to enable data transfer
@@ -230,7 +230,7 @@ class StorageController:
         self._bs.execute_jobs([job1])
         self.moveRequested[jid1] = dataset.get_id()
 
-        print("[", self._bs.time(), "] StorageController starting move dataset", dataset_id, "to qbox disk", dest_id)
+        self._logger.info("[", self._bs.time(), "] StorageController starting move dataset", dataset_id, "to qbox disk", dest_id)
 
     def clear_strategy(self, storage):
         """ LRU implementation to clean Storage of the oldest Dataset 
@@ -311,7 +311,7 @@ class StorageController:
         pass
 
     def onSimulationEnds(self):
-        print("End of simulation")
+        self._logger.info("End of simulation")
         for storage in self._storages.values():
             self._logger.info("{} contains the following Datasets:{}".format(storage._name,", ".join(storage._datasets.keys())))
 
