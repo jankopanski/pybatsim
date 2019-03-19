@@ -2,7 +2,8 @@ from batsim.batsim import Job
 
 from procset import ProcSet
 
-
+import math
+import json
 
 class Dataset:
 
@@ -61,11 +62,34 @@ class Dataset:
 class Storage:
     
     def __init__(self, id, name, storage_capacity):
-        self._id = id                               # Resource id of the storage
-        self._name = name                           # Name of the storage
-        self._storage_capacity = storage_capacity   # Capacity of the storage in bytes (float)
-        self._available_space = storage_capacity    # Current available space of the storage in bytes (float)
-        self._datasets = dict()                     # Dict of dataset_id -> Dataset object
+        self._id = id                                   # Resource id of the storage
+        self._name = name                               # Name of the storage
+                                                        # Assumption : If name is "storage_server", it means it is ceph
+
+        if(self.name == "storage_server"):
+            self.is_ceph = True
+            self._storage_capacity = math.inf           # Capacity set to infinite (float)
+            self._available_space = math.inf            # Available space set to infinite (float)
+        else:
+            self.is_ceph = False
+            self._storage_capacity = storage_capacity   # Capacity of the storage in bytes (float)
+            self._available_space = storage_capacity    # Current available space of the storage in bytes (float)
+
+        self._datasets = dict()                         # Dict of dataset_id -> Dataset object
+
+    def read_dataset_json(self, filename):
+
+        # Open the dataset file
+        with open(filename, 'r') as file:
+
+            # Iterate over every line (which is a json object)
+            for cnt, line in enumerate(file):
+
+                # Parse this object
+                parsed = json.loads(line)
+
+                # Store this object in the dataset with timestamp 0
+                self.add_dataset(Dataset(parsed["id"], parsed["size"]), 0)
 
     def get_available_space(self):
         """ Returns the remaining space on the Storage """
@@ -143,21 +167,17 @@ class StorageController:
         self.moveRequested = {}  # Maps the job_id to the dataset_id
 
         for res in storage_resources:
-            self.add_storage(Storage(res["id"], res["name"], float(res["properties"]["size"])))
+            new_storage = Storage(res["id"], res["name"], float(res["properties"]["size"]))
 
+            # If it is the CEPH Server
             if res["name"] == "storage_server":
+
+                # Store the CEPH ID
                 self._ceph_id = res["id"]
+                # Parse the dataset file
+                new_storage.read_dataset_json(filename)
 
-        '''
-        Clement: I think the filename holding all the datasets in a simulation will
-        be directly passed as argument of the scheduler in pybatsim (and forwarded here).
-        So yet another TODO:
-        Need to read the list of the datasets (one JSON object per line corresponding to one dataset)
-        that are assumed to be available in the CEPH at t=0 (since the CEPH has an 'infinite' storage capacity)
-
-        In reality, the datasets are available at the submission time of the QTask that needs it,
-        but for the case of Qarnot schedulers it does not change anything (I guess).
-        '''
+            self.add_storage(new_storage)
 
         self._logger.info("[{}]- StorageController initialization completed, CEPH id is {} and there are {} QBox disks".format(self._bs.time(),self._ceph_id, len(self._storages)-1))
 
@@ -168,7 +188,7 @@ class StorageController:
 
     def get_storages(self):
         """ Returns the Storages in the Storage Controller """
-        return self._storages[storage_id]
+        return self._storages
 
 
     def get_storages_by_dataset(self, required_dataset):
