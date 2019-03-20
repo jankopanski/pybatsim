@@ -147,6 +147,18 @@ class Storage:
 
         return True
 
+    def has_dataset(self, dataset_id):
+        '''
+
+        :param dataset_id: The id of the dataset
+        :return: True if this storage has the storage of that id
+        '''
+        dataset = self.get_dataset(dataset_id)
+
+        if(dataset == None):
+            return False
+        else:
+            return True;
 
     def has_enough_space(self, size):
         """ Returns true if the Storage has enough space to store a dataset corresponding to the
@@ -177,6 +189,11 @@ class StorageController:
         self._bs = bs            # Pybatsim
         self._qn = qn            # The QNode Scheduler
         self._logger = bs.logger
+
+        # Stores the requests that have been staged.
+        # If transfer from CEPH to storage_id i fro dataset_id j
+        # Then this will have the entry (i, j)
+        self.staging_map = set()
 
         self.mappingQBoxes = {}  # Maps the disk index to the QBox Scheduler object
         self.moveRequested = {}  # Maps the job_id to the dataset_id
@@ -266,6 +283,20 @@ class StorageController:
         storage.add_dataset(dataset, self._bs.time())
         return True
 
+    def has_dataset(self, storage_id, dataset_id):
+        '''
+        Check if a storage has a dataset
+
+        :param storage_id: Id of the storage to find in
+        :param dataset_id: Id of the dataset to find
+        :return: True if it exists, else false
+        '''
+        storage = self.get_storage(storage_id)
+
+        if(storage == None):
+            return False
+        else:
+            return storage.has_dataset(dataset_id)
 
     def copy_from_CEPH_to_dest(self, dataset_ids, dest_id):
         """ Method used to move datasets from the CEPH to the disk of a QBox
@@ -364,6 +395,8 @@ class StorageController:
         self.moveRequested[jid1] = dataset.get_id()
 
         self._logger.info("[", self._bs.time(), "] StorageController starting move dataset", dataset_id, "to qbox disk", dest_id)
+
+        self.staging_map.add((dest_id, dataset_id))
 
         return True
 
@@ -473,14 +506,24 @@ class StorageController:
 
     def onQBoxAskDataset(self, storage_id, dataset_id):
         '''
-        TODO
         This function is called from a QBox scheduler and asks for a dataset to be on disk.
-        If the dataset is already on disk, return True
-        If not, start data staging job and return False
-        WARNING! If the data staging of that dataset on this qbox disk was already asked, return False but don't start
+        
+        If the dataset is already on disk, returns True
+        If not, start data staging job and returns False
+        If the data staging of that dataset on this qbox disk was already asked, returns False but doesnt start
         another data staging job.
         '''
-        return True
+
+        # If the data is already on disk
+        if(self.has_dataset(storage_id, dataset_id)):
+            return True
+        # Check if the data is being staged
+        elif((storage_id, dataset_id) in self.staging_map):
+            return False
+        # Else add the dataset
+        else:
+            self.copy_from_CEPH_to_dest([dataset_id], storage_id)
+            return False
 
 # Handlers of Batsim-related events
 
@@ -498,6 +541,9 @@ class StorageController:
         dataset_new.get_running_jobs(job.id)
 
         self.get_storage(dest_id).add_dataset(dataset_new, job.finish_time)
+
+        # Remove from the staging knowledge
+        self.staging_map.remove((dest_id, dataset_id))
 
         self.mappingQBoxes[dest_id].onDatasetArrived(dataset_id)
 
