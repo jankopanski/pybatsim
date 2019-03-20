@@ -114,6 +114,7 @@ class Storage:
 
     def add_dataset(self, dataset, timestamp):
         """ Add Dataset to the Storage
+        If the dataset is already present, then it updates the timestamp
         
         When adding a dataset, its timestamp is set to current time.
         Then, we subtract the available space on storage with the size of the Dataset only if the data was not present.
@@ -152,6 +153,20 @@ class Storage:
         provided size.
         """
         return (self._available_space - size) >= 0
+
+    def update_timestamp(self, dataset_id, timestamp):
+        '''
+
+        :param dataset_id: Datasetid to update timestamp with
+        :return: False if dataset with id not present, True else
+        '''
+        if(self.get_dataset(dataset_id) == None):
+            return False
+
+        dataset = self.get_dataset(dataset_id)
+
+        self.add_dataset(dataset, timestamp)
+
 
 class StorageController:
 
@@ -221,12 +236,13 @@ class StorageController:
         self._storages[storage._id] = storage
 
 
-    def add_dataset(self, storage_id, dataset):
+    def add_dataset(self, storage_id, dataset, timestamp=0):
         """ Add to the given storage the dataset
 
         Returns False if the storage does not exist
         Else return True
         Asserts if the capacity is greater than required
+        timestamp of the dataset is updated if exists.
         """
         storage = self.get_storage(storage_id)
 
@@ -236,11 +252,12 @@ class StorageController:
         # Check if the storage already has the dataset
         if(storage.get_dataset(dataset.get_id()) != None):
             self._logger.debug("[{}] Dataset {} already present in storage with id {}".format(self._bs.time(), dataset.get_id(), storage_id))
-            #TODO need to ypdate the timestamp of the Dataset in this storage
+
+            storage.update_timestamp(dataset.get_id(), timestamp)
+
             return True
 
         # Now check if the dataset fits in the storage
-        # TODO: If possible change this to a return value rather than an assert statement.
         assert storage.get_storage_capacity() >= dataset.get_size(), "The dataset %r is larger than the storage capacity, aborting." % dataset._id
 
         if not storage.has_enough_space(dataset.get_size()):
@@ -276,9 +293,6 @@ class StorageController:
 
         If we can't move the Dataset, then no job for it is scheduled
         """
-
-        #TODO check if a datasest already on the qbox disk no need to send it
-        # TODO check if the move of a dataset already asked towards the same qbox disk, no need to send it twice
 
         source = self.get_storage(source_id)
         dest = self.get_storage(dest_id)
