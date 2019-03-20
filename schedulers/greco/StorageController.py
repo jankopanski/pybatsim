@@ -7,10 +7,10 @@ import json
 
 class Dataset:
 
-    def __init__(self, id, size):
+    def __init__(self, id, size, timestamp = 0):
         self._id = id                       # UID of the dataset
         self._size = size                   # Size in bytes of the dataset (float)
-        self._timestamp = 0                 # When the dataset has been added to a Storage
+        self._timestamp                     # When the dataset has been added to a Storage
         self._running_job = set()           # The id of the running jobs that are using this Dataset
 
     def get_id(self):
@@ -418,22 +418,58 @@ class StorageController:
         assert False, "QBox {} registered but no corresponding disk was found".format(qbox_name)
 
 
-    def onQBoxAskHardLink(self, storage_id, dataset_ids):
+    def onQBoxAskHardLink(self, storage_id, dataset_ids, job_ids):
         '''
-        TODO
         This function is called from a QBox scheduler when new instances of a QTask starts running
         A hard link should be created for all the datasets that are inputs of the QTask
-        '''
-        pass
 
-    def onQBoxReleaseHardLinks(self, storage_id, dataset_ids):
+        Takes two lists dataset_ids and job_ids that have to be same size.
+        dataset_ids[i] is being used by job_ids[i] in storage_id
+
+        Returns false if the lengths of the arrys are different.
+        Returns true otherwise.
+        '''
+
+        if(len(dataset_ids) != len(job_ids)):
+            self._logger.info("Length of jobs and datasets not equal")
+            return False
+
+        len = len(dataset_ids)
+
+        for i in range(len):
+            storage = self.get_storage(storage_id)
+            dataset = storage.get_dataset(dataset_ids[i])
+            dataset.add_running_job(job_ids[i])
+
+        return True
+
+
+    def onQBoxReleaseHardLinks(self, storage_id, dataset_ids, job_ids):
         '''
         TODO
         This function is called from a QBox scheduler when there are no more
         instances of a QTask that uses their input datasets.
-        Multiple hardlink are released
+        Multiple hardlink are released.
+
+        Takes two lists dataset_ids and job_ids that have to be same size.
+        dataset_ids[i] is released by job_ids[i] in storage_id
+
+        Returns false if the lengths of the arrays are different.
+        Return True otherwise.
         '''
-        pass
+
+        if(len(dataset_ids) != len(job_ids)):
+            self._logger.info("Length of jobs and datasets not equal")
+            return False
+
+        len = len(dataset_ids)
+
+        for i in range(len):
+            storage = self.get_storage(storage_id)
+            dataset = storage.get_dataset(dataset_ids[i])
+            dataset.delete_running_job(job_ids[i])
+
+        return True
 
     def onQBoxAskDataset(self, storage_id, dataset_id):
         '''
@@ -441,20 +477,27 @@ class StorageController:
         This function is called from a QBox scheduler and asks for a dataset to be on disk.
         If the dataset is already on disk, return True
         If not, start data staging job and return False
-        WARNING! If the data staging of that dataset on this qbox disk was already asked, return False but don't start another data staging job.
+        WARNING! If the data staging of that dataset on this qbox disk was already asked, return False but don't start
+        another data staging job.
         '''
         return True
 
 # Handlers of Batsim-related events
 
     def onDataStagingCompletion(self, job):
-        dest_id = list(job.allocation)[0] # TODO index 0 of the allocation should always be the machine id of a qbox disk and not the storage server, but should not be hardcodded like that...
+        dest_id = list(job.allocation)[0]
+        # TODO index 0 of the allocation should always be the machine id of a qbox disk and not the storage server,
+        #  but should not be hardcodded like that...
+
         dataset_id = self.moveRequested.pop(job.id)
 
-        # TODO make a HARD copy of the dataset when it's been downloaded on another storage
         dataset = self.get_storage(self._ceph_id).get_dataset(dataset_id)
 
-        self.get_storage(dest_id).add_dataset(dataset, job.finish_time)
+        # Create a hard copy
+        dataset_new = Dataset(dataset.get_id(), dataset.get_size())
+        dataset_new.get_running_jobs(job.id)
+
+        self.get_storage(dest_id).add_dataset(dataset_new, job.finish_time)
 
         self.mappingQBoxes[dest_id].onDatasetArrived(dataset_id)
 
