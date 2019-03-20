@@ -40,6 +40,10 @@ class QarnotNodeSched(BatsimScheduler):
 
         #self.logger.setLevel(logging.CRITICAL)
 
+        # Make sure the path to the datasets is passed
+        assert "dataset_filename" in options, "The path to the list of datasets should be given as a CLI option as follows: "
+              "[pybatsim command] -o '{\"dataset_filename\":\"path/to/datasests.json\"}"
+
         # For the manager
         self.dict_qboxes = {}    # Maps the QBox id to the QarnotBoxSched object
         self.dict_resources = {} # Maps the Batsim resource id to the QarnotBoxSched object
@@ -105,7 +109,7 @@ class QarnotNodeSched(BatsimScheduler):
 
     def initQBoxesAndStorageController(self):
       # Let's create the StorageController
-      self.storage_controller = StorageController(self.bs.machines["storage"], self.bs, self)
+      self.storage_controller = StorageController(self.bs.machines["storage"], self.bs, self, self.options["dataset_filename"])
 
 
       # Retrieve the QBox ids and the associated list of QMobos Batsim ids

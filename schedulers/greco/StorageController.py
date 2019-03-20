@@ -131,7 +131,7 @@ class Storage:
 
 class StorageController:
 
-    def __init__(self, storage_resources, bs, qn):
+    def __init__(self, storage_resources, bs, qn, filename):
         self._storages = dict()  # Maps the storage batsim id to the Storage object
         self._ceph_id = -1       # The batsim id of the storage_server
         self._idSub = 0
