@@ -124,11 +124,6 @@ class StorageController:
 
         return self._storages[storage_id]
 
-    def get_storages(self):
-        """ Returns the Storages in the Storage Controller """
-
-        return self._storages
-
     def get_storages_by_dataset(self, required_dataset):
         """ Returns the list of storages that already has the required dataset """
 
