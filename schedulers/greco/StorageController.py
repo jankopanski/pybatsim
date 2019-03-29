@@ -10,7 +10,7 @@ class Dataset:
     def __init__(self, id, size, timestamp = 0):
         self._id = id                       # UID of the dataset
         self._size = size                   # Size in bytes of the dataset (float)
-        self._timestamp                     # When the dataset has been added to a Storage
+        self._timestamp = timestamp         # When the dataset has been added to a Storage
         self._running_job = set()           # The id of the running jobs that are using this Dataset
 
     def get_id(self):
@@ -66,7 +66,7 @@ class Storage:
         self._name = name                               # Name of the storage
                                                         # Assumption : If name is "storage_server", it means it is ceph
 
-        if(self.name == "storage_server"):
+        if(self._name == "storage_server"):
             self.is_ceph = True
             self._storage_capacity = math.inf           # Capacity set to infinite (float)
             self._available_space = math.inf            # Available space set to infinite (float)
@@ -451,8 +451,13 @@ class StorageController:
         assert False, "QBox {} registered but no corresponding disk was found".format(qbox_name)
 
 
-    def onQBoxAskHardLink(self, storage_id, dataset_ids, job_ids):
+    def onQBoxAskHardLink(self, storage_id, dataset_id, qtask_id):
         '''
+        This function is called when a QBox requests a hardlink for an input dataset of a given qtask.
+        A hardlink should be created between this QTask and the dataset.
+        '''
+        '''
+        OLD DESCRIPTION
         This function is called from a QBox scheduler when new instances of a QTask starts running
         A hard link should be created for all the datasets that are inputs of the QTask
 
@@ -463,7 +468,7 @@ class StorageController:
         Returns true otherwise.
         '''
 
-        if(len(dataset_ids) != len(job_ids)):
+        '''if(len(dataset_ids) != len(job_ids)):
             self._logger.info("Length of jobs and datasets not equal")
             return False
 
@@ -472,14 +477,19 @@ class StorageController:
         for i in range(len):
             storage = self.get_storage(storage_id)
             dataset = storage.get_dataset(dataset_ids[i])
-            dataset.add_running_job(job_ids[i])
+            dataset.add_running_job(job_ids[i])'''
 
         return True
 
 
-    def onQBoxReleaseHardLinks(self, storage_id, dataset_ids, job_ids):
+    def onQBoxReleaseHardLinks(self, storage_id, qtask_id):
         '''
-        TODO
+        This function is called when all instances of a QTask have finished in a QBox.
+        The hardlinks of all datasets for this QTask should be released.
+        '''
+
+        '''
+        OLD DESCRIPTION
         This function is called from a QBox scheduler when there are no more
         instances of a QTask that uses their input datasets.
         Multiple hardlink are released.
@@ -491,7 +501,7 @@ class StorageController:
         Return True otherwise.
         '''
 
-        if(len(dataset_ids) != len(job_ids)):
+        '''if(len(dataset_ids) != len(job_ids)):
             self._logger.info("Length of jobs and datasets not equal")
             return False
 
@@ -500,7 +510,7 @@ class StorageController:
         for i in range(len):
             storage = self.get_storage(storage_id)
             dataset = storage.get_dataset(dataset_ids[i])
-            dataset.delete_running_job(job_ids[i])
+            dataset.delete_running_job(job_ids[i])'''
 
         return True
 
@@ -523,7 +533,15 @@ class StorageController:
         # Else add the dataset
         else:
             self.copy_from_CEPH_to_dest([dataset_id], storage_id)
+            self._logger.info("SC asked staging of {} onto {}".format(dataset_id, self._storages[storage_id]._name))
             return False
+
+    def onKillAllStagingJobs(self):
+        # This is called by the QNode scheduler upon receiving a 'stop_simulation' external event
+        # return the list of data staging jobs to be killed in order to finish the simulation
+        self._logger.info("[{}] StorageController killing {} data staging jobs".format(self._bs.time(), len(self.moveRequested.keys())))
+        return self.moveRequested.keys()
+        
 
 # Handlers of Batsim-related events
 

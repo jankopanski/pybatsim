@@ -365,17 +365,23 @@ class QarnotNodeSched(BatsimScheduler):
     def killOrRejectAllJobs(self):
       self.logger.info("Killing all running jobs and rejecting all waiting ones.")
       to_reject = []
+      to_kill = []
+      for qb in self.dict_qboxes.values():
+        (qb_reject,qb_kill) = qb.killOrRejectAllJobs()
+        to_reject.extend(qb_reject)
+        to_kill.extend(qb_kill)
+
       for qtask in self.qtasks_queue.values():
         qtask.print_infos(self.logger)
         if len(qtask.waiting_instances) > 0:
           to_reject.extend(qtask.waiting_instances)
+
+      to_kill.extend(self.storage_controller.onKillAllStagingJobs())
+
       if len(to_reject) > 0:
         self.logger.info("Rejecting jobs:{}".format(to_reject))
         self.bs.reject_jobs(to_reject)
 
-      to_kill = []
-      for job_id in self.jobs_mapping.keys():
-        to_kill.append(self.bs.jobs[job_id])
       if len(to_kill) > 0:
         self.logger.info("Killing jobs:{}".format(to_kill))
         self.bs.kill_jobs(to_kill)

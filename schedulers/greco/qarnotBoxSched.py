@@ -150,6 +150,20 @@ class QarnotBoxSched():
         pass
 
 
+    def killOrRejectAllJobs(self):
+        '''
+        'stop_simulation' event has been received. Returns the lists of jobs to reject and to kill.
+        '''
+        to_reject = []
+        to_kill = []
+
+        for sub_qtask in self.dict_subqtasks.values():
+            to_reject.extend(sub_qtask.waiting_instances)
+            to_kill.extend(sub_qtask.running_instances)
+
+        return (to_reject, to_kill)
+
+
     def updateAndReportState(self):
         '''
         The state of the QBox is updated every *qnode_sched.update_period* seconds, or before the QNode performs a dispatch.
@@ -243,11 +257,11 @@ class QarnotBoxSched():
             for dataset_id in sub_qtask.datasets:
                 if self.storage_controller.onQBoxAskDataset(self.disk_batid, dataset_id):
                     # The dataset is already on disk, ask for a hardlink
-                    self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id)
+                    self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id, sub_qtask.id)
                 else:
                     # The dataset is not on disk yet, put it in the lists of waiting datasets
                     sub_qtask.waiting_datasets.append(dataset_id)
-                    self.waiting_datasets.add(dataset_id)
+                    self.waiting_datasets.append(dataset_id)
 
             # If all required datasets are on disk, launch the instances
             if len(sub_qtask.waiting_datasets) == 0:
@@ -268,7 +282,7 @@ class QarnotBoxSched():
                 if dataset_id in sub_qtask.waiting_datasets:
                     sub_qtask.waiting_datasets.remove(dataset_id)
                     self.waiting_datasets.remove(dataset_id)
-                    self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id)
+                    self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id, sub_qtask.id)
                     if len(sub_qtask.waiting_datasets) == 0:
                         # The SubQTask has all the datasets, launch it
                         to_launch.append(sub_qtask)
@@ -409,7 +423,7 @@ class QarnotBoxSched():
         '''
         if len(sub_qtask.running_instances) == 0 and len(sub_qtask.waiting_instances) == 0:
             self.logger.debug("[{}]--- QBox {} executed all dispatched instances of {}, releasing the hardlinks.".format(self.bs.time(), self.name, sub_qtask.id))
-            self.storage_controller.onQBoxReleaseHardLinks(self.disk_batid, sub_qtask.datasets)
+            self.storage_controller.onQBoxReleaseHardLinks(self.disk_batid, sub_qtask.id)
             del self.dict_subqtasks[sub_qtask.id]
 
 
