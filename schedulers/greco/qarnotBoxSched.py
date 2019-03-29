@@ -152,7 +152,7 @@ class QarnotBoxSched():
 
     def updateAndReportState(self):
         '''
-        The state of the QBox is updated every 30 seconds.
+        The state of the QBox is updated every *qnode_sched.update_period* seconds, or before the QNode performs a dispatch.
         The temperature of the QRads is checked and decisions are taken to kill an instance if the rad is too hot
         Then, the list of mobos available for each priority group is updated
         and returned back to the QNode.
@@ -189,19 +189,17 @@ class QarnotBoxSched():
                         job = qm.pop_job()
                         jobs_to_kill.append(job)
 
-            # Update the list of available mobos
-            if qr.diffTemp >= 1:
-                self.availBkgd |= ProcSet(*qr.dict_mobos.keys())
-            elif qr.diffTemp >= -1:
-                for qmobo in qr.dict_mobos.values():
-                    if qmobo.state < QMoboState.RUNLOW: # This mobo is available for LOW instances
-                        self.availLow.insert(qmobo.batid)
-                #self.availLow |= ProcSet(*qr.dict_mobos.keys())
-            elif qr.diffTemp >= -4:
-                for qmobo in qr.dict_mobos.values():
-                    if qmobo.state < QMoboState.RUNHIGH: # This mobo is available for HIGH
-                        self.availHigh.insert(qmobo.batid)
-                #self.availHigh |= ProcSet(*qr.dict_mobos.keys())
+            for qmobo in qr.dict_mobos.values():
+                if (qr.diffTemp >= 1) and (qmobo.state < QMoboState.RUNBKGD):
+                    # This mobo is available for BKGD instances
+                    self.availBkgd.insert(qmobo.batid)
+                elif (qr.diffTemp >= -1) and (qmobo.state < QMoboState.RUNLOW):
+                    # This mobo is available for LOW instances
+                    self.availLow.insert(qmobo.batid)
+                elif (qr.diffTemp >= -4) and (qmobo.state < QMoboState.RUNHIGH):
+                    # This mobo is available for HIGH
+                    self.availHigh.insert(qmobo.batid)
+
 
         if len(jobs_to_kill) > 0:
             self.logger.info("[{}]--- {} asked to kill the following jobs during updateAndReportState: {}".format(self.bs.time(), self.name, jobs_to_kill))
