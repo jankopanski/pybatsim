@@ -62,8 +62,8 @@ class QarnotNodeSched(BatsimScheduler):
         #self.qboes_queued_upload_size = {} # Maps the QBox id to the queued upload size (in GB)
 
         #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
-        #self.update_period = 600 # TODO every 10 minutes for testing
-        self.update_period = 300 # TODO every 5 minutes for testing
+        self.update_period = 600 # TODO every 10 minutes for testing
+        #self.update_period = 300 # TODO every 5 minutes for testing
         self.time_next_update = 1.0 # The next time the scheduler should be woken up
         self.ask_next_update = False # Whether to ask for next update in onNoMoreEvents function
         self.next_update_asked = False   # Whether the 'call_me_later' has been sent or not
@@ -72,7 +72,7 @@ class QarnotNodeSched(BatsimScheduler):
         self.nb_rejected_jobs_by_qboxes = 0 # Just to keep track of the count
 
         #self.max_simulation_time = 87100 # 1 day
-        self.max_simulation_time = 1211000 # 1 week TODO remove this guard?
+        self.max_simulation_time = 1211000 # 2 weeks TODO remove this guard?
         self.end_of_simulation_asked = False
 
 
@@ -181,13 +181,7 @@ class QarnotNodeSched(BatsimScheduler):
         qb.onBeforeEvents()
 
       if self.bs.time() >= self.time_next_update:
-        self.logger.info("[{}]- QNode calling update on QBoxes".format(self.bs.time()))
-        # It's time to ask QBoxes to update and report their state
-        self.lists_available_mobos = []
-        for qb in self.dict_qboxes.values():
-          # This will update the list of availabilities of the QMobos (and other QBox-related stuff)
-          tup = qb.updateAndReportState()
-          self.lists_available_mobos.append(tup)
+        self.updateAllQBoxes()
 
         self.time_next_update = math.floor(self.bs.time()) + self.update_period
 
@@ -209,15 +203,25 @@ class QarnotNodeSched(BatsimScheduler):
         self.doDispatch()
 
       for qb in self.dict_qboxes.values():
+        # Will do the frequency regulation for each QBox
         qb.onNoMoreEvents()
 
       # If the simulation is not finished and we need to ask Batsim for the next waking up
-      self.checkNoMoreInstances()
-      self.checkSimulationFinished()
+      #self.checkNoMoreInstances()
+      #self.checkSimulationFinished()
       if not self.end_of_simulation_asked and self.ask_next_update:
         self.bs.wake_me_up_at(self.time_next_update)
         self.ask_next_update = False
 
+
+    def updateAllQBoxes(self):
+      self.logger.info("[{}]- QNode calling update on QBoxes".format(self.bs.time()))
+      # It's time to ask QBoxes to update and report their state
+      self.lists_available_mobos = []
+      for qb in self.dict_qboxes.values():
+        # This will update the list of availabilities of the QMobos (and other QBox-related stuff)
+        tup = qb.updateAndReportState()
+        self.lists_available_mobos.append(tup)
 
     def onNotifyEventTargetTemperatureChanged(self, qrad_name, new_temperature):
       self.dict_qrads[qrad_name].onTargetTemperatureChanged(qrad_name, new_temperature)
@@ -245,7 +249,7 @@ class QarnotNodeSched(BatsimScheduler):
         self.killOrRejectAllJobs()
         self.bs.notify_registration_finished()
         self.end_of_simulation_asked = True
-        self.logger.info("Now Batsim should stop the simulation")
+        #self.logger.info("Now Batsim should stop the simulation")
       else:
         pass # TODO need to handle jobs already running somewhere here (with dynamic jobs?)
 
@@ -317,8 +321,10 @@ class QarnotNodeSched(BatsimScheduler):
           else:
             qb.onJobCompletion(job)
             # A slot should be available, do a general dispatch
-            # TODO well actually that's not true since the slots are not updated...
-            #self.do_dispatch = True
+            # TODO actually no, because update of available slots is not done between now and the do_dispatch
+            # TODO If we run simulations with update_period of more than 30 seconds we need to update the slots here
+            #      when an instance completes
+            self.do_dispatch = True
 
             #Check if the QTask is complete
             if qtask.is_complete():
@@ -336,16 +342,15 @@ class QarnotNodeSched(BatsimScheduler):
       #TODO pass?
 
 
-    def checkNoMoreInstances(self):
+    '''def checkNoMoreInstances(self):
       if (len(self.qtasks_queue) == 0) and (len(self.jobs_mapping) == 0) and self.bs.no_more_static_jobs:
         self.logger.info("[{}] All static jobs seems to have finished. We could stop the simulation right now!".format(self.bs.time()))
         return True
       else:
-        return False
+        return False'''
 
 
-    def checkSimulationFinished(self):
-      # TODO This is a guard to avoid infinite loops.
+    '''def checkSimulationFinished(self):
       if self.bs.no_more_static_jobs and self.bs.no_more_external_events:
         self.logger.info("The simulation seems to be finished (no more static jobs or external events)."
           " Killing or rejecting all remaining jobs.")
@@ -354,7 +359,7 @@ class QarnotNodeSched(BatsimScheduler):
         self.bs.notify_registration_finished()
         return True
       else:
-        return False
+        return False'''
 
 
     def killOrRejectAllJobs(self):
