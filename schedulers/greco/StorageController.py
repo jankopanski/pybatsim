@@ -77,7 +77,7 @@ class Storage:
 
         self._datasets = dict()                         # Dict of dataset_id -> Dataset object
 
-    def read_dataset_json(self, filename):
+    def load_datasets_from_json(self, filename):
 
         # Open the dataset file
         with open(filename, 'r') as file:
@@ -158,7 +158,7 @@ class Storage:
         if(dataset == None):
             return False
         else:
-            return True;
+            return True
 
     def has_enough_space(self, size):
         """ Returns true if the Storage has enough space to store a dataset corresponding to the
@@ -207,7 +207,7 @@ class StorageController:
                 # Store the CEPH ID
                 self._ceph_id = res["id"]
                 # Parse the dataset file
-                new_storage.read_dataset_json(filename)
+                new_storage.load_datasets_from_json(filename)
 
             self.add_storage(new_storage)
 

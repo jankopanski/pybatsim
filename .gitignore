@@ -54,3 +54,7 @@ docs/_build/
 # emacs and vim tmp files
 *~
 *.swp
+
+.DS_Store
+venv
+.idea
