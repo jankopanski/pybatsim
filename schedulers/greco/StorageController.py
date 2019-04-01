@@ -187,7 +187,7 @@ class Storage:
         :return: True
         '''
 
-        for dataset_id, dataset in self.get_datasets():
+        for dataset in self.get_datasets().values():
             dataset.delete_running_job(qtask_id)
 
         return True
@@ -318,8 +318,11 @@ class StorageController:
         See the documentation of the copy_dataset function
         """
         status = True
+        
         for dataset_id in dataset_ids:
-            status = status or self.copy_dataset(dataset_id, self._ceph_id, dest_id)
+            temp = self.copy_dataset(dataset_id, self._ceph_id, dest_id)
+            status = (status & temp)
+
         return status
 
 
@@ -544,14 +547,14 @@ class StorageController:
 
         # Create a hard copy
         dataset_new = Dataset(dataset.get_id(), dataset.get_size())
-        dataset_new.get_running_jobs(job.id)
+        dataset_new.add_running_job(job.id)
 
         self.get_storage(dest_id).add_dataset(dataset_new, job.finish_time)
 
         # Remove from the staging knowledge
         self.staging_map.remove((dest_id, dataset_id))
 
-        self.mappingQBoxes[dest_id].onDatasetArrived(dataset_id)
+        # self.mappingQBoxes[dest_id].onDatasetArrived(dataset_id)
 
 
     def onSimulationBegins(self):
