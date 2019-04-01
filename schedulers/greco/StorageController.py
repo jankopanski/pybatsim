@@ -179,6 +179,19 @@ class Storage:
 
         self.add_dataset(dataset, timestamp)
 
+    def releaseHardLinks(self, qtask_id):
+        '''
+        Releases hardlinks to a given qtask_id
+
+        :param qtask_id: The qtask id of the task
+        :return: True
+        '''
+
+        for dataset_id, dataset in self.get_datasets():
+            dataset.delete_running_job(qtask_id)
+
+        return True
+
 
 class StorageController:
 
@@ -430,14 +443,17 @@ class StorageController:
 
 
     def clear_storage(self, storage, dataset):
-        """ Clear the storage until it has enough space to store the given dataset """
+        """ Clear the storage until it has enough space to store the given dataset
+        Breaks if not possible to remove dataset
+        """
 
         while not storage.has_enough_space(dataset.get_size()):
             # Caching strategy call
             dataset_to_delete = self.clear_strategy(storage)
             if dataset_to_delete != -1:
                 storage.delete_dataset(dataset_to_delete)
-
+            else:
+                break
 
     ''' This function should be called during init of the QBox Scheduler '''
     def onQBoxRegistration(self, qbox_name, qbox):
@@ -455,64 +471,36 @@ class StorageController:
         '''
         This function is called when a QBox requests a hardlink for an input dataset of a given qtask.
         A hardlink should be created between this QTask and the dataset.
-        '''
-        '''
-        OLD DESCRIPTION
-        This function is called from a QBox scheduler when new instances of a QTask starts running
-        A hard link should be created for all the datasets that are inputs of the QTask
 
-        Takes two lists dataset_ids and job_ids that have to be same size.
-        dataset_ids[i] is being used by job_ids[i] in storage_id
-
-        Returns false if the lengths of the arrys are different.
-        Returns true otherwise.
+        Returns False if storage_id or dataset_id not present
+        Returns True if qtask_id not present or is present and removed
         '''
-
-        '''if(len(dataset_ids) != len(job_ids)):
-            self._logger.info("Length of jobs and datasets not equal")
+        storage = self.get_storage(storage_id)
+        if storage is None :
             return False
 
-        len = len(dataset_ids)
+        dataset = storage.get_dataset(dataset_id)
+        if dataset is None:
+            return False
 
-        for i in range(len):
-            storage = self.get_storage(storage_id)
-            dataset = storage.get_dataset(dataset_ids[i])
-            dataset.add_running_job(job_ids[i])'''
+        dataset.add_running_job(qtask_id)
 
         return True
-
 
     def onQBoxReleaseHardLinks(self, storage_id, qtask_id):
         '''
         This function is called when all instances of a QTask have finished in a QBox.
         The hardlinks of all datasets for this QTask should be released.
+
+        Return False if storage with storage id not present
+        Return True else
         '''
 
-        '''
-        OLD DESCRIPTION
-        This function is called from a QBox scheduler when there are no more
-        instances of a QTask that uses their input datasets.
-        Multiple hardlink are released.
-
-        Takes two lists dataset_ids and job_ids that have to be same size.
-        dataset_ids[i] is released by job_ids[i] in storage_id
-
-        Returns false if the lengths of the arrays are different.
-        Return True otherwise.
-        '''
-
-        '''if(len(dataset_ids) != len(job_ids)):
-            self._logger.info("Length of jobs and datasets not equal")
+        storage = self.get_storage(storage_id)
+        if storage is None :
             return False
 
-        len = len(dataset_ids)
-
-        for i in range(len):
-            storage = self.get_storage(storage_id)
-            dataset = storage.get_dataset(dataset_ids[i])
-            dataset.delete_running_job(job_ids[i])'''
-
-        return True
+        storage.releaseHardLinks(qtask_id)
 
     def onQBoxAskDataset(self, storage_id, dataset_id):
         '''
