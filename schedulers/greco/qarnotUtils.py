@@ -122,7 +122,7 @@ class QMobo:
         self.batid = batid           # The Batsim id of the mobo
         self.pstate = 0              # The power state of the mobo
         self.max_pstate = max_pstate # The last power state (corresponds to the state OFF)
-        self.state = QMoboState.IDLE  # The state of the mobo
+        self.state = QMoboState.OFF  # The state of the mobo
         self.running_job = -1        # The Job running on this mobo
 
 

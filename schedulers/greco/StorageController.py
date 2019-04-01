@@ -10,24 +10,52 @@ class Dataset:
         self._id = id                       # UID of the dataset
         self._size = size                   # Size in bytes of the dataset (float)
         self._timestamp = 0                 # When the dataset has been added to a Storage
+        self._running_job = set()           # The id of the running jobs that are using this Dataset
 
     def get_id(self):
         return self._id
 
     def get_size(self):
         """ Returns the size of the Dataset """
-
         return self._size
     
     def get_timestamp(self):
         """ Returns the timestamp of the Dataset """
-
         return self._timestamp
     
     def set_timestamp(self, timestamp):
         """ Update the timestamp of the Dataset """
-        
         self._timestamp = timestamp
+
+    def add_running_job(self, job_id):
+        """ Append the id of the job that is using this dataset """
+        self._running_job.add(job_id)
+
+    def delete_running_job(self, job_id):
+        """ Deletes the job_id from the list
+        Returns True if the job id was present in the set
+        Else returns false """
+        if job_id in self._running_job:
+            self._running_job.remove(job_id)
+            return True
+        else:
+            return False
+
+    def get_running_jobs(self):
+        """ Gets the list of running job ids """
+        ret = []
+
+        for val in self._running_job:
+            ret.append(val)
+
+        return ret
+
+    def is_job_running(self):
+        """ See if there is any running job present """
+        if(len(self._running_job) != 0):
+            return True
+        else:
+            return False
 
 
 class Storage:
@@ -55,40 +83,55 @@ class Storage:
         return self._datasets
 
     def get_dataset(self, dataset_id):
-        """ Returns a Dataset corresponding to the dataset_id if it exists"""
+        """ Returns a Dataset corresponding to the dataset_id if it exists """
 
         return self._datasets[dataset_id] if dataset_id in self._datasets else None
+
 
     def add_dataset(self, dataset, timestamp):
         """ Add Dataset to the Storage
         
         When adding a dataset, its timestamp is set to current time.
-        Then, we subtract the available space on storage with the size of the Dataset.
+        Then, we subtract the available space on storage with the size of the Dataset only if the data was not present.
         """
 
+        # Check if the storage already has the dataset with this id. if yes, do not subtract available space
+        if(self.get_dataset(dataset.get_id()) == None):
+            self._available_space = self._available_space - dataset.get_size()
+
+        # Then update the timestamp of last use
         dataset.set_timestamp(timestamp)
         self._datasets[dataset._id] = dataset
-        self._available_space = self._available_space - dataset.get_size()
 
-    def delete_dataset(self, dataset_key):
+
+    def delete_dataset(self, dataset_id):
         """ Delete the Dataset on Storage corresponding to the dataset_key 
         
-        When deleting a Dataset, its size is added to remaining storage space on Storage
+        When deleting a Dataset, its size is added to remaining storage space on Storage.
+        Returns False if the Dataset was not present in this Storage.
+        Returns True if the Dataset was correctly removed.
         """
+        dataset = self.get_dataset(dataset_id)
 
-        self._available_space = self._available_space + self._datasets[dataset_key].get_size()
-        self._datasets.pop(dataset_key)
+        # Check if dataset is not present
+        if dataset == None:
+            return False
+
+        self._available_space = self._available_space + dataset.get_size()
+        self._datasets.pop(dataset_id)
+
+        return True
+
 
     def has_enough_space(self, size):
         """ Returns true if the Storage has enough space to store a dataset corresponding to the
         provided size.
         """
-
-        return self._available_space - size >= 0
+        return (self._available_space - size) >= 0
 
 class StorageController:
 
-    def __init__(self, storage_resources, bs, qn):
+    def __init__(self, storage_resources, bs, qn, filename):
         self._storages = dict()  # Maps the storage batsim id to the Storage object
         self._ceph_id = -1       # The batsim id of the storage_server
         self._idSub = 0
@@ -120,60 +163,97 @@ class StorageController:
 
 
     def get_storage(self, storage_id):
-        """ Returns the Storage corresponding to given storage_id """
+        """ Returns the Storage corresponding to given storage_id if it exists or returns None. """
+        return self._storages[storage_id] if storage_id in self._storages else None
 
+    def get_storages(self):
+        """ Returns the Storages in the Storage Controller """
         return self._storages[storage_id]
+
 
     def get_storages_by_dataset(self, required_dataset):
         """ Returns the list of storages that already has the required dataset """
 
-        qboxes_list = [] # The dict of all qboxes with the required dataset
-        # To check the storages
-        for storage in self.get_storages():
-            # At this point, storage is an ID. Let's take the storage (Class) with this ID.
-            storage = self.get_storage(storage)
+        # The dict of all qboxes with the required dataset
+        qboxes_list = []
+
+        # Iterate over all the storages
+        for storage_id, storage in self.get_storages():
             self._logger.info("{} storages: {} " .format(storage._name, storage._datasets))
+
             hasDataset = True
+
             # To check if this storage has all the datasets required.
             for dataset in required_dataset:
                 if (storage.get_dataset(dataset) == None):
                     hasDataset = False
                     break
-            # If true, the storage has all required datasets. So, candidate_qb = {storages}
+            # If true, the storage has all required datasets.
             if(hasDataset):
-                self._logger.info("     This QBOX has the required dataset. QBOX: ", self.mappingQBoxes[storage._id])
+                self._logger.debug("[{}]     QBOX {} has the required datasets.".format(self._bs.time(), self.mappingQBoxes[storage._id]))
                 qboxes_list.append(self.mappingQBoxes[storage._id])
         
         return qboxes_list
 
+
     def add_storage(self, storage):
         """ Add storage to storages list """
-
         self._storages[storage._id] = storage
 
-    def add_dataset(self, storage_id, dataset):
-        """ Add to the given storage the dataset """
 
+    def add_dataset(self, storage_id, dataset):
+        """ Add to the given storage the dataset
+
+        Returns False if the storage does not exist
+        Else return True
+        Asserts if the capacity is greater than required
+        """
         storage = self.get_storage(storage_id)
 
+        if(storage == None):
+            return False
+
+        # Check if the storage already has the dataset
+        if(storage.get_dataset(dataset.get_id()) != None):
+            self._logger.debug("[{}] Dataset {} already present in storage with id {}".format(self._bs.time(), dataset.get_id(), storage_id))
+            #TODO need to ypdate the timestamp of the Dataset in this storage
+            return True
+
+        # Now check if the dataset fits in the storage
+        # TODO: If possible change this to a return value rather than an assert statement.
         assert storage.get_storage_capacity() >= dataset.get_size(), "The dataset %r is larger than the storage capacity, aborting." % dataset._id
 
         if not storage.has_enough_space(dataset.get_size()):
             self.clear_storage(storage, dataset)
 
         storage.add_dataset(dataset, self._bs.time())
+        return True
 
 
-    def move_to_dest(self, dataset_ids, dest_id):
-        """ Method used to move datasets from the CEPH to the disk of a QBox """
+    def copy_from_CEPH_to_dest(self, dataset_ids, dest_id):
+        """ Method used to move datasets from the CEPH to the disk of a QBox
+
+        A false return indicates that one of the inserts had an issue.
+        See the documentation of the copy_dataset function
+        """
+        status = True
         for dataset_id in dataset_ids:
-            self.move_dataset(dataset_id, self._ceph_id, dest_id)
+            status = status or self.copy_dataset(dataset_id, self._ceph_id, dest_id)
+        return status
 
 
+    def copy_dataset(self, dataset_id, source_id, dest_id):
+        """
+        COPY a Dataset from a source to a destination given source_id and dest_id respectively
 
-    def move_dataset(self, dataset_id, source_id, dest_id):
-        """ Copy a Dataset from a source to a destination given source_id and dest_id respectively 
-        
+        Returns true iff:
+        1. The dataset is already present in the destination.
+        2. If not present in destination, but, source exists, destination exists, dataset exists in source and move is possible.
+
+        Returns false iff:
+        1. Dataset not present in source and destination, also destination is different than source.
+        2. Source or destination id do not exist
+
         If we can't move the Dataset, then no job for it is scheduled
         """
 
@@ -182,21 +262,45 @@ class StorageController:
 
         source = self.get_storage(source_id)
         dest = self.get_storage(dest_id)
+
+        # First check if destination exists
+        if(dest == None):
+            self._logger.info("Destination storage with id {} not found".format(dest_id))
+            return False
+
+        # Now check if destination has dataset
+        if(dest.get_dataset(dataset_id) != None):
+            self._logger.info("Dataset with id {} already present in destination with id {}.".format(dataset_id, dest_id))
+            return True
+
+        # Now we know that destination is present and does not have the dataset
+
+        # We check if the source exists
+        if(source == None):
+            self._logger.info("Source storage with id {} not found".format(dest_id))
+            return False
+
+        # Now check if it is same as destination
+        if(source_id == dest_id):
+            self._logger.info("Source id and detination id are same = {} where Data with id {} not present".format(source_id, dataset_id))
+            return False
+
+        # Now check if the source has the dataset required
+        if(source.get_dataset(dataset_id) == None):
+            self._logger.info("Source with id {} does not have dataset with id {}.".format(source_id, dest_id))
+            return False
+
+        # Now we check if the destination has enough storage
         dataset = source.get_dataset(dataset_id)
-
-        storage = self.get_storage(source_id)
-
-        assert dataset is not None, "Error: Dataset %r not found in source %r" % (dataset_id, source_id)
 
         assert dest.get_storage_capacity() >= dataset.get_size(), "The dataset %r is larger than the storage capacity, aborting." % dataset._id
         
-        if dest.get_dataset(dataset_id) is not None:
-            self._logger.info("Dataset already in dest")
-            return
-
         # Clear storage to enable data transfer
         if not dest.has_enough_space(dataset.get_size()):
             self.clear_storage(dest, dataset)
+
+        # Now we are clear to do the transfer
+        self.add_dataset(dest_id, dataset)
 
         # Profile Submit
         profile_name = "staging" + str(self._idSub + 1)
@@ -227,26 +331,45 @@ class StorageController:
 
         self._logger.info("[", self._bs.time(), "] StorageController starting move dataset", dataset_id, "to qbox disk", dest_id)
 
+        return True
+
+
     def clear_strategy(self, storage):
-        """ LRU implementation to clean Storage of the oldest Dataset 
-        
+        """ LRU implementation to clean Storage of the oldest Dataset
         This method can be changed to implement other caching strategy if needed.
+
+        Returns the id of the dataset which is not used by any job and has the minimum value of timestamp (LRU)
+        Returns -1 if it is not possible to remove any dataset.
         """
-        
-        return min(storage.get_datasets(), key=(lambda key: storage.get_datasets()[key].get_timestamp()))
+        # This is used so that we can initialize the fields the first time a valid one is encountered.
+        dataset_final = -1
+        min_valid_timestamp = None
+
+        for dataset_id, dataset in storage.get_datasets():
+
+            # This is to find the first valid dataset
+            if dataset_final == -1:
+                if not (dataset.is_job_running()):
+                    dataset_final = dataset_id
+                    min_valid_timestamp = dataset.get_timestamp()
+            # If the first one is found, then check the parameters
+            elif dataset.is_job_running():
+                continue
+            elif min_valid_timestamp > dataset.get_timestamp():
+                dataset_final = dataset_id
+                min_valid_timestamp = dataset.get_timestamp()
+
+        return dataset_final
+
 
     def clear_storage(self, storage, dataset):
         """ Clear the storage until it has enough space to store the given dataset """
 
-        ## ATTENTION !!!!!!!
-        # TODO
-        # Ajouter des infos sur les datasets qui sont utilisés par des running jobs.
-        # Pour ne pas les enlever du disque pendant que le job tourne encore ...
-
         while not storage.has_enough_space(dataset.get_size()):
             # Caching strategy call
-            dataset_to_delete = self.clear_strategy(storage) 
-            storage.delete_dataset(dataset_to_delete)
+            dataset_to_delete = self.clear_strategy(storage)
+            if dataset_to_delete != -1:
+                storage.delete_dataset(dataset_to_delete)
 
 
     ''' This function should be called during init of the QBox Scheduler '''
@@ -261,7 +384,7 @@ class StorageController:
         assert False, "QBox {} registered but no corresponding disk was found".format(qbox_name)
 
 
-    def onQBoxAskHardLink(self, qb_disk_id, dataset_id):
+    def onQBoxAskHardLink(self, storage_id, dataset_ids):
         '''
         TODO
         This function is called from a QBox scheduler when new instances of a QTask starts running
@@ -269,7 +392,7 @@ class StorageController:
         '''
         pass
 
-    def onQBoxReleaseHardLinks(self, qb_disk_id, dataset_ids):
+    def onQBoxReleaseHardLinks(self, storage_id, dataset_ids):
         '''
         TODO
         This function is called from a QBox scheduler when there are no more
@@ -278,7 +401,7 @@ class StorageController:
         '''
         pass
 
-    def onQBoxAskDataset(self, qb_disk_id, dataset_id):
+    def onQBoxAskDataset(self, storage_id, dataset_id):
         '''
         TODO
         This function is called from a QBox scheduler and asks for a dataset to be on disk.
