@@ -410,7 +410,7 @@ class StorageController:
         self._bs.execute_jobs([job1])
         self.moveRequested[jid1] = dataset.get_id()
 
-        self._logger.info("[", self._bs.time(), "] StorageController starting move dataset", dataset_id, "to qbox disk", dest_id)
+        self._logger.info("[ {} ] StorageController starting move dataset {} to qbox disk {}".format(self._bs.time(), dataset_id, dest_id))
 
         self.staging_map.add((dest_id, dataset_id))
 
@@ -554,7 +554,7 @@ class StorageController:
         # Remove from the staging knowledge
         self.staging_map.remove((dest_id, dataset_id))
 
-        # self.mappingQBoxes[dest_id].onDatasetArrived(dataset_id)
+        self.mappingQBoxes[dest_id].onDatasetArrivedOnDisk(dataset_id)
 
 
     def onSimulationBegins(self):

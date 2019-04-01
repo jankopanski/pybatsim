@@ -275,7 +275,7 @@ class QarnotBoxSched():
         Then check if we can launch instances.
         '''
         to_launch = []
-        if dataset_id in self.waiting.datasets:
+        if dataset_id in self.waiting_datasets:
             n = self.waiting_datasets.count(dataset_id)
             self.logger.info("[{}]--- Dataset {} arrived on QBox {} and was waited by {} SubQTasks".format(self.bs.time(), dataset_id, self.name, n))
             for sub_qtask in self.dict_subqtasks.values():
