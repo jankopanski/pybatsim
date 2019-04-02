@@ -547,7 +547,6 @@ class StorageController:
 
         # Create a hard copy
         dataset_new = Dataset(dataset.get_id(), dataset.get_size())
-        dataset_new.add_running_job(job.id)
 
         self.get_storage(dest_id).add_dataset(dataset_new, job.finish_time)
 

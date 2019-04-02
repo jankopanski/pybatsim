@@ -9,6 +9,7 @@ from collections import defaultdict
 import math
 import logging
 import sys
+import os
 '''
 This is the scheduler instanciated by Pybatsim for a simulation of the Qarnot platform and has two roles:
 - It does the interface between Batsim/Pybatsim API and the QNode/QBox schedulers (manager)
@@ -42,6 +43,8 @@ class QarnotNodeSched(BatsimScheduler):
 
         # Make sure the path to the datasets is passed
         assert "dataset_filename" in options, "The path to the list of datasets should be given as a CLI option as follows: [pybatsim command] -o \'{\"dataset_filename\":\"path/to/datasests.json\"}\'"
+        if not os.path.exists(options["dataset_filename"]):
+            assert False, "Could not find dataset file {}".format(options["dataset_filename"])
 
         # For the manager
         self.dict_qboxes = {}    # Maps the QBox id to the QarnotBoxSched object
