@@ -250,11 +250,15 @@ class QarnotBoxSched():
         else:
             # This is a QTask "unknown" to the QBox.
             # Create and add the SubQTask to the dict
-            sub_qtask = SubQTask(qtask_id, priority_group, instances.copy())
+            list_datasets = self.bs.profiles[instances[0].workload][instances[0].profile]["datasets"]
+            if list_datasets is None:
+                list_datasets = []
+
+            sub_qtask = SubQTask(qtask_id, priority_group, instances.copy(), list_datasets)
             self.dict_subqtasks[qtask_id] = sub_qtask
 
             # Then ask for the data staging of the required datasets
-            for dataset_id in sub_qtask.datasets:
+            for dataset_id in list_datasets:
                 if self.storage_controller.onQBoxAskDataset(self.disk_batid, dataset_id):
                     # The dataset is already on disk, ask for a hardlink
                     self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id, sub_qtask.id)
