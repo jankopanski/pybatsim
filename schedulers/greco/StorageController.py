@@ -78,7 +78,6 @@ class Storage:
         self._datasets = dict()                         # Dict of dataset_id -> Dataset object
 
     def load_datasets_from_json(self, filename):
-
         # Open the dataset file
         with open(filename, 'r') as file:
 
@@ -475,35 +474,36 @@ class StorageController:
         This function is called when a QBox requests a hardlink for an input dataset of a given qtask.
         A hardlink should be created between this QTask and the dataset.
 
-        Returns False if storage_id or dataset_id not present
-        Returns True if qtask_id not present or is present and removed
+        Returns True if the hard link was added.
         '''
         storage = self.get_storage(storage_id)
         if storage is None :
-            return False
+            assert False, "Requesting a hard link on a non-existent storage {}".format(storage_id)
 
         dataset = storage.get_dataset(dataset_id)
         if dataset is None:
-            return False
+            assert False, "Requestion a hard link on dataset {} that is not in the disk {}".format(dataset_id, storage_id)
 
         dataset.add_running_job(qtask_id)
+        self._logger.debug("[{}] StorageController added a hard link to {} for {} on disk {}.".format(self._bs.time(), dataset_id, qtask_id, storage_id))
 
         return True
+
 
     def onQBoxReleaseHardLinks(self, storage_id, qtask_id):
         '''
         This function is called when all instances of a QTask have finished in a QBox.
         The hardlinks of all datasets for this QTask should be released.
 
-        Return False if storage with storage id not present
-        Return True else
+        Return True if the hard link was released.
         '''
 
         storage = self.get_storage(storage_id)
         if storage is None :
-            return False
+            assert False, "Releasing a hard link on a non-existent storage {}".format(storage_id)
 
         storage.releaseHardLinks(qtask_id)
+
 
     def onQBoxAskDataset(self, storage_id, dataset_id):
         '''
@@ -524,13 +524,13 @@ class StorageController:
         # Else add the dataset
         else:
             self.copy_from_CEPH_to_dest([dataset_id], storage_id)
-            self._logger.info("SC asked staging of {} onto {}".format(dataset_id, self._storages[storage_id]._name))
             return False
+
 
     def onKillAllStagingJobs(self):
         # This is called by the QNode scheduler upon receiving a 'stop_simulation' external event
         # return the list of data staging jobs to be killed in order to finish the simulation
-        self._logger.info("[{}] StorageController killing {} data staging jobs".format(self._bs.time(), len(self.moveRequested.keys())))
+        self._logger.info("[{}] StorageController returns {} data staging jobs to be killed".format(self._bs.time(), len(self.moveRequested.keys())))
         return self.moveRequested.keys()
         
 
