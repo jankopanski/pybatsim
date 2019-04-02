@@ -70,19 +70,15 @@ class QTask:
 
 class SubQTask:
     # Used by the QBox scheduler
-    def __init__(self, id, priority_group, instances):
+    def __init__(self, id, priority_group, instances, list_datasets):
+        print("             ### QUtil: SubQtask: intances", instances)
+        print("             ### QUtil: SubQtask: intances.profile_dict", instances[0].profile_dict)
         self.id = id
         self.priority_group = priority_group
-        self.waiting_instances = instances      # List of batsim jobs that are waiting to be started
-        self.running_instances = []             # List of batsim jobs that are currently running
-        self.waiting_datasets = []   # Datasets that are waiting to be on disk
-
-        d = instances[0].profile_dict["datasets"] # List of input datasets
-        self.datasets = d if d is not None else []
-        '''if d is not None:
-            self.datasets = d
-        else:
-            self.datasets = []'''
+        self.waiting_instances = instances     # List of batsim jobs that are waiting to be started
+        self.running_instances = []            # List of batsim jobs that are currently running
+        self.waiting_datasets = []             # Datasets that are waiting to be on disk       
+        self.datasets = list_datasets          # List of input datasets
 
     def pop_waiting_instance(self):
         return self.waiting_instances.pop()

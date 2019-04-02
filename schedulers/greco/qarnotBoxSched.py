@@ -227,20 +227,30 @@ class QarnotBoxSched():
         Datasets are shared between the instances of the same QTask. So we only need to retrive the datasets once for all instances
         '''
         self.logger.info("[{}]--- {} received {} instances of {} for the priority group {}".format(self.bs.time(), self.name, len(instances), qtask_id, priority_group))
+        print(" ###### BOXSched - onDispatchedInstance, instances ", instances)
+        print(" ###### BOXSched - onDispatchedInstance, qtask_id ", qtask_id)
         if qtask_id in self.dict_subqtasks:
+            print("     ###### BOXSched - onDispatchedInstance, qtask_id in dict_subqtasks")
             # Some instances of this QTask have already been received by this QBox
             sub_qtask = self.dict_subqtasks[qtask_id]
             sub_qtask.waiting_instances.extend(instances.copy()) #TODO maybe don't need this copy since we do extend
             if len(sub_qtask.waiting_datasets) == 0:
                 self.scheduleInstances(sub_qtask)
         else:
+            print("     ###### BOXSched - onDispatchedInstance, qtask_id NOT in dict_subqtasks")
             # This is a QTask "unknown" to the QBox.
             # Create and add the SubQTask to the dict
-            sub_qtask = SubQTask(qtask_id, priority_group, instances.copy())
+            list_datasets = self.bs.profiles[instances[0].workload][instances[0].profile]["datasets"]
+            if list_datasets is None:
+                list_datasets = []
+
+            sub_qtask = SubQTask(qtask_id, priority_group, instances.copy(), list_datasets)
             self.dict_subqtasks[qtask_id] = sub_qtask
 
+            print("     ###### BOXSched - onDispatchedInstance, subqtask created")
+
             # Then ask for the data staging of the required datasets
-            for dataset_id in sub_qtask.datasets:
+            for dataset_id in list_datasets:
                 if self.storage_controller.onQBoxAskDataset(self.disk_batid, dataset_id):
                     # The dataset is already on disk, ask for a hardlink
                     self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id)
