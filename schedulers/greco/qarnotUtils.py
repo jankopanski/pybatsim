@@ -71,8 +71,6 @@ class QTask:
 class SubQTask:
     # Used by the QBox scheduler
     def __init__(self, id, priority_group, instances, list_datasets):
-        print("             ### QUtil: SubQtask: intances", instances)
-        print("             ### QUtil: SubQtask: intances.profile_dict", instances[0].profile_dict)
         self.id = id
         self.priority_group = priority_group
         self.waiting_instances = instances     # List of batsim jobs that are waiting to be started

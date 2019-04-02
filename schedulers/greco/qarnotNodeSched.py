@@ -257,26 +257,14 @@ class QarnotNodeSched(BatsimScheduler):
 
     def onJobSubmission(self, job):
       
-      print(" ### OnJobSubmission, job ", job)
-      print(" ### OnJobSubmission, job.id ", job.id)
-
       qtask_id = job.id.split('_')[0]
       job.qtask_id = qtask_id
-
-      # Resubmission
-      #if(job.metadata != None):
-        #qtask = QTask(qtask_id, job.profile_dict["priority"])
-        #self.qtasks_queue[qtask_id] = qtask
-
       # Retrieve or create the corresponding QTask
       if not qtask_id in self.qtasks_queue:
-        print(" ### OnJobSubmission, qtask_id NOT in queue ")
         qtask = QTask(qtask_id, job.profile_dict["priority"])
         self.qtasks_queue[qtask_id] = qtask
       else:
-        print(" ### OnJobSubmission, qtask_id in queue ")
         qtask = self.qtasks_queue[qtask_id]
-      print(" ### OnJobSubmission, before instance submitted ", job.qtask_id)
       qtask.instance_submitted(job)
       self.do_dispatch = True
       #TODO maybe we'll need to disable this dispatch, same reason as when a job completes
@@ -286,7 +274,7 @@ class QarnotNodeSched(BatsimScheduler):
       if job.metadata is None:
         metadata = {"parent_job": job.id, "nb_resubmit": 1}
       else:
-        metadata = self.bs.deepcopy(job.metadata)
+        metadata = deepcopy(job.metadata)
         if "nb_resubmit" not in metadata:
           metadata["nb_resubmit"] = 1
         else:
@@ -306,17 +294,9 @@ class QarnotNodeSched(BatsimScheduler):
         assert splitted_id[1] == str(metadata["nb_resubmit"] - 1)
 
       new_job = new_job + Batsim.ATTEMPT_JOB_SEPARATOR + str(metadata["nb_resubmit"])
-      #new_job = Job(new_job_name, self.bs.time(), job.requested_time, job.requested_resources, job.profile, job.json_dict)
-      #self.bs.register_job(new_job.id, new_job.requested_resources, new_job.requested_time, new_job.profile)
-      print(" ### New_Job before registered ", new_job)
       new_job = self.bs.register_resubmitted_job(new_job, job)
-      #self.bs.set_job_metadata(new_job, metadata)
       new_job.metadata = metadata
 
-      #new_job.job_state =  Job.State.SUBMITTED
-      #new_job.profile_dict = job.profile_dict
-      print(" ### New_Job after registered ", new_job)
-      print(" ### New_Job after registered, id ", new_job.id)
       self.onJobSubmission(new_job)
 
     def onQBoxRejectedInstances(self, instances, qb_name):
@@ -330,7 +310,6 @@ class QarnotNodeSched(BatsimScheduler):
       #RESUBMIT THE JOB  
 
     def onJobCompletion(self, job):
-      print("######## Job", job)
       if job.workload == "dyn-burn":
         assert job.job_state != Job.State.COMPLETED_SUCCESSFULLY, "CPU burn job on machine {} finished, this should never happen".format(str(job.allocation))
         # If the job was killed, don't do anything
@@ -353,8 +332,6 @@ class QarnotNodeSched(BatsimScheduler):
           # This should be an instance preempted by an instance of higher priority
           resub_job = job
           qtask.instance_killed()
-          #TODO need to re-submit to Batsim a new instance and add it to the QTask.
-
           qb = self.jobs_mapping.pop(job.id)
           qb.onJobKilled(job)
           if (self.end_of_simulation_asked == False):
