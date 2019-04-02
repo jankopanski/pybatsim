@@ -448,7 +448,6 @@ class StorageController:
         """ Clear the storage until it has enough space to store the given dataset
         Breaks if not possible to remove dataset
         """
-
         while not storage.has_enough_space(dataset.get_size()):
             # Caching strategy call
             dataset_to_delete = self.clear_strategy(storage)
@@ -562,7 +561,8 @@ class StorageController:
     def onSimulationEnds(self):
         self._logger.info("End of simulation")
         for storage in self._storages.values():
-            self._logger.info("{} contains the following Datasets:{}".format(storage._name,", ".join(storage._datasets.keys())))
+            #self._logger.info("{} contains the following Datasets:{}".format(storage._name,", ".join(storage._datasets.keys())))
+            self._logger.info("{} is filled at {} / {}.".format(storage._name, (storage._storage_capacity-storage._available_space), storage._storage_capacity))
 
     def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
         for machine_id in machines:
