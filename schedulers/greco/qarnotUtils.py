@@ -115,7 +115,7 @@ class QMobo:
     def __init__(self, name, batid, max_pstate):
         self.name = name             # The name of the mobo
         self.batid = batid           # The Batsim id of the mobo
-        self.pstate = 0              # The power state of the mobo
+        self.pstate = 0              # The current power state of the mobo
         self.max_pstate = max_pstate # The last power state (corresponds to the state OFF)
         self.state = QMoboState.OFF  # The state of the mobo
         self.running_job = -1        # The Job running on this mobo
@@ -138,4 +138,14 @@ class QMobo:
         assert self.running_job.qtask_id == job.qtask_id, "Direct restart of instance {} on mobo {} but previous instance is of different QTask ({})".format(job.id, self.name, self.running_job.id)
         self.running_job = job
 
+    def turn_off(self):
+        assert self.running_job == -1, "Turning OFF mobo {} that is running {}".format(self.name, self.running_job.id)
+        self.pstate = self.max_pstate
+        self.state = QMoboState.OFF
 
+    def push_burn_job(self, job):
+        assert self.running_job == -1, "Starting burn_job on mobo {} that is running {}".format(self.name, self.running_job.id)
+        job.priority_group = PriorityGroup.BKGD
+        self.running_job = job
+        self.state = QMoboState.RUNBKGD
+        self.pstate = 0

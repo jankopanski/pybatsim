@@ -65,14 +65,16 @@ class QarnotNodeSched(BatsimScheduler):
         #self.qboes_queued_upload_size = {} # Maps the QBox id to the queued upload size (in GB)
 
         #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
-        self.update_period = 600 # TODO every 10 minutes for testing
-        #self.update_period = 300 # TODO every 5 minutes for testing
+        #self.update_period = 600 # TODO every 10 minutes for testing
+        self.update_period = 150 # TODO every 2.5 minutes for testing
         self.time_next_update = 1.0 # The next time the scheduler should be woken up
         self.ask_next_update = False # Whether to ask for next update in onNoMoreEvents function
         self.next_update_asked = False   # Whether the 'call_me_later' has been sent or not
         self.very_first_update = True
 
+        self.next_burn_job_id = 0
         self.nb_rejected_jobs_by_qboxes = 0 # Just to keep track of the count
+        self.nb_preempted_jobs = 0
 
         #self.max_simulation_time = 87100 # 1 day
         self.max_simulation_time = 1211000 # 2 weeks TODO remove this guard?
@@ -107,7 +109,10 @@ class QarnotNodeSched(BatsimScheduler):
 
       self.storage_controller.onSimulationEnds()
 
-      self.logger.info("Number of rejected instances by QBoxes during dispatch: %s", self.nb_rejected_jobs_by_qboxes)
+      print("Number of rejected instances by QBoxes during dispatch:", self.nb_rejected_jobs_by_qboxes)
+      print("Number of burn jobs created:", self.next_burn_job_id)
+      print("Number of staging jobs created:", self.storage_controller._next_staging_job_id)
+      print("Number of preempted jobs:", self.nb_preempted_jobs)
 
 
     def initQBoxesAndStorageController(self):
@@ -249,6 +254,8 @@ class QarnotNodeSched(BatsimScheduler):
       for machine_id in machines:
         self.dict_resources[machine_id].onNotifyMachineAvailable(machine_id)
 
+    def onMachinePStateChanged(self, nodeid, pstate):
+      pass
 
     def onNotifyGenericEvent(self, event_data):
       if event_data["type"] == "stop_simulation":
@@ -288,8 +295,6 @@ class QarnotNodeSched(BatsimScheduler):
       if job.workload == "dyn-burn":
         assert job.job_state != Job.State.COMPLETED_SUCCESSFULLY, "CPU burn job on machine {} finished, this should never happen".format(str(job.allocation))
         # If the job was killed, don't do anything
-        self.logger.info("[{}] CPU burn job on machine {} was just killed".format(self.bs.time(), job.allocation))
-        # TODO maybe we'll need to forward it to the QBox, but I don't think so
 
       elif job.workload == "dyn-staging":
         if job.job_state == Job.State.COMPLETED_SUCCESSFULLY:
@@ -306,6 +311,7 @@ class QarnotNodeSched(BatsimScheduler):
         if job.job_state == Job.State.COMPLETED_KILLED:
           # This should be an instance preempted by an instance of higher priority
           qtask.instance_killed()
+          self.nb_preempted_jobs+=1
           #TODO need to re-submit to Batsim a new instance and add it to the QTask.
 
           qb = self.jobs_mapping.pop(job.id)
