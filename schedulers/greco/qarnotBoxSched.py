@@ -107,7 +107,6 @@ class QarnotBoxSched():
 
         self.logger.info("[{}]--- QBox {} initialization completed. Night gathers, and now my watch on {} Qrads and {} QMobos begins!".format(self.bs.time(),self.name, len(self.dict_qrads.keys()), self.nb_mobos))
 
-
     def onSimulationEnds(self):
         pass
 

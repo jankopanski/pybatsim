@@ -77,6 +77,7 @@ class QarnotNodeSched(BatsimScheduler):
         #self.max_simulation_time = 87100 # 1 day
         self.max_simulation_time = 1211000 # 2 weeks TODO remove this guard?
         self.end_of_simulation_asked = False
+        self.next_print = 43200
 
 
     def onSimulationBegins(self):
@@ -174,8 +175,11 @@ class QarnotNodeSched(BatsimScheduler):
 
 
     def onBeforeEvents(self):
+      if self.bs.time() >= self.next_print:
+        print(self.bs.time())
+        self.next_print+=43200
       if self.bs.time() > self.max_simulation_time:
-        self.logger.info(str(self.bs.time()), "SYS EXIT")
+        self.logger.info("[{}] SYS EXIT".format(self.bs.time()))
         sys.exit(1)
 
       self.logger.info("\n")
@@ -252,7 +256,6 @@ class QarnotNodeSched(BatsimScheduler):
         self.killOrRejectAllJobs()
         self.bs.notify_registration_finished()
         self.end_of_simulation_asked = True
-        #self.logger.info("Now Batsim should stop the simulation")
       else:
         pass # TODO need to handle jobs already running somewhere here (with dynamic jobs?)
 
@@ -345,26 +348,6 @@ class QarnotNodeSched(BatsimScheduler):
       #TODO pass?
 
 
-    '''def checkNoMoreInstances(self):
-      if (len(self.qtasks_queue) == 0) and (len(self.jobs_mapping) == 0) and self.bs.no_more_static_jobs:
-        self.logger.info("[{}] All static jobs seems to have finished. We could stop the simulation right now!".format(self.bs.time()))
-        return True
-      else:
-        return False'''
-
-
-    '''def checkSimulationFinished(self):
-      if self.bs.no_more_static_jobs and self.bs.no_more_external_events:
-        self.logger.info("The simulation seems to be finished (no more static jobs or external events)."
-          " Killing or rejecting all remaining jobs.")
-        self.end_of_simulation_asked = True
-        self.killOrRejectAllJobs() # For Batsim to finish the simulation
-        self.bs.notify_registration_finished()
-        return True
-      else:
-        return False'''
-
-
     def killOrRejectAllJobs(self):
       self.logger.info("Killing all running jobs and rejecting all waiting ones.")
       to_reject = []
@@ -382,11 +365,11 @@ class QarnotNodeSched(BatsimScheduler):
       to_kill.extend(self.storage_controller.onKillAllStagingJobs())
 
       if len(to_reject) > 0:
-        self.logger.info("Rejecting jobs:{}".format(to_reject))
+        self.logger.info("Rejecting {} jobs".format(len(to_reject)))
         self.bs.reject_jobs(to_reject)
 
       if len(to_kill) > 0:
-        self.logger.info("Killing jobs:{}".format(to_kill))
+        self.logger.info("Killing {} jobs".format(len(to_kill)))
         self.bs.kill_jobs(to_kill)
 
       self.logger.info("Now Batsim should stop the simulation on next message (or after next REQUESTED_CALL)")

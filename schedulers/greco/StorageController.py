@@ -197,7 +197,7 @@ class StorageController:
     def __init__(self, storage_resources, bs, qn, filename):
         self._storages = dict()  # Maps the storage batsim id to the Storage object
         self._ceph_id = -1       # The batsim id of the storage_server
-        self._idSub = 0
+        self._next_staging_job_id = 0
         self._bs = bs            # Pybatsim
         self._qn = qn            # The QNode Scheduler
         self._logger = bs.logger
@@ -383,7 +383,7 @@ class StorageController:
         self.add_dataset(dest_id, dataset)
 
         # Profile Submit
-        profile_name = "staging" + str(self._idSub + 1)
+        profile_name = "staging" + str(self._next_staging_job_id + 1)
         move_profile = {
             profile_name : 
             {
@@ -396,8 +396,8 @@ class StorageController:
         self._bs.register_profiles("dyn-staging", move_profile)
 
         # Job Submit
-        self._idSub += 1
-        jid1 = "dyn-staging!" + str(self._idSub)
+        self._next_staging_job_id += 1
+        jid1 = "dyn-staging!" + str(self._next_staging_job_id)
         self._bs.register_job(id=jid1, res=1, walltime=-1, profile_name=profile_name)
 
         # Job Execution

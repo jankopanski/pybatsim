@@ -393,7 +393,7 @@ class Batsim(object):
         if len(splitted_id) == 1:
             new_job_name = deepcopy(job.id)
         else:
-            # This job as already an attempt number
+            # This job has already an attempt number
             new_job_name = splitted_id[0]
             assert splitted_id[1] == str(metadata["nb_resubmit"] - 1)
         new_job_name =  new_job_name + Batsim.ATTEMPT_JOB_SEPARATOR + str(metadata["nb_resubmit"])
