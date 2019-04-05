@@ -5,6 +5,7 @@ from qarnotBoxSched import QarnotBoxSched
 
 from procset import ProcSet
 from collections import defaultdict
+from copy import deepcopy
 
 import math
 import logging
@@ -265,20 +266,52 @@ class QarnotNodeSched(BatsimScheduler):
         else:
             pass # TODO need to handle jobs already running somewhere here (with dynamic jobs?)
 
-    def onJobSubmission(self, job):
+    def onJobSubmission(self, job, resubmit=False):
         qtask_id = job.id.split('_')[0]
         job.qtask_id = qtask_id
 
         # Retrieve or create the corresponding QTask
         if not qtask_id in self.qtasks_queue:
+            assert resubmit == False, "QTask id not found during resubmission of an instance"
             qtask = QTask(qtask_id, job.profile_dict["priority"])
             self.qtasks_queue[qtask_id] = qtask
         else:
             qtask = self.qtasks_queue[qtask_id]
 
-        qtask.instance_submitted(job)
+        qtask.instance_submitted(job, resubmit)
+
         self.do_dispatch = True
         #TODO maybe we'll need to disable this dispatch, same reason as when a job completes
+
+
+    def resubmitJob(self, job):
+        if job.metadata is None:
+            metadata = {"parent_job": job.id, "nb_resubmit": 1}
+        else:
+            metadata = deepcopy(job.metadata)
+            if "nb_resubmit" not in metadata:
+                metadata["nb_resubmit"] = 1
+            else:
+                metadata["nb_resubmit"] = metadata["nb_resubmit"] + 1
+            if "parent_job" not in metadata:
+                metadata["parent_job"] = job.id
+
+        # Keep the current workload and add a resubmit number
+        splitted_id = job.id.split(self.bs.ATTEMPT_JOB_SEPARATOR)
+        if len(splitted_id) == 1:
+            new_job_id = deepcopy(job.id)
+        else:
+            # This job as already an attempt number
+            new_job_id = splitted_id[0]
+            assert splitted_id[1] == str(metadata["nb_resubmit"] - 1)
+
+        # Since ACK of dynamic jobs registration is disabled, submit it manually
+        new_job_id = new_job_id + Batsim.ATTEMPT_JOB_SEPARATOR + str(metadata["nb_resubmit"])
+        new_job = self.bs.register_job(new_job_id, job.requested_resources, job.requested_time, job.profile)
+        new_job.metadata = metadata
+
+        self.logger.info("[{}] QNode resubmitting {} with new id {}".format(self.bs.time(), job, new_job_id))
+        self.onJobSubmission(new_job, resubmit=True)
 
 
     def onQBoxRejectedInstances(self, instances, qb_name):
@@ -308,13 +341,14 @@ class QarnotNodeSched(BatsimScheduler):
             # (or another name of worklow for re-submitted instances that were previously preempted)
             qtask = self.qtasks_queue[job.qtask_id]
             if job.job_state == Job.State.COMPLETED_KILLED:
-                # This should be an instance preempted by an instance of higher priority
                 qtask.instance_killed()
-                self.nb_preempted_jobs+=1
-                #TODO need to re-submit to Batsim a new instance and add it to the QTask.
-
                 qb = self.jobs_mapping.pop(job.id)
                 qb.onJobKilled(job)
+
+                if self.end_of_simulation_asked == False:
+                    #This should be an instance preempted by an instance of higher priority
+                    self.nb_preempted_jobs += 1
+                    self.resubmitJob(job)
 
             elif job.job_state == Job.State.COMPLETED_SUCCESSFULLY:
                 qtask.instance_finished()

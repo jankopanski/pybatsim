@@ -251,6 +251,7 @@ class Batsim(object):
         self.jobs[id] = Job.from_json_dict(job_dict)
         self.jobs[id].job_state = Job.State.IN_SUBMISSON
         self.nb_jobs_in_submission = self.nb_jobs_in_submission + 1
+        return self.jobs[id]
 
     def set_resource_state(self, resources, state):
         """ args:resources: is a ProcSet containing a list of resources.

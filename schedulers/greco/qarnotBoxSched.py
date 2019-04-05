@@ -443,7 +443,8 @@ class QarnotBoxSched():
         # For mobos that are still computing something, need to check if a change in pstate is needed
         to_execute = set()
         for qr in self.dict_qrads.values():
-            start_cpu_burn = (qr.diffTemp >= 1)
+            start_cpu_burn = self.qn.do_dispatch and (qr.diffTemp >= 1)
+            # Don't start cpu_burn jobs if a dispatch has not been done during this scheduling step
             for qm in qr.dict_mobos.values():
                 if start_cpu_burn and (qm.state <= QMoboState.IDLE):
                     # If the mobo is IDLE/OFF and heating is required, start a cpu_burn job

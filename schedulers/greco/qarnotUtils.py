@@ -40,11 +40,12 @@ class QTask:
         self.waiting_instances.append(job)
         self.nb_dispatched_instances -= 1
 
-    def instance_submitted(self, job):
-        # An instance was submitted by Batsim
+    def instance_submitted(self, job, resubmit=False):
+        # An instance was submitted by Batsim (or re-submitted by the QNode)
         job.priority_group = self.priority_group
         self.waiting_instances.append(job)
-        self.nb_received_instances += 1
+        if not resubmit:
+            self.nb_received_instances += 1
 
     def instances_dispatched(self, jobs):
         # These instances were dispatched to a QBox
@@ -124,6 +125,8 @@ class QMobo:
     def push_job(self, job):
         assert self.running_job == -1, "Job {} placed on mobo {} that was already executing job {}".format(self.running_job.id, self.name, job.id)
         self.running_job = job
+        if self.state == QMoboState.OFF:
+            self.pstate = 0
         self.state = QMoboState.fromPriority[job.priority_group]
 
     def pop_job(self):
