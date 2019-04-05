@@ -69,7 +69,7 @@ class QarnotNodeSched(BatsimScheduler):
         #self.update_period = 600 # TODO every 10 minutes for testing
         self.update_period = 150 # TODO every 2.5 minutes for testing
         self.time_next_update = 1.0 # The next time the scheduler should be woken up
-        self.ask_next_update = False # Whether to ask for next update in onNoMoreEvents function
+        self.update_in_current_step = False # Whether update should be done in this current scheduling step
         self.next_update_asked = False     # Whether the 'call_me_later' has been sent or not
         self.very_first_update = True
 
@@ -162,7 +162,7 @@ class QarnotNodeSched(BatsimScheduler):
 
 
     def onRequestedCall(self):
-        self.ask_next_update = True#pass
+        self.update_in_current_step = True#pass
 
 
     def onNoMoreJobsInWorkloads(self):
@@ -182,7 +182,7 @@ class QarnotNodeSched(BatsimScheduler):
 
     def onBeforeEvents(self):
         if self.bs.time() >= self.next_print:
-            print(self.bs.time())
+            print(self.bs.time(), (math.floor(self.bs.time())/86400.0))
             self.next_print+=43200
         if self.bs.time() > self.max_simulation_time:
             self.logger.info("[{}] SYS EXIT".format(self.bs.time()))
@@ -200,7 +200,7 @@ class QarnotNodeSched(BatsimScheduler):
             if self.very_first_update: # First update at t=1, next updates every 30 seconds starting at t=30
                 self.time_next_update -= 1
                 self.very_first_update = False
-                self.ask_next_update = True # We will ask for the next wake up in onNoMoreEvents if the simulation is not finished yet
+                self.update_in_current_step = True # We will ask for the next wake up in onNoMoreEvents if the simulation is not finished yet
 
             self.do_dispatch = True # We will do a dispatch anyway
         else:
@@ -221,9 +221,9 @@ class QarnotNodeSched(BatsimScheduler):
         # If the simulation is not finished and we need to ask Batsim for the next waking up
         #self.checkNoMoreInstances()
         #self.checkSimulationFinished()
-        if not self.end_of_simulation_asked and self.ask_next_update:
+        if not self.end_of_simulation_asked and self.update_in_current_step:
             self.bs.wake_me_up_at(self.time_next_update)
-            self.ask_next_update = False
+            self.update_in_current_step = False
 
 
     def updateAllQBoxes(self):

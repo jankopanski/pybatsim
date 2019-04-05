@@ -482,6 +482,11 @@ class QarnotBoxSched():
                     # Mobo should be in state OFF or RUNBKGD and we have nothing to do
                     assert (qm.state == QMoboState.OFF) or (qm.state == QMoboState.RUNBKGD), "In Frequency regulator, this assert should not be broken (qm.state {} and qr.diffTemp {}".format(qm.state, qr.diffTemp)
 
+                if qm.state == QMoboState.IDLE:
+                    assert False, "IDLE mobo {} at the end of frequency regulation. Should not happen!".format(qm.name)
+                elif qm.state > QMoboState.OFF and qm.pstate == qm.max_pstate:
+                    assert False, "Pstate max for running mobo {}. Should not happen!".format(qm.name)
+
         if len(to_execute) > 0:
             self.logger.info("[{}]--- FrequencyRegulator of {} has started {} burn_jobs".format(self.bs.time(), self.name, len(to_execute)))
             self.jobs_to_execute.extend(to_execute)
