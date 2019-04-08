@@ -77,11 +77,11 @@ class QarnotNodeSched(BatsimScheduler):
         self.nb_rejected_jobs_by_qboxes = 0 # Just to keep track of the count
         self.nb_preempted_jobs = 0
 
-<<<<<<< HEAD
         #self.max_simulation_time = 87100 # 1 day
         self.max_simulation_time = 1211000 # 2 weeks TODO remove this guard?
         self.end_of_simulation_asked = False
         self.next_print = 43200
+
 
     def onSimulationBegins(self):
         assert self.bs.dynamic_job_registration_enabled, "Registration of dynamic jobs must be enabled for this scheduler to work"
@@ -97,6 +97,7 @@ class QarnotNodeSched(BatsimScheduler):
         self.initQBoxesAndStorageController()
         for qb in self.dict_qboxes.values():
             qb.onBeforeEvents()
+
         self.storage_controller.onSimulationBegins()
 
         self.logger.info("[{}]- QNode: End of SimulationBegins".format(self.bs.time()))
@@ -118,6 +119,7 @@ class QarnotNodeSched(BatsimScheduler):
     def initQBoxesAndStorageController(self):
         # Let's create the StorageController
         self.storage_controller = StorageController(self.bs.machines["storage"], self.bs, self, self.options["dataset_filename"])
+
 
         # Retrieve the QBox ids and the associated list of QMobos Batsim ids
         dict_ids = defaultdict(lambda: defaultdict(list))
@@ -162,6 +164,7 @@ class QarnotNodeSched(BatsimScheduler):
     def onRequestedCall(self):
         self.update_in_current_step = True#pass
 
+
     def onNoMoreJobsInWorkloads(self):
         pass
         '''self.logger.info("There is no more static jobs in the workload")
@@ -176,9 +179,6 @@ class QarnotNodeSched(BatsimScheduler):
         for qtask in self.qtasks_queue.values():
             qtask.print_infos(self.logger)'''
 
-
-    def onRequestedCall(self):
-      pass
 
     def onBeforeEvents(self):
         if self.bs.time() >= self.next_print:
@@ -279,6 +279,7 @@ class QarnotNodeSched(BatsimScheduler):
             qtask = self.qtasks_queue[qtask_id]
 
         qtask.instance_submitted(job, resubmit)
+
         self.do_dispatch = True
         #TODO maybe we'll need to disable this dispatch, same reason as when a job completes
 
@@ -335,12 +336,6 @@ class QarnotNodeSched(BatsimScheduler):
             else:
                 assert False, "Data staging job {} reached the state {}, this should not happen.".format(job.id, job.job_state)
 
-            #Check if the QTask is complete
-            if qtask.is_complete():
-              self.logger.info("[{}]  All instances of QTask {} have terminated".format(self.bs.time(), qtask.id))
-              del self.qtasks_queue[qtask.id]
-
-
         else:
             # This should either be a job from a static workflow or from "dyn-resubmit"
             # (or another name of worklow for re-submitted instances that were previously preempted)
@@ -391,6 +386,7 @@ class QarnotNodeSched(BatsimScheduler):
         pass
         #TODO pass?
 
+
     def killOrRejectAllJobs(self):
         self.logger.info("Killing all running jobs and rejecting all waiting ones.")
         to_reject = []
@@ -416,6 +412,7 @@ class QarnotNodeSched(BatsimScheduler):
             self.bs.kill_jobs(to_kill)
 
         self.logger.info("Now Batsim should stop the simulation on next message (or after next REQUESTED_CALL)")
+
 
     def sortAvailableMobos(self, priority):
         if priority == "bkgd":

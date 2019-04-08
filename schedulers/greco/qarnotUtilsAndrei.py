@@ -19,23 +19,27 @@ class QTask:
         self.nb_received_instances = 0    # Number of jobs submitted by Batsim
         self.nb_dispatched_instances = 0  # Number of jobs disatched to the QBoxes
         self.nb_terminated_instances = 0  # Number of jobs that have finished correctly (not killed)
+        self.nb_killed_instances = 0
 
         self.priority = int(priority)
         self.priority_group = PriorityGroup.HIGH if self.priority >= 0 else ( PriorityGroup.BKGD if self.priority < -10 else PriorityGroup.LOW )
 
-        self.metadata = None
 
         #TODO
         ''' At some point we'll need to re-submit dynamic jobs that have been killed
         due to a rad too hot or a higher priority jobs scheduled on the mobo.
         '''
 
+    def print_infos(self, logger):
+        logger.info("QTask: {}, {} received, {} waiting, {} dispatched, {} terminated, {} killed.".format(
+            self.id, self.nb_received_instances, len(self.waiting_instances), self.nb_dispatched_instances, self.nb_terminated_instances, self.nb_killed_instances))
+
     def is_complete(self):
         #TODO make sure all instances of a task arrives at the same time in the workload
         return (len(self.waiting_instances) == 0) and (self.nb_received_instances == self.nb_terminated_instances)
 
     def instance_rejected(self, job):
-        # The instance was rejected by the QBox it was dispatched to
+        # This instance was rejected by the QBox it was dispatched to
         self.waiting_instances.append(job)
         self.nb_dispatched_instances -= 1
 
@@ -53,10 +57,8 @@ class QTask:
 
     def instance_poped_and_dispatched(self):
         # A quick dispatch of an instance of this QTask is required
-        self.instance_finished()
         self.nb_dispatched_instances += 1
         return self.waiting_instances.pop()
-        #TODO pop from subqtask??
 
     def instance_finished(self):
         # An instance finished successfully
@@ -66,6 +68,7 @@ class QTask:
     def instance_killed(self):
         # An instance was killed by the QBox scheduler
         self.nb_dispatched_instances -= 1
+        self.nb_killed_instances += 1
 
 
 class SubQTask:
@@ -83,6 +86,15 @@ class SubQTask:
             self.datasets = d
         else:
             self.datasets = []'''
+
+    def pop_waiting_instance(self):
+        return self.waiting_instances.pop()
+
+    def mark_running_instance(self, job):
+        self.running_instances.append(job)
+
+    def instance_finished(self, job):
+        self.running_instances.remove(job)
 
 
 
@@ -103,7 +115,8 @@ class QRad:
         self.targetTemp = 20 # Temperature required in the room
         self.diffTemp = 0    # targetTemp - airTemp: If positive, we need to heat! (This can be viewed as heating capacity)
         self.properties = {} # The simgrid properties of the first mobo (should be the same for all mobos)
-        self.pset_mobos = ProcSet()
+        self.pset_mobos = ProcSet() # The ProcSet of all mobos
+        self.temperature_master = -1 # The batid of the temperature_master mobo
 
 
 class QMobo:
@@ -122,7 +135,7 @@ class QMobo:
         self.state = QMoboState.fromPriority[job.priority_group]
 
     def pop_job(self):
-        assert self.running_job != -1, "Kill required on mobo {} but it is not running any job".format(self.name)
+        assert self.running_job != -1, "Pop_job required on mobo {} but it is not running any job (current state is {})".format(self.name, self.state)
         job = self.running_job
         self.running_job = -1
         self.state = QMoboState.IDLE
@@ -130,12 +143,5 @@ class QMobo:
         return job
 
     def push_direct_job(self, job):
-        #if (self.running_job == -1):
-        #    assert self.running_job == job.qtask.id, "Direct restart of instance {} on mobo {} but previous instance is of different QTask ({})".format( self.name, self.running_job.id)
-        #else:
-        #    assert self.running_job.qtask.id == job.qtask.id, "Direct restart of instance {} on mobo {} but previous instance is of different QTask ({})".format(self.name, self.running_job.id)
-        #    self.running_job = job
-
         assert self.running_job.qtask_id == job.qtask_id, "Direct restart of instance {} on mobo {} but previous instance is of different QTask ({})".format(job.id, self.name, self.running_job.id)
         self.running_job = job
-
