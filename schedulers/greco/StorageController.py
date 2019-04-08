@@ -310,6 +310,38 @@ class StorageController:
         else:
             return storage.has_dataset(dataset_id)
 
+    def get_free_bandwidth_between_storages(self, source_id, dest_id):
+        '''
+        Gets a rough estimate of the free bandwidth (in bits/sec) to move from one storage to other.
+        Uses staged jobs to find which of the network links are congested.
+        If source_id is not CEPH, then dest_id is replaced by CEPH
+        TODO: Update this function to enable qbox to qbox transfers.
+
+        :param source_id: Source of the transfer
+        :param dest_id: Destination of the transfer
+        :return: Cost of free bandwidth assuming equal share
+        '''
+
+        if(source_id == dest_id):
+            return 1000000000       # 1Tbps
+
+        id = source_id
+        if(source_id == self._ceph_id):
+            id = dest_id
+
+        default = 1000000000.0        # 1Gbps
+
+        transfers = 0
+        for val in self.staging_map:
+            if(val[0] == id):
+                transfers = transfers + 1
+            elif(val[1] == id):
+                transfers = transfers + 1
+
+        transfers = transfers + 1   # Assuming the current one starts
+        return float(default)/float(transfers)
+
+
     def copy_from_CEPH_to_dest(self, dataset_ids, dest_id):
         """ Method used to move datasets from the CEPH to the disk of a QBox
 
