@@ -259,6 +259,7 @@ class QarnotBoxSched():
                 list_datasets = []
 
             sub_qtask = SubQTask(qtask_id, priority_group, instances.copy(), list_datasets)
+
             self.dict_subqtasks[qtask_id] = sub_qtask
 
             # Then ask for the data staging of the required datasets

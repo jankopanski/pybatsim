@@ -273,7 +273,12 @@ class QarnotNodeSched(BatsimScheduler):
         # Retrieve or create the corresponding QTask
         if not qtask_id in self.qtasks_queue:
             assert resubmit == False, "QTask id not found during resubmission of an instance"
-            qtask = QTask(qtask_id, job.profile_dict["priority"])
+            
+            list_datasets = self.bs.profiles[job.workload][job.profile]["datasets"]
+            if list_datasets is None:
+                list_datasets = []
+            
+            qtask = QTask(qtask_id, job.profile_dict["priority"], list_datasets)
             self.qtasks_queue[qtask_id] = qtask
         else:
             qtask = self.qtasks_queue[qtask_id]

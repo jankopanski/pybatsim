@@ -10,16 +10,19 @@ class PriorityGroup:
 
 class QTask:
     # Used by the QNode scheduler
-    def __init__(self, id, priority):
+    def __init__(self, id, priority, list_datasets):
         self.id = id
         self.waiting_instances = [] # List of Batsim Jobs waiting to be scheduled
         self.nb_received_instances = 0    # Number of jobs submitted by Batsim
         self.nb_dispatched_instances = 0  # Number of jobs disatched to the QBoxes
         self.nb_terminated_instances = 0  # Number of jobs that have finished correctly (not killed)
         self.nb_killed_instances = 0
-
+        
+        self.datasets = list_datasets          # List of input datasets
+        
         self.priority = int(priority)
         self.priority_group = PriorityGroup.HIGH if self.priority >= 0 else ( PriorityGroup.BKGD if self.priority < -10 else PriorityGroup.LOW )
+
 
 
         #TODO
@@ -78,7 +81,6 @@ class SubQTask:
         self.running_instances = []            # List of batsim jobs that are currently running
         self.waiting_datasets = []             # Datasets that are waiting to be on disk
         self.datasets = list_datasets          # List of input datasets
-
 
     def pop_waiting_instance(self):
         return self.waiting_instances.pop()

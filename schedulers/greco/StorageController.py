@@ -240,11 +240,15 @@ class StorageController:
 
         # The dict of all qboxes with the required dataset
         qboxes_list = []
-
+        
+        # Removing CEPH from this dict
+        storages = {}
+        for s in self.get_storages():
+            if (s != self._ceph_id):
+                storages[s] = self.get_storage(s)
+        
         # Iterate over all the storages
-        for storage_id, storage in self.get_storages():
-            self._logger.info("{} storages: {} " .format(storage._name, storage._datasets))
-
+        for storage in storages.values():
             hasDataset = True
 
             # To check if this storage has all the datasets required.
@@ -254,7 +258,7 @@ class StorageController:
                     break
             # If true, the storage has all required datasets.
             if(hasDataset):
-                self._logger.debug("[{}]     QBOX {} has the required datasets.".format(self._bs.time(), self.mappingQBoxes[storage._id]))
+                #self._logger.debug("[{}]     QBOX {} has the required datasets.".format(self._bs.time(), self.mappingQBoxes[storage._id]))
                 qboxes_list.append(self.mappingQBoxes[storage._id])
         
         return qboxes_list
