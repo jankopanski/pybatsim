@@ -112,9 +112,7 @@ class QarnotBoxSched():
         pass
 
     def onBeforeEvents(self):
-        self.stateChanges.clear()
-        self.jobs_to_execute = []
-        self.jobs_to_kill = []
+        pass
 
     def onNoMoreEvents(self):
         if self.bs.time() >= 1.0:
@@ -142,9 +140,6 @@ class QarnotBoxSched():
         pass # This is not used by the qarnot schedulers
     '''
 
-    def onTargetTemperatureChanged(self, machine_batid, new_temperature):
-        self.dict_ids[machine_batid].diffTemp = new_temperature - self.bs.air_temperatures[str(machine_batid)]
-        self.dict_ids[machine_batid].targetTemp = new_temperature
 
     def onNotifyMachineUnavailable(self, machine_batid):
         # The QRad became too hot (from external event), need to kill the instance running on it, if any
@@ -235,6 +230,8 @@ class QarnotBoxSched():
         self.availBkgd -= self.mobosUnavailable
         self.availLow -= self.mobosUnavailable
         self.availHigh -= self.mobosUnavailable
+
+
         self.logger.info("[{}]--- {} reporting the available slots for bkgd/low/high: {}/{}/{}".format(self.bs.time(), self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)))
         return [self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)]
 
@@ -278,6 +275,7 @@ class QarnotBoxSched():
             if len(sub_qtask.waiting_datasets) == 0:
                 self.scheduleInstances(sub_qtask)
 
+
     def onDatasetArrivedOnDisk(self, dataset_id):
         '''
         The Storage Controller notifies that the required dataset arrived on the disk.
@@ -296,6 +294,7 @@ class QarnotBoxSched():
                     if len(sub_qtask.waiting_datasets) == 0:
                         # The SubQTask has all the datasets, launch it
                         to_launch.append(sub_qtask)
+
                     n-= 1
                     if n == 0:
                         # All SubQTasks waiting for this dataset were found, stop
@@ -307,6 +306,7 @@ class QarnotBoxSched():
                 self.scheduleInstances(sub_qtask)
         #else
         # The dataset is no longer required by a QTask. Do nothing
+
 
     def scheduleInstances(self, sub_qtask):
         '''
@@ -353,6 +353,7 @@ class QarnotBoxSched():
                         n-=1
                         if n == 0:
                             return # All instances have been started
+
         # Some instances were dispatched by cannot be started yet, return them to the QNode
         self.logger.info("[{}]--- {} still has {} instances of {} to start, rejecting these instances back to the QNode but this should not happen.".format(self.bs.time(), self.name, len(sub_qtask.waiting_instances), sub_qtask.id))
         self.logger.info("[{}]--- {} has available slots for bkgd/low/high: {}/{}/{}".format(self.bs.time(), self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)))
@@ -360,6 +361,7 @@ class QarnotBoxSched():
         assert len(sub_qtask.waiting_instances) > 0, "QBox wants to reject 0 instances to the QNode..."
         self.qn.onQBoxRejectedInstances(sub_qtask.waiting_instances.copy(), self.name) # TODO maybe we don't need to copy this
         sub_qtask.waiting_instances = []
+
 
     def startInstance(self, qm, job):
         '''
@@ -409,6 +411,7 @@ class QarnotBoxSched():
             self.logger.debug("[{}] {} just completed with job_state {} on alloc {} on mobo {} {}".format(self.bs.time(), job.id, job.job_state, str(job.allocation), qm.name, qm.batid))
             qm.pop_job()
             self.checkCleanSubQTask(sub_qtask)
+
 
     def onJobKilled(self, job):
         '''

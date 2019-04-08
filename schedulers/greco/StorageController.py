@@ -236,7 +236,7 @@ class StorageController:
 
 
     def get_storages_by_dataset(self, required_dataset):
-        """ Returns the list of storages that already have the required dataset """
+        """ Returns the list of storages that already has the required dataset """
 
         # The dict of all qboxes with the required dataset
         qboxes_list = []
