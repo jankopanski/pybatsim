@@ -17,12 +17,11 @@ class QTask:
         self.nb_dispatched_instances = 0  # Number of jobs disatched to the QBoxes
         self.nb_terminated_instances = 0  # Number of jobs that have finished correctly (not killed)
         self.nb_killed_instances = 0
-        
+
         self.datasets = list_datasets          # List of input datasets
-        
+
         self.priority = int(priority)
         self.priority_group = PriorityGroup.HIGH if self.priority >= 0 else ( PriorityGroup.BKGD if self.priority < -10 else PriorityGroup.LOW )
-
 
 
         #TODO
@@ -82,6 +81,7 @@ class SubQTask:
         self.waiting_datasets = []             # Datasets that are waiting to be on disk
         self.datasets = list_datasets          # List of input datasets
 
+
     def pop_waiting_instance(self):
         return self.waiting_instances.pop()
 
@@ -94,7 +94,7 @@ class SubQTask:
 
 
 class QMoboState:
-    OFF, IDLE, RUNBKGD, RUNLOW, RUNHIGH = range(5)
+    OFF, IDLE, LAUNCHING, RUNBKGD, RUNLOW, RUNHIGH = range(6)
     # When in OFF, the batsim host should be in the last pstate or marked as unavailable
     fromPriority = {
         PriorityGroup.BKGD : RUNBKGD,
@@ -125,14 +125,12 @@ class QMobo:
 
 
     def push_job(self, job):
-        assert self.running_job == -1, "Job {} placed on mobo {} that was already executing job {}".format(self.running_job.id, self.name, job.id)
+        assert self.running_job == -1, "Job {} placed on mobo {} {} that was already executing job {}".format(self.running_job.id, self.batid, self.name, job.id)
         self.running_job = job
-        if self.state == QMoboState.OFF:
-            self.pstate = 0
-        self.state = QMoboState.fromPriority[job.priority_group]
+        self.state = QMoboState.LAUNCHING
 
     def pop_job(self):
-        assert self.running_job != -1, "Pop_job required on mobo {} but it is not running any job (current state is {})".format(self.name, self.state)
+        assert self.running_job != -1, "Pop_job asked on mobo {} {} but it is not running any job (current state is {})".format(self.batid, self.name, self.state)
         job = self.running_job
         self.running_job = -1
         self.state = QMoboState.IDLE
@@ -140,17 +138,24 @@ class QMobo:
         return job
 
     def push_direct_job(self, job):
-        assert self.running_job.qtask_id == job.qtask_id, "Direct restart of instance {} on mobo {} but previous instance is of different QTask ({})".format(job.id, self.name, self.running_job.id)
+        assert self.running_job.qtask_id == job.qtask_id, "Direct restart of instance {} on mobo {} {} but previous instance is of different QTask ({})".format(job.id, self.batid, self.name, self.running_job.id)
         self.running_job = job
 
     def turn_off(self):
-        assert self.running_job == -1, "Turning OFF mobo {} that is running {}".format(self.name, self.running_job.id)
+        assert self.running_job == -1, "Turning OFF mobo {} {} that is running {}.".format(self.batid, self.name, self.running_job.id)
+        assert self.state != QMoboState.OFF, "Turning OFF mobo {} {} that is already OFF.".format(self.batid, self.name)
         self.pstate = self.max_pstate
         self.state = QMoboState.OFF
 
     def push_burn_job(self, job):
-        assert self.running_job == -1, "Starting burn_job on mobo {} that is running {}".format(self.name, self.running_job.id)
+        assert self.running_job == -1, "Starting burn_job on mobo {} {} that is running {}".format(self.batid, self.name, self.running_job.id)
         job.priority_group = PriorityGroup.BKGD
         self.running_job = job
         self.state = QMoboState.RUNBKGD
+        self.pstate = 0
+
+    def launch_job(self):
+        assert self.state == QMoboState.LAUNCHING, "Asked to launch a job but mobo {} {} is not in LAUNCHING state.".format(self.batid, self.name)
+        assert self.running_job != -1, "Asked to launch job but no one was pushed on mobo {} {}.".format(self.batid, self.name)
+        self.state = QMoboState.fromPriority[self.running_job.priority_group]
         self.pstate = 0

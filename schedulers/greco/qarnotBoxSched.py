@@ -205,16 +205,16 @@ class QarnotBoxSched():
                         job = qm.pop_job()
                         jobs_to_kill.add(job)
 
-            for qmobo in qr.dict_mobos.values():
-                if (qr.diffTemp >= 1) and (qmobo.state < QMoboState.RUNBKGD):
+            for qm in qr.dict_mobos.values():
+                if (qr.diffTemp >= 1) and (qm.state < QMoboState.RUNBKGD) and (qm.state != QMoboState.LAUNCHING):
                     # This mobo is available for BKGD instances
-                    self.availBkgd.insert(qmobo.batid)
-                elif (qr.diffTemp >= -1) and (qmobo.state < QMoboState.RUNLOW):
+                    self.availBkgd.insert(qm.batid)
+                elif (qr.diffTemp >= -1) and (qm.state < QMoboState.RUNLOW) and (qm.state != QMoboState.LAUNCHING):
                     # This mobo is available for LOW instances
-                    self.availLow.insert(qmobo.batid)
-                elif (qr.diffTemp >= -4) and (qmobo.state < QMoboState.RUNHIGH):
+                    self.availLow.insert(qm.batid)
+                elif (qr.diffTemp >= -4) and (qm.state < QMoboState.RUNHIGH) and (qm.state != QMoboState.LAUNCHING):
                     # This mobo is available for HIGH
-                    self.availHigh.insert(qmobo.batid)
+                    self.availHigh.insert(qm.batid)
 
 
         if len(jobs_to_kill) > 0:
@@ -259,7 +259,6 @@ class QarnotBoxSched():
                 list_datasets = []
 
             sub_qtask = SubQTask(qtask_id, priority_group, instances.copy(), list_datasets)
-
             self.dict_subqtasks[qtask_id] = sub_qtask
 
             # Then ask for the data staging of the required datasets
@@ -323,14 +322,15 @@ class QarnotBoxSched():
             qr_list = sorted(self.dict_qrads.values(), key=lambda qr:-qr.diffTemp) # Take QRads by decreasing temperature difference (i.e., increasing heating capacity)
             for qr in qr_list:
                 for batid in (qr.pset_mobos & available_slots):
-                    if qr.dict_mobos[batid].state <= QMoboState.RUNBKGD: # Either OFF/IDLE or running BKGD
+                    qm = qr.dict_mobos[batid]
+                    if (qm.state <= QMoboState.RUNBKGD) and (qm.state != QMoboState.LAUNCHING): # Either OFF/IDLE or running BKGD
                         job = sub_qtask.pop_waiting_instance()
                         sub_qtask.mark_running_instance(job)
-                        self.startInstance(qr.dict_mobos[batid], job)
+                        self.startInstance(qm, job)
                         n-=1
                         if n == 0:
                             return # All instances have been started
-                    elif qr.dict_mobos[batid].state == QMoboState.RUNLOW:
+                    elif qm.state == QMoboState.RUNLOW:
                         running_low.append(batid)
             # There are still instances to start, take mobos that are running LOW instances.
             for batid in running_low: # Mobos in this list are already sorted by coolest QRad first
@@ -347,10 +347,11 @@ class QarnotBoxSched():
             qr_list = sorted(self.dict_qrads.values(), key=lambda qr:qr.diffTemp) # Take QRads by increasing temperature difference (i.e., decreasing heat capacity)
             for qr in qr_list:
                 for batid in (qr.pset_mobos & available_slots):
-                    if qr.dict_mobos[batid].state <= QMoboState.RUNBKGD: # Either OFF/IDLE or running BKGD
+                    qm = qr.dict_mobos[batid]
+                    if (qm.state <= QMoboState.RUNBKGD) and (qm.state != QMoboState.LAUNCHING): # Either OFF/IDLE or running BKGD
                         job = sub_qtask.pop_waiting_instance()
                         sub_qtask.mark_running_instance(job)
-                        self.startInstance(qr.dict_mobos[batid], job)
+                        self.startInstance(qm, job)
                         n-=1
                         if n == 0:
                             return # All instances have been started
@@ -409,7 +410,7 @@ class QarnotBoxSched():
             sub_qtask.mark_running_instance(direct_job)
             self.jobs_to_execute.append(direct_job)
         else:
-            self.logger.debug("[{}] {} just completed with job_state {} on alloc {} on mobo {} {}".format(self.bs.time(), job.id, job.job_state, str(job.allocation), qm.name, qm.batid))
+            self.logger.debug("[{}] {} just completed with job_state {} on alloc {} on mobo {} {} with pstate {}".format(self.bs.time(), job.id, job.job_state, str(job.allocation), qm.name, qm.batid, qm.pstate))
             qm.pop_job()
             self.checkCleanSubQTask(sub_qtask)
 
@@ -460,11 +461,20 @@ class QarnotBoxSched():
 
                     # Then set the pstate of the mobo to 0 (corresponding to full speed)
                     self.stateChanges[0].insert(qm.batid)
+                    self.logger.debug("++++++++ Change state of {} to {} {} (burn job)".format(qm.batid, 0, qm.pstate))
 
                 elif qm.state == QMoboState.IDLE:
                     # No heating required, turn off this mobo
+                    self.logger.debug("Turning OFF mobo {} {}".format(qm.batid, qm.name))
                     qm.turn_off()
                     self.stateChanges[qm.max_pstate].insert(qm.batid)
+                    self.logger.debug("++++++++ Change state of {} to {} {} (off)".format(qm.batid, qm.max_pstate, qm.pstate))
+
+                elif qm.state == QMoboState.LAUNCHING:
+                    # A new instance was started during this scheduling step. Update the state and set pstate to 0 (max speed)
+                    qm.launch_job()
+                    self.stateChanges[0].insert(qm.batid)
+                    self.logger.debug("++++++++ Change state of {} to {} {} (launch job)".format(qm.batid, 0, qm.pstate))
 
                 elif qm.state >= QMoboState.RUNLOW:
                     # Check if we can increase/decrease the processor speed
@@ -472,11 +482,13 @@ class QarnotBoxSched():
                         # Increase speed
                         qm.pstate -= 1
                         self.stateChanges[qm.pstate].insert(qm.batid)
+                        self.logger.debug("++++++++ Change state of {} to {} {} (increase speed)".format(qm.batid, qm.pstate, qm.pstate))
 
                     elif qr.diffTemp <= -1 and qm.pstate < (qm.max_pstate-1):
                         # Decrease speed
                         qm.pstate += 1
                         self.stateChanges[qm.pstate].insert(qm.batid)
+                        self.logger.debug("++++++++ Change state of {} to {} {} (decrease speed)".format(qm.batid, qm.pstate, qm.pstate))
                     # Else we stay in this pstate
 
                 else:
@@ -484,9 +496,11 @@ class QarnotBoxSched():
                     assert (qm.state == QMoboState.OFF) or (qm.state == QMoboState.RUNBKGD), "In Frequency regulator, this assert should not be broken (qm.state {} and qr.diffTemp {}".format(qm.state, qr.diffTemp)
 
                 if qm.state == QMoboState.IDLE:
-                    assert False, "IDLE mobo {} at the end of frequency regulation. Should not happen!".format(qm.name)
+                    assert False, "IDLE mobo {} {} at the end of frequency regulation. Should not happen!".format(qm.batid, qm.name)
+                elif qm.pstate == qm.max_pstate and qm.state != QMoboState.OFF:
+                    assert False, "Pstate max but the mobo {} {} is not OFF (in state {}). Should not happen!".format(qm.batid, qm.name, qm.state)
                 elif qm.state > QMoboState.OFF and qm.pstate == qm.max_pstate:
-                    assert False, "Pstate max for running mobo {}. Should not happen!".format(qm.name)
+                    assert False, "Pstate max for running mobo {} {} (in state {}). Should not happen!".format(qm.batid, qm.name, qm.state)
 
         if len(to_execute) > 0:
             self.logger.info("[{}]--- FrequencyRegulator of {} has started {} burn_jobs".format(self.bs.time(), self.name, len(to_execute)))
