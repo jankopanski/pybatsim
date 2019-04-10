@@ -444,7 +444,7 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                 return True
         return False
 
-    def list_qboxes_with_dataset(self, qtask):
+    def get_qboxes_with_dataset(self, qtask):
         ''' Lists all QBoxes that have the required list of datasets from the job 
         Could happen:
         - Required Data Set == NULL => qboxes_list empty
@@ -454,9 +454,9 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
         required_datasets = qtask.datasets # To get the list of datasets requireds by the job
         if (required_datasets != None and len(required_datasets) > 0):
             qboxes_list = self.storage_controller.get_storages_by_dataset(required_datasets)
-        #print(" \n ############# Qbox_list: \n ", qboxes_list)
         return qboxes_list
 
+    """    
     def list_qboxes_by_download_time(self, qtask):
         ''' Lists QBoxes ordered by the predicted download time of the datasets '''
 
@@ -469,14 +469,14 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
         else:
             qboxes_list = []
         return qboxes_list
+    """
 
-    def list_available_mobos(self, qboxes_list):
+    def get_available_mobos_with_ds(self, qboxes_list):
         ''' It receives the qboxes_list and returns a list wich all qmobos available from each qbox '''
 
         available_mobos_by_dataset = []
         for qb in qboxes_list:
             for mobo in self.lists_available_mobos:
-                #print("         ### Lookinf for the mobo: ", mobo)
                 if (qb.name == mobo[0]):
                     available_mobos_by_dataset.append(mobo)
         return available_mobos_by_dataset
@@ -507,25 +507,22 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
         self.logger.info("[{}]- QNode starting doDispatch".format(self.bs.time()))
         
         for qtask in sorted(self.qtasks_queue.values(),key=lambda qtask:(-qtask.priority, qtask.nb_dispatched_instances)):
-            #print(" ### DoDispatch, qtask: ", qtask.id)
             nb_instances_left = len(qtask.waiting_instances)
             if nb_instances_left > 0:
                 self.logger.debug("[{}]- QNode trying to dispatch {} of priority {} having {} waiting and {} dispatched instances".format(self.bs.time(),qtask.id, qtask.priority, len(qtask.waiting_instances), qtask.nb_dispatched_instances))
                 # Dispatch as many instances as possible on mobos available for bkgd, no matter the priority of the qtask
                 self.sortAvailableMobos("bkgd")
 
-                list_qboxes = self.list_qboxes_with_dataset(qtask)
-                #print(" ### DoDispatch, BKGD, \n    ### list_of_box: ", list_qboxes)
+                list_qboxes = self.get_qboxes_with_dataset(qtask)
                 if(len(list_qboxes) == 0):
-                    list_available_mobos = self.lists_available_mobos
+                    available_mobos = self.lists_available_mobos
                 else:
-                    list_available_mobos = self.list_available_mobos(list_qboxes)
+                    available_mobos = self.get_available_mobos_with_ds(list_qboxes)
                     for mobo in self.lists_available_mobos:
-                        if mobo not in list_available_mobos:
-                            list_available_mobos.append(mobo)
+                        if mobo not in available_mobos:
+                            available_mobos.append(mobo)
 
-                #print(" ### DoDispatch, list_of_mobos: ", list_available_mobos)
-                for tup in list_available_mobos:
+                for tup in available_mobos:
                     qb = self.dict_qboxes[tup[0]]
                     nb_slots = tup[1]
                     if nb_slots >= nb_instances_left:
@@ -551,16 +548,17 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                 if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.BKGD):
                     # There are more instances to dispatch and the qtask is either low or high priority
                     self.sortAvailableMobos("low")
-                    #print(" ### DoDispatch, LOW, list_of_box: ", list_qboxes)
+
+                    list_qboxes = self.get_qboxes_with_dataset(qtask)
                     if(len(list_qboxes) == 0):
-                        list_available_mobos = self.lists_available_mobos
+                        available_mobo = self.lists_available_mobos
                     else:
-                        list_available_mobos = self.list_available_mobos(list_qboxes)
+                        available_mobos = self.get_available_mobos_with_ds(list_qboxes)
                         for mobo in self.lists_available_mobos:
-                            if mobo not in list_available_mobos:
-                                list_available_mobos.append(mobo)
-                    #print(" ### DoDispatch, list_of_mobos: ", list_available_mobos)
-                    for tup in list_available_mobos:
+                            if mobo not in available_mobos:
+                                available_mobos.append(mobo)
+
+                    for tup in available_mobos:
                         qb = self.dict_qboxes[tup[0]]
                         nb_slots = tup[2]
                         if nb_slots >= nb_instances_left:
@@ -586,16 +584,17 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
                     if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.LOW):
                         # There are more instances to dispatch and the qtask is high priority
                         self.sortAvailableMobos("high")
-                        #print(" ### DoDispatch, HIGH, list_of_box: ", list_qboxes)
+                        
+                        list_qboxes = self.get_qboxes_with_dataset(qtask)
                         if(len(list_qboxes) == 0):
-                            list_available_mobos = self.lists_available_mobos
+                            available_mobos = self.lists_available_mobos
                         else:
-                            list_available_mobos = self.list_available_mobos(list_qboxes)
+                            available_mobos = self.get_available_mobos_with_ds(list_qboxes)
                             for mobo in self.lists_available_mobos:
-                                if mobo not in list_available_mobos:
-                                    list_available_mobos.append(mobo)
-                        #print(" ### DoDispatch, list_of_mobos: ", list_available_mobos)    
-                        for tup in list_available_mobos:
+                                if mobo not in available_mobos:
+                                    available_mobos.append(mobo)  
+
+                        for tup in available_mobos:
                             qb = self.dict_qboxes[tup[0]]
                             nb_slots = tup[3]
                             if nb_slots >= nb_instances_left:
