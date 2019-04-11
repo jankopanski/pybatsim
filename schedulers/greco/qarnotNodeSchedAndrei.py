@@ -11,6 +11,7 @@ import math
 import logging
 import sys
 import os
+import csv
 '''
 This is the scheduler instanciated by Pybatsim for a simulation of the Qarnot platform and has two roles:
 - It does the interface between Batsim/Pybatsim API and the QNode/QBox schedulers (manager)
@@ -115,6 +116,18 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
         print("Number of staging jobs created:", self.storage_controller._next_staging_job_id)
         print("Number of preempted jobs:", self.nb_preempted_jobs)
 
+        self.save_additional_information()
+
+
+    def save_additional_information(self):
+        with open('_schedule_plus.csv', 'w', newline='') as csvfile:
+            fieldnames = ['nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created', 'nb_staging_jobs_created', 'nb_preempted_jobs']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerow({'nb_rejected_instances_during_dispatch': self.nb_rejected_jobs_by_qboxes, 
+                'nb_burn_jobs_created': self.next_burn_job_id, 
+                'nb_staging_jobs_created': self.storage_controller._next_staging_job_id,  
+                'nb_preempted_jobs': self.nb_preempted_jobs})
 
     def initQBoxesAndStorageController(self):
         # Let's create the StorageController
