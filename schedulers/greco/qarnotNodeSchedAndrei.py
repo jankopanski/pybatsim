@@ -68,7 +68,8 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
 
         #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
         #self.update_period = 600 # TODO every 10 minutes for testing
-        self.update_period = 150 # TODO every 2.5 minutes for testing
+        self.update_period = 60 # TODO every 1 minutes for testing
+        #self.update_period = 150 # TODO every 2.5 minutes for testing
         self.time_next_update = 1.0 # The next time the scheduler should be woken up
         self.update_in_current_step = False # Whether update should be done in this current scheduling step
         self.next_update_asked = False     # Whether the 'call_me_later' has been sent or not

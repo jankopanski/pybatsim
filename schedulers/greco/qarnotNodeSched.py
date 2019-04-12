@@ -11,6 +11,8 @@ import math
 import logging
 import sys
 import os
+
+import csv
 '''
 This is the scheduler instanciated by Pybatsim for a simulation of the Qarnot platform and has two roles:
 - It does the interface between Batsim/Pybatsim API and the QNode/QBox schedulers (manager)
@@ -67,7 +69,8 @@ class QarnotNodeSched(BatsimScheduler):
 
         #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
         #self.update_period = 600 # TODO every 10 minutes for testing
-        self.update_period = 150 # TODO every 2.5 minutes for testing
+        self.update_period = 60 # TODO every 1 minutes for testing
+        #self.update_period = 150 # TODO every 2.5 minutes for testing
         self.time_next_update = 1.0 # The next time the scheduler should be woken up
         self.update_in_current_step = False # Whether update should be done in this current scheduling step
         self.next_update_asked = False     # Whether the 'call_me_later' has been sent or not
@@ -118,6 +121,7 @@ class QarnotNodeSched(BatsimScheduler):
         self.save_additional_information()
 
 
+    # TODO To correct the dictory to save the csv file.     
     def save_additional_information(self):
         with open('_schedule_plus.csv', 'w', newline='') as csvfile:
             fieldnames = ['nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created', 'nb_staging_jobs_created', 'nb_preempted_jobs']
