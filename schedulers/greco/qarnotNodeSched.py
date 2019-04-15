@@ -47,6 +47,14 @@ class QarnotNodeSched(BatsimScheduler):
         if not os.path.exists(options["dataset_filename"]):
                 assert False, "Could not find dataset file {}".format(options["dataset_filename"])
 
+        if "update_period" in options:
+            self.update_period = options["update_period"]
+        else:
+            #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
+            #self.update_period = 600 # TODO every 10 minutes for testing
+            self.update_period = 150 # TODO every 2.5 minutes for testing
+
+
         # For the manager
         self.dict_qboxes = {}        # Maps the QBox id to the QarnotBoxSched object
         self.dict_resources = {} # Maps the Batsim resource id to the QarnotBoxSched object
@@ -65,9 +73,6 @@ class QarnotNodeSched(BatsimScheduler):
         #self.qboxes_free_disk_space = {} # Maps the QBox id to the free disk space (in GB)
         #self.qboes_queued_upload_size = {} # Maps the QBox id to the queued upload size (in GB)
 
-        #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
-        #self.update_period = 600 # TODO every 10 minutes for testing
-        self.update_period = 150 # TODO every 2.5 minutes for testing
         self.time_next_update = 1.0 # The next time the scheduler should be woken up
         self.update_in_current_step = False # Whether update should be done in this current scheduling step
         self.next_update_asked = False     # Whether the 'call_me_later' has been sent or not
