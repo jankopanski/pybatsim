@@ -222,36 +222,6 @@ class Batsim(object):
             self.logger.debug("Registering profile: {}".format(msg["data"]))
             self.profiles[workload_name][profile_name] = profile
 
-    def register_resubmitted_job(self, new_job_id, job):
-        """
-        The given job was killed by some preemption, so, the new_job_id is how we will resubmit it.
-        We will get the current time as the new_job.submit_time. 
-        The new_job.job_state should be Job.State.SUBMITTED because it will be submitted in the sequence.
-        The other values are the same as the job killed.
-        This method returns the new job registered.
-        """
-
-        job_dict = {
-            "profile": job.profile,
-            "id": new_job_id,
-            "res": job.requested_resources,
-            "walltime": job.requested_time,
-            "subtime": self.time(),
-        }
-        msg = {
-            "timestamp": self.time(),
-            "type": "REGISTER_JOB",
-            "data": {
-                "job_id": new_job_id,
-                "job": job_dict,
-            }
-        }
-        self._events_to_send.append(msg)
-        self.jobs[new_job_id] = Job.from_json_dict(job_dict)
-        self.jobs[new_job_id].job_state = Job.State.SUBMITTED
-        self.nb_jobs_in_submission = self.nb_jobs_in_submission + 1
-        return self.jobs[new_job_id]
-
     def register_job(
             self,
             id,

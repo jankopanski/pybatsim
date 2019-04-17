@@ -45,9 +45,17 @@ class QarnotNodeSched(BatsimScheduler):
         #self.logger.setLevel(logging.CRITICAL)
 
         # Make sure the path to the datasets is passed
-        assert "dataset_filename" in options, "The path to the list of datasets should be given as a CLI option as follows: [pybatsim command] -o \'{\"dataset_filename\":\"path/to/datasests.json\"}\'"
-        if not os.path.exists(options["dataset_filename"]):
-                assert False, "Could not find dataset file {}".format(options["dataset_filename"])
+        assert "input_path" in options, "The path to the input files should be given as a CLI option as follows: [pybatsim command] -o \'{\"input_path\":\"path/to/input/files\"}\'"
+        if not os.path.exists(options["input_path"]):
+                assert False, "Could not find input path {}".format(options["input_path"])
+
+        if "update_period" in options:
+            self.update_period = options["update_period"]
+        else:
+            #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
+            #self.update_period = 600 # TODO every 10 minutes for testing
+            self.update_period = 150 # TODO every 2.5 minutes for testing
+
 
         # For the manager
         self.dict_qboxes = {}        # Maps the QBox id to the QarnotBoxSched object
@@ -67,10 +75,6 @@ class QarnotNodeSched(BatsimScheduler):
         #self.qboxes_free_disk_space = {} # Maps the QBox id to the free disk space (in GB)
         #self.qboes_queued_upload_size = {} # Maps the QBox id to the queued upload size (in GB)
 
-        #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
-        #self.update_period = 600 # TODO every 10 minutes for testing
-        self.update_period = 60 # TODO every 1 minutes for testing
-        #self.update_period = 150 # TODO every 2.5 minutes for testing
         self.time_next_update = 1.0 # The next time the scheduler should be woken up
         self.update_in_current_step = False # Whether update should be done in this current scheduling step
         self.next_update_asked = False     # Whether the 'call_me_later' has been sent or not
@@ -118,24 +122,26 @@ class QarnotNodeSched(BatsimScheduler):
         print("Number of staging jobs created:", self.storage_controller._next_staging_job_id)
         print("Number of preempted jobs:", self.nb_preempted_jobs)
 
-        self.save_additional_information()
+        self.write_output_to_file()
 
 
     # TODO To correct the dictory to save the csv file.     
-    def save_additional_information(self):
-        with open('_schedule_plus.csv', 'w', newline='') as csvfile:
-            fieldnames = ['nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created', 'nb_staging_jobs_created', 'nb_preempted_jobs']
+    def write_output_to_file(self):
+        with open(self.option["input_path"]+"_schedule_plus.csv", 'w', newline='') as csvfile:
+            fieldnames = ['update_period', 'nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created', 'nb_staging_jobs_created', 'nb_preempted_jobs']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
-            writer.writerow({'nb_rejected_instances_during_dispatch': self.nb_rejected_jobs_by_qboxes, 
-                'nb_burn_jobs_created': self.next_burn_job_id, 
-                'nb_staging_jobs_created': self.storage_controller._next_staging_job_id,  
+            writer.writerow({
+                'update_period': self.update_period,
+                'nb_rejected_instances_during_dispatch': self.nb_rejected_jobs_by_qboxes,
+                'nb_burn_jobs_created': self.next_burn_job_id,
+                'nb_staging_jobs_created': self.storage_controller._next_staging_job_id,
                 'nb_preempted_jobs': self.nb_preempted_jobs})
 
 
     def initQBoxesAndStorageController(self):
         # Let's create the StorageController
-        self.storage_controller = StorageController(self.bs.machines["storage"], self.bs, self, self.options["dataset_filename"])
+        self.storage_controller = StorageController(self.bs.machines["storage"], self.bs, self, self.options["input_path"])
 
 
         # Retrieve the QBox ids and the associated list of QMobos Batsim ids

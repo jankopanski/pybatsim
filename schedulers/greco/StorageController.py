@@ -194,7 +194,7 @@ class Storage:
 
 class StorageController:
 
-    def __init__(self, storage_resources, bs, qn, filename):
+    def __init__(self, storage_resources, bs, qn, input_path):
         self._storages = dict()  # Maps the storage batsim id to the Storage object
         self._ceph_id = -1       # The batsim id of the storage_server
         self._next_staging_job_id = 0
@@ -219,7 +219,7 @@ class StorageController:
                 # Store the CEPH ID
                 self._ceph_id = res["id"]
                 # Parse the dataset file
-                new_storage.load_datasets_from_json(filename)
+                new_storage.load_datasets_from_json(input_path+"/datasets.json")
 
             self.add_storage(new_storage)
 
