@@ -251,6 +251,7 @@ class Batsim(object):
         self.jobs[id] = Job.from_json_dict(job_dict)
         self.jobs[id].job_state = Job.State.IN_SUBMISSON
         self.nb_jobs_in_submission = self.nb_jobs_in_submission + 1
+        return self.jobs[id]
 
     def set_resource_state(self, resources, state):
         """ args:resources: is a ProcSet containing a list of resources.
@@ -393,7 +394,7 @@ class Batsim(object):
         if len(splitted_id) == 1:
             new_job_name = deepcopy(job.id)
         else:
-            # This job as already an attempt number
+            # This job has already an attempt number
             new_job_name = splitted_id[0]
             assert splitted_id[1] == str(metadata["nb_resubmit"] - 1)
         new_job_name =  new_job_name + Batsim.ATTEMPT_JOB_SEPARATOR + str(metadata["nb_resubmit"])

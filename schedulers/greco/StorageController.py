@@ -194,10 +194,10 @@ class Storage:
 
 class StorageController:
 
-    def __init__(self, storage_resources, bs, qn, filename):
+    def __init__(self, storage_resources, bs, qn, input_path):
         self._storages = dict()  # Maps the storage batsim id to the Storage object
         self._ceph_id = -1       # The batsim id of the storage_server
-        self._idSub = 0
+        self._next_staging_job_id = 0
         self._bs = bs            # Pybatsim
         self._qn = qn            # The QNode Scheduler
         self._logger = bs.logger
@@ -219,7 +219,7 @@ class StorageController:
                 # Store the CEPH ID
                 self._ceph_id = res["id"]
                 # Parse the dataset file
-                new_storage.load_datasets_from_json(filename)
+                new_storage.load_datasets_from_json(input_path+"/datasets.json")
 
             self.add_storage(new_storage)
 
@@ -240,11 +240,15 @@ class StorageController:
 
         # The dict of all qboxes with the required dataset
         qboxes_list = []
-
+        
+        # Removing CEPH from this dict
+        storages = {}
+        for s in self.get_storages():
+            if (s != self._ceph_id):
+                storages[s] = self.get_storage(s)
+        
         # Iterate over all the storages
-        for storage_id, storage in self.get_storages():
-            self._logger.info("{} storages: {} " .format(storage._name, storage._datasets))
-
+        for storage in storages.values():
             hasDataset = True
 
             # To check if this storage has all the datasets required.
@@ -254,7 +258,7 @@ class StorageController:
                     break
             # If true, the storage has all required datasets.
             if(hasDataset):
-                self._logger.debug("[{}]     QBOX {} has the required datasets.".format(self._bs.time(), self.mappingQBoxes[storage._id]))
+                #self._logger.debug("[{}]     QBOX {} has the required datasets.".format(self._bs.time(), self.mappingQBoxes[storage._id]))
                 qboxes_list.append(self.mappingQBoxes[storage._id])
         
         return qboxes_list
@@ -415,7 +419,7 @@ class StorageController:
         self.add_dataset(dest_id, dataset)
 
         # Profile Submit
-        profile_name = "staging" + str(self._idSub + 1)
+        profile_name = "staging" + str(self._next_staging_job_id + 1)
         move_profile = {
             profile_name : 
             {
@@ -428,8 +432,8 @@ class StorageController:
         self._bs.register_profiles("dyn-staging", move_profile)
 
         # Job Submit
-        self._idSub += 1
-        jid1 = "dyn-staging!" + str(self._idSub)
+        self._next_staging_job_id += 1
+        jid1 = "dyn-staging!" + str(self._next_staging_job_id)
         self._bs.register_job(id=jid1, res=1, walltime=-1, profile_name=profile_name)
 
         # Job Execution

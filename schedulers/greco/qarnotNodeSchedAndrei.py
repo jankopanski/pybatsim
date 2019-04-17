@@ -11,7 +11,6 @@ import math
 import logging
 import sys
 import os
-
 import csv
 '''
 This is the scheduler instanciated by Pybatsim for a simulation of the Qarnot platform and has two roles:
@@ -38,7 +37,7 @@ A job refers to a Batsim job (see batsim.batsim.Job)
 A task or QTask refers to a Qarnot QTask (see qarnotUtils.QTask)
 '''
 
-class QarnotNodeSched(BatsimScheduler):
+class QarnotNodeSchedAndrei(BatsimScheduler):
     def __init__(self, options):
         super().__init__(options)
 
@@ -55,15 +54,6 @@ class QarnotNodeSched(BatsimScheduler):
             #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
             #self.update_period = 600 # TODO every 10 minutes for testing
             self.update_period = 150 # TODO every 2.5 minutes for testing
-
-
-        if "update_period" in options:
-            self.update_period = options["update_period"]
-        else:
-            #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
-            #self.update_period = 600 # TODO every 10 minutes for testing
-            self.update_period = 150 # TODO every 2.5 minutes for testing
-
 
         # For the manager
         self.dict_qboxes = {}        # Maps the QBox id to the QarnotBoxSched object
@@ -130,12 +120,10 @@ class QarnotNodeSched(BatsimScheduler):
         print("Number of staging jobs created:", self.storage_controller._next_staging_job_id)
         print("Number of preempted jobs:", self.nb_preempted_jobs)
 
-        self.write_output_to_file()
+        self.write_outputs_in_file()
 
-
-    # TODO To correct the dictory to save the csv file.     
-    def write_output_to_file(self):
-        with open(self.option["input_path"]+"_schedule_plus.csv", 'w', newline='') as csvfile:
+    def write_outputs_in_file(self):
+        with open(self.options["input_path"]+"/_schedule_plus.csv", 'w', newline='') as csvfile:
             fieldnames = ['update_period', 'nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created', 'nb_staging_jobs_created', 'nb_preempted_jobs']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
@@ -146,11 +134,9 @@ class QarnotNodeSched(BatsimScheduler):
                 'nb_staging_jobs_created': self.storage_controller._next_staging_job_id,
                 'nb_preempted_jobs': self.nb_preempted_jobs})
 
-
     def initQBoxesAndStorageController(self):
         # Let's create the StorageController
         self.storage_controller = StorageController(self.bs.machines["storage"], self.bs, self, self.options["input_path"])
-
 
         # Retrieve the QBox ids and the associated list of QMobos Batsim ids
         dict_ids = defaultdict(lambda: defaultdict(list))
@@ -475,6 +461,42 @@ class QarnotNodeSched(BatsimScheduler):
                 return True
         return False
 
+    def get_qboxes_with_dataset(self, qtask):
+        ''' Lists all QBoxes that have the required list of datasets from the job 
+        Could happen:
+        - Required Data Set == NULL => qboxes_list empty
+        - Required Data Set != NULL => qboxes_list empty or Not
+        '''
+        qboxes_list = []
+        required_datasets = qtask.datasets # To get the list of datasets requireds by the job
+        if (required_datasets != None and len(required_datasets) > 0):
+            qboxes_list = self.storage_controller.get_storages_by_dataset(required_datasets)
+        return qboxes_list
+
+    """    
+    def list_qboxes_by_download_time(self, qtask):
+        ''' Lists QBoxes ordered by the predicted download time of the datasets '''
+
+        required_datasets = {} # To get the list of datasets requireds by the job
+        if (self.bs.profiles.get(qtask.profile) != None) :
+            required_datasets = self.bs.profiles[qtask.profile]['datasets']
+        if (len(required_datasets) > 0):
+            # TODO
+            qboxes_list = [] # self.storage_controller.get_storages_by_download_time(required_dataset)
+        else:
+            qboxes_list = []
+        return qboxes_list
+    """
+
+    def get_available_mobos_with_ds(self, qboxes_list):
+        ''' It receives the qboxes_list and returns a list wich all qmobos available from each qbox '''
+
+        available_mobos_by_dataset = []
+        for qb in qboxes_list:
+            for mobo in self.lists_available_mobos:
+                if (qb.name == mobo[0]):
+                    available_mobos_by_dataset.append(mobo)
+        return available_mobos_by_dataset
 
     def doDispatch(self):
         '''For the dispatch of a task:
@@ -500,13 +522,24 @@ class QarnotNodeSched(BatsimScheduler):
 
         # Sort the jobs by decreasing priority (hence the '-' sign) and then by increasing number of running instances
         self.logger.info("[{}]- QNode starting doDispatch".format(self.bs.time()))
+        
         for qtask in sorted(self.qtasks_queue.values(),key=lambda qtask:(-qtask.priority, qtask.nb_dispatched_instances)):
             nb_instances_left = len(qtask.waiting_instances)
             if nb_instances_left > 0:
                 self.logger.debug("[{}]- QNode trying to dispatch {} of priority {} having {} waiting and {} dispatched instances".format(self.bs.time(),qtask.id, qtask.priority, len(qtask.waiting_instances), qtask.nb_dispatched_instances))
                 # Dispatch as many instances as possible on mobos available for bkgd, no matter the priority of the qtask
                 self.sortAvailableMobos("bkgd")
-                for tup in self.lists_available_mobos:
+
+                list_qboxes = self.get_qboxes_with_dataset(qtask)
+                if(len(list_qboxes) == 0):
+                    available_mobos = self.lists_available_mobos
+                else:
+                    available_mobos = self.get_available_mobos_with_ds(list_qboxes)
+                    for mobo in self.lists_available_mobos:
+                        if mobo not in available_mobos:
+                            available_mobos.append(mobo)
+
+                for tup in available_mobos:
                     qb = self.dict_qboxes[tup[0]]
                     nb_slots = tup[1]
                     if nb_slots >= nb_instances_left:
@@ -532,7 +565,17 @@ class QarnotNodeSched(BatsimScheduler):
                 if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.BKGD):
                     # There are more instances to dispatch and the qtask is either low or high priority
                     self.sortAvailableMobos("low")
-                    for tup in self.lists_available_mobos:
+
+                    list_qboxes = self.get_qboxes_with_dataset(qtask)
+                    if(len(list_qboxes) == 0):
+                        available_mobo = self.lists_available_mobos
+                    else:
+                        available_mobos = self.get_available_mobos_with_ds(list_qboxes)
+                        for mobo in self.lists_available_mobos:
+                            if mobo not in available_mobos:
+                                available_mobos.append(mobo)
+
+                    for tup in available_mobos:
                         qb = self.dict_qboxes[tup[0]]
                         nb_slots = tup[2]
                         if nb_slots >= nb_instances_left:
@@ -558,7 +601,17 @@ class QarnotNodeSched(BatsimScheduler):
                     if (nb_instances_left > 0) and (qtask.priority_group > PriorityGroup.LOW):
                         # There are more instances to dispatch and the qtask is high priority
                         self.sortAvailableMobos("high")
-                        for tup in self.lists_available_mobos:
+                        
+                        list_qboxes = self.get_qboxes_with_dataset(qtask)
+                        if(len(list_qboxes) == 0):
+                            available_mobos = self.lists_available_mobos
+                        else:
+                            available_mobos = self.get_available_mobos_with_ds(list_qboxes)
+                            for mobo in self.lists_available_mobos:
+                                if mobo not in available_mobos:
+                                    available_mobos.append(mobo)  
+
+                        for tup in available_mobos:
                             qb = self.dict_qboxes[tup[0]]
                             nb_slots = tup[3]
                             if nb_slots >= nb_instances_left:
