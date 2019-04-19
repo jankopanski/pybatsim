@@ -2,6 +2,8 @@ from batsim.batsim import Job
 
 from procset import ProcSet
 
+import xml.etree.ElementTree as ET
+
 import math
 import json
 
@@ -225,6 +227,15 @@ class StorageController:
 
         self._logger.info("[{}]- StorageController initialization completed, CEPH id is {} and there are {} QBox disks".format(self._bs.time(),self._ceph_id, len(self._storages)-1))
 
+        # Now parse the platform file to get the bandwidth values
+
+        tree = ET.parse(input_path+'/platform.xml')
+
+        self.bandwidth = {}
+
+        for child in tree.getroot().iter('link'):
+            if ('wan_link' in child.attrib['id']) and ('bandwidth' in child.attrib):
+                self.bandwidth[child.attrib['id'][:-9]] = float(child.attrib['bandwidth'][:-4])
 
     def get_storage(self, storage_id):
         """ Returns the Storage corresponding to given storage_id if it exists or returns None. """
@@ -326,24 +337,27 @@ class StorageController:
         :return: Cost of free bandwidth assuming equal share
         '''
 
-        if(source_id == dest_id):
+        if source_id == dest_id:
             return 1000000000       # 1Tbps
 
         id = source_id
-        if(source_id == self._ceph_id):
+        if source_id == self._ceph_id:
             id = dest_id
 
-        default = 1000000000.0        # 1Gbps
+        speed = 1000.0        # 1Gbps
+
+        if dest_id in self.bandwidth:
+            speed = self.bandwidth[dest_id]
 
         transfers = 0
         for val in self.staging_map:
-            if(val[0] == id):
+            if val[0] == id:
                 transfers = transfers + 1
-            elif(val[1] == id):
+            elif val[1] == id:
                 transfers = transfers + 1
 
         transfers = transfers + 1   # Assuming the current one starts
-        return float(default)/float(transfers)
+        return float(speed)/float(transfers)
 
 
     def copy_from_CEPH_to_dest(self, dataset_ids, dest_id):
