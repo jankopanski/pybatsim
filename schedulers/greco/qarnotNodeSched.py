@@ -59,19 +59,12 @@ class QarnotNodeSched(BatsimScheduler):
             self.update_period = 150 # TODO every 2.5 minutes for testing
 
 
-        if "update_period" in options:
-            self.update_period = options["update_period"]
-        else:
-            #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
-            #self.update_period = 600 # TODO every 10 minutes for testing
-            self.update_period = 150 # TODO every 2.5 minutes for testing
-
-
         # For the manager
         self.dict_qboxes = {}        # Maps the QBox id to the QarnotBoxSched object
         self.dict_resources = {} # Maps the Batsim resource id to the QarnotBoxSched object
         self.dict_qrads = {}         # Maps the QRad name to the QarnotBoxSched object
         self.dict_sites = defaultdict(list) # Maps the site name ("paris" or "bordeaux" for now) to a list of QarnotBoxSched object
+        self.numeric_ids = {} # Maps the Qmobo name to its batid
 
         # Dispatcher
         self.qtasks_queue = {}     # Maps the QTask id to the QTask object that is waiting to be scheduled
@@ -172,7 +165,7 @@ class QarnotNodeSched(BatsimScheduler):
 
         # Retrieve the numeric ids given by the extractor. To check that they are the same as batids of the mobos.
         with open(self.options["input_path"]+"/platform.json", 'r') as file:
-            numeric_ids = json.load(file)["mobos_numeric_ids"]
+            self.numeric_ids = json.load(file)["mobos_numeric_ids"]
 
         # Let's create the QBox Schedulers
         for (qb_name, dict_qrads) in dict_ids.items():
@@ -188,7 +181,7 @@ class QarnotNodeSched(BatsimScheduler):
             for mobos_list in dict_qrads.values():
                 for (batid, qm_name, _) in mobos_list:
                     self.dict_resources[batid] = qb
-                    numeric_id = numeric_ids[qm_name]
+                    numeric_id = self.numeric_ids[qm_name]
                     # Just a guard to be sure.
                     assert batid == numeric_id, "{} and {} are different (types are {} {})".format(batid, numeric_id, type(batid), type(numeric_id))
 
@@ -524,7 +517,7 @@ class QarnotNodeSched(BatsimScheduler):
                         jobs = qtask.waiting_instances.copy()
                         self.addJobsToMapping(jobs, qb)                     # Add the Jobs to the internal mapping
                         qtask.instances_dispatched(jobs)                    # Update the QTask
-                        qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id) # Dispatch the instances
+                        qb.onDispatchedInstance(jobs, qtask.priority_group, qtask.id) # Dispatch the instances
                         tup[1] -= nb_instances_left                             # Update the number of slots in the list
                         nb_instances_left = 0
                         # No more instances are waiting, stop the dispatch for this qtask
@@ -534,7 +527,7 @@ class QarnotNodeSched(BatsimScheduler):
                         jobs = qtask.waiting_instances[0:nb_slots]
                         self.addJobsToMapping(jobs, qb)
                         qtask.instances_dispatched(jobs)
-                        qb.onDispatchedInstance(jobs, PriorityGroup.BKGD, qtask.id)
+                        qb.onDispatchedInstance(jobs, qtask.priority_group, qtask.id)
                         tup[1] = 0
                         nb_instances_left -= nb_slots
                 #End for bkgd slots
@@ -550,7 +543,7 @@ class QarnotNodeSched(BatsimScheduler):
                             jobs = qtask.waiting_instances.copy()
                             self.addJobsToMapping(jobs, qb)
                             qtask.instances_dispatched(jobs)
-                            qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+                            qb.onDispatchedInstance(jobs, qtask.priority_group, qtask.id)
                             tup[2] -= nb_instances_left
                             nb_instances_left = 0
                             # No more instances are waiting, stop the dispatch for this qtask
@@ -560,7 +553,7 @@ class QarnotNodeSched(BatsimScheduler):
                             jobs = qtask.waiting_instances[0:nb_slots]
                             self.addJobsToMapping(jobs, qb)
                             qtask.instances_dispatched(jobs)
-                            qb.onDispatchedInstance(jobs, PriorityGroup.LOW, qtask.id)
+                            qb.onDispatchedInstance(jobs, qtask.priority_group, qtask.id)
                             tup[2] = 0
                             nb_instances_left -= nb_slots
                     #End for low slots
@@ -576,7 +569,7 @@ class QarnotNodeSched(BatsimScheduler):
                                 jobs = qtask.waiting_instances.copy()
                                 self.addJobsToMapping(jobs, qb)
                                 qtask.instances_dispatched(jobs)
-                                qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
+                                qb.onDispatchedInstance(jobs, qtask.priority_group, qtask.id)
                                 tup[3] -= nb_instances_left
                                 nb_instances_left = 0
                                 # No more instances are waiting, stop the dispatch for this qtask
@@ -586,7 +579,7 @@ class QarnotNodeSched(BatsimScheduler):
                                 jobs = qtask.waiting_instances[0:nb_slots]
                                 self.addJobsToMapping(jobs, qb)
                                 qtask.instances_dispatched(jobs)
-                                qb.onDispatchedInstance(jobs, PriorityGroup.HIGH, qtask.id)
+                                qb.onDispatchedInstance(jobs, qtask.priority_group, qtask.id)
                                 tup[3] = 0
                                 nb_instances_left -= nb_slots
                         #End for high slots

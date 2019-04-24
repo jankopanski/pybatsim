@@ -239,8 +239,7 @@ class QarnotBoxSched():
     def onDispatchedInstance(self, instances, priority_group, qtask_id):
         '''
         Instances is a list of Batsim jobs corresponding to the instances dispatched to this QBox.
-        Priority_group is either bkgd/low/high and tells in which list of available
-        mobos we should execute the instances.
+        Priority_group of the instances
 
         Datasets are shared between the instances of the same QTask. So we only need to retrive the datasets once for all instances
         '''
@@ -461,20 +460,20 @@ class QarnotBoxSched():
 
                     # Then set the pstate of the mobo to 0 (corresponding to full speed)
                     self.stateChanges[0].insert(qm.batid)
-                    self.logger.debug("++++++++ Change state of {} to {} {} (burn job)".format(qm.batid, 0, qm.pstate))
+                    #self.logger.debug("++++++++ Change state of {} to {} {} (burn job)".format(qm.batid, 0, qm.pstate))
 
                 elif qm.state == QMoboState.IDLE:
                     # No heating required, turn off this mobo
                     self.logger.debug("Turning OFF mobo {} {}".format(qm.batid, qm.name))
                     qm.turn_off()
                     self.stateChanges[qm.max_pstate].insert(qm.batid)
-                    self.logger.debug("++++++++ Change state of {} to {} {} (off)".format(qm.batid, qm.max_pstate, qm.pstate))
+                    #self.logger.debug("++++++++ Change state of {} to {} {} (off)".format(qm.batid, qm.max_pstate, qm.pstate))
 
                 elif qm.state == QMoboState.LAUNCHING:
                     # A new instance was started during this scheduling step. Update the state and set pstate to 0 (max speed)
                     qm.launch_job()
                     self.stateChanges[0].insert(qm.batid)
-                    self.logger.debug("++++++++ Change state of {} to {} {} (launch job)".format(qm.batid, 0, qm.pstate))
+                    #self.logger.debug("++++++++ Change state of {} to {} {} (launch job)".format(qm.batid, 0, qm.pstate))
 
                 elif qm.state >= QMoboState.RUNLOW:
                     # Check if we can increase/decrease the processor speed
@@ -482,13 +481,13 @@ class QarnotBoxSched():
                         # Increase speed
                         qm.pstate -= 1
                         self.stateChanges[qm.pstate].insert(qm.batid)
-                        self.logger.debug("++++++++ Change state of {} to {} {} (increase speed)".format(qm.batid, qm.pstate, qm.pstate))
+                        #self.logger.debug("++++++++ Change state of {} to {} {} (increase speed)".format(qm.batid, qm.pstate, qm.pstate))
 
                     elif qr.diffTemp <= -1 and qm.pstate < (qm.max_pstate-1):
                         # Decrease speed
                         qm.pstate += 1
                         self.stateChanges[qm.pstate].insert(qm.batid)
-                        self.logger.debug("++++++++ Change state of {} to {} {} (decrease speed)".format(qm.batid, qm.pstate, qm.pstate))
+                        #self.logger.debug("++++++++ Change state of {} to {} {} (decrease speed)".format(qm.batid, qm.pstate, qm.pstate))
                     # Else we stay in this pstate
 
                 else:
