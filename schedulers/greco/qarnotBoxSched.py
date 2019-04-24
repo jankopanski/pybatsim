@@ -106,7 +106,7 @@ class QarnotBoxSched():
         # Tells the StorageController who we are and retrieve the batid of our disk
         self.disk_batid = self.storage_controller.onQBoxRegistration(self.name, self)
 
-        self.logger.info("[{}]--- QBox {} initialization completed. Night gathers, and now my watch on {} Qrads and {} QMobos begins!".format(self.bs.time(),self.name, len(self.dict_qrads.keys()), self.nb_mobos))
+        self.logger.info("[{}]--- {} init'd correctly. Night gathers, and now my watch on {} Qrads and {} QMobos begins!".format(self.bs.time(),self.name, len(self.dict_qrads.keys()), self.nb_mobos))
 
     def onSimulationEnds(self):
         pass

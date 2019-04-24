@@ -13,6 +13,8 @@ import sys
 import os
 
 import csv
+
+import json
 '''
 This is the scheduler instanciated by Pybatsim for a simulation of the Qarnot platform and has two roles:
 - It does the interface between Batsim/Pybatsim API and the QNode/QBox schedulers (manager)
@@ -129,13 +131,14 @@ class QarnotNodeSched(BatsimScheduler):
         print("Number of burn jobs created:", self.next_burn_job_id)
         print("Number of staging jobs created:", self.storage_controller._next_staging_job_id)
         print("Number of preempted jobs:", self.nb_preempted_jobs)
+        print("Update_period was:", self.update_period)
 
         self.write_output_to_file()
 
 
     # TODO To correct the dictory to save the csv file.     
     def write_output_to_file(self):
-        with open(self.option["input_path"]+"_schedule_plus.csv", 'w', newline='') as csvfile:
+        with open(self.options["input_path"]+"_schedule_plus.csv", 'w', newline='') as csvfile:
             fieldnames = ['update_period', 'nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created', 'nb_staging_jobs_created', 'nb_preempted_jobs']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
@@ -167,6 +170,10 @@ class QarnotNodeSched(BatsimScheduler):
 
             dict_ids[qb_name][qr_name].append((batid, qm_name, properties))
 
+        # Retrieve the numeric ids given by the extractor. To check that they are the same as batids of the mobos.
+        with open(self.options["input_path"]+"/platform.json", 'r') as file:
+            numeric_ids = json.load(file)["mobos_numeric_ids"]
+
         # Let's create the QBox Schedulers
         for (qb_name, dict_qrads) in dict_ids.items():
             site = self.site_from_qb_name(qb_name)
@@ -179,8 +186,11 @@ class QarnotNodeSched(BatsimScheduler):
 
             # Populate the mapping between batsim resource ids and the associated QarnotBoxSched
             for mobos_list in dict_qrads.values():
-                for (batid, _, _) in mobos_list:
+                for (batid, qm_name, _) in mobos_list:
                     self.dict_resources[batid] = qb
+                    numeric_id = numeric_ids[qm_name]
+                    # Just a guard to be sure.
+                    assert batid == numeric_id, "{} and {} are different (types are {} {})".format(batid, numeric_id, type(batid), type(numeric_id))
 
         self.nb_qboxes = len(self.dict_qboxes)
         self.nb_computing_resources = len(self.dict_resources)
