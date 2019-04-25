@@ -2,11 +2,14 @@ from procset import ProcSet
 
 class PriorityGroup:
     BKGD, LOW, HIGH = range(3)
-    '''
-    If priority in (-max_int, -10) then BKGD
-                   [-10,0) then LOW
-                   [0,+10] then HIGH
-    '''
+
+    def fromValue(priority):
+        return PriorityGroup.HIGH if priority >= 0 else ( PriorityGroup.BKGD if priority < -10 else PriorityGroup.LOW )
+        '''
+        If priority in (-max_int, -10) then BKGD
+                       [-10,0) then LOW
+                       [0,+10] then HIGH
+        '''
 
 class QTask:
     # Used by the QNode scheduler
@@ -21,7 +24,7 @@ class QTask:
         self.datasets = list_datasets          # List of input datasets
 
         self.priority = int(priority)
-        self.priority_group = PriorityGroup.HIGH if self.priority >= 0 else ( PriorityGroup.BKGD if self.priority < -10 else PriorityGroup.LOW )
+        self.priority_group = PriorityGroup.fromValue(self.priority)
 
 
         #TODO
