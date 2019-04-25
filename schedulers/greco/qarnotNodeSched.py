@@ -148,8 +148,7 @@ class QarnotNodeSched(BatsimScheduler):
 
     def initQBoxesAndStorageController(self):
         # Let's create the StorageController
-        self.storage_controller = StorageController(self.bs.machines["storage"], self.bs, self, self.options["input_path"])
-
+        self.storage_controller = self.create_storage_controller(self.bs.machines["storage"], self.bs, self, self.options["input_path"])
 
         # Retrieve the QBox ids and the associated list of QMobos Batsim ids
         dict_ids = defaultdict(lambda: defaultdict(list))
@@ -173,7 +172,7 @@ class QarnotNodeSched(BatsimScheduler):
         # Let's create the QBox Schedulers
         for (qb_name, dict_qrads) in dict_ids.items():
             site = self.site_from_qb_name(qb_name)
-            qb = QarnotBoxSched(qb_name, dict_qrads, site, self.bs, self, self.storage_controller)
+            qb = self.create_qbox_sched(qb_name, dict_qrads, site, self.bs, self, self.storage_controller)
 
             self.dict_qboxes[qb_name] = qb
             self.dict_sites[site].append(qb)
@@ -190,6 +189,12 @@ class QarnotNodeSched(BatsimScheduler):
 
         self.nb_qboxes = len(self.dict_qboxes)
         self.nb_computing_resources = len(self.dict_resources)
+
+    def create_storage_controller(self, *args):
+        return StorageController(*args)
+
+    def create_qbox_sched(self, *args):
+        return QarnotBoxSched(*args)
 
     def site_from_qb_name(self, qb_name):
         if qb_name.split('-')[1] == "2000":
