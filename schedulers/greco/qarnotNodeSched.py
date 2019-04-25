@@ -456,12 +456,13 @@ class QarnotNodeSched(BatsimScheduler):
 
 
     def sortAvailableMobos(self, priority):
+        #self.lists_available_mobos.sort(key=lambda tup:tup[0])
         if priority == "bkgd":
-            self.lists_available_mobos.sort(key=lambda nb:nb[1])
+            self.lists_available_mobos.sort(key=lambda tup:(tup[0],tup[1]))
         elif priority == "low":
-            self.lists_available_mobos.sort(key=lambda nb:nb[2])
+            self.lists_available_mobos.sort(key=lambda tup:(tup[0],tup[2]))
         elif priority == "high":
-            self.lists_available_mobos.sort(key=lambda nb:nb[3])
+            self.lists_available_mobos.sort(key=lambda tup:(tup[0],tup[3]))
 
 
     def addJobsToMapping(self, jobs, qb):
