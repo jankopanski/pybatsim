@@ -58,6 +58,8 @@ class QarnotNodeSched(BatsimScheduler):
             #self.update_period = 600 # TODO every 10 minutes for testing
             self.update_period = 150 # TODO every 2.5 minutes for testing
 
+        self.output_path = options["output_path"] if "output_path" in options else None
+
 
         # For the manager
         self.dict_qboxes = {}        # Maps the QBox id to the QarnotBoxSched object
@@ -126,12 +128,12 @@ class QarnotNodeSched(BatsimScheduler):
         print("Number of preempted jobs:", self.nb_preempted_jobs)
         print("Update_period was:", self.update_period)
 
-        self.write_output_to_file()
+        if self.output_path != None:
+            self.write_output_to_file(self.output_path + "/out_pybatsim.csv")
 
-
-    # TODO To correct the dictory to save the csv file.     
-    def write_output_to_file(self):
-        with open(self.options["input_path"]+"_schedule_plus.csv", 'w', newline='') as csvfile:
+    def write_output_to_file(self, filename):
+        print("Writing outputs to", filename)
+        with open(filename, 'w', newline='') as csvfile:
             fieldnames = ['update_period', 'nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created', 'nb_staging_jobs_created', 'nb_preempted_jobs']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()

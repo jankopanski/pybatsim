@@ -13,28 +13,8 @@ import sys
 import os
 import csv
 '''
-This is the scheduler instanciated by Pybatsim for a simulation of the Qarnot platform and has two roles:
-- It does the interface between Batsim/Pybatsim API and the QNode/QBox schedulers (manager)
-- It holds the implementation of the Qarnot QNode scheduler (dispatcher)
-
-
-Every 30 seconds from t=0 the QNode scheduler will be woken up by Batsim.
-At this time, the QBox sched will be asked to update their state (cf function updateAndReportState of the QBox scheduler)
-
-Every time the QNode sched will be woken up, a dispatch of the tasks in the queue will be performed after each event
-in the message from Batsim was handled.
-
-
-Notion of priority for tasks:
-There are 3 major groups: Bkgd, Low and High
-Each task has a certain numerical value of priority.
-
-A task cannot preempt a task in the same priority group (even if its numerical priority is smaller)
-but can preempt tasks from a lower priority group.
-
-
-A job refers to a Batsim job (see batsim.batsim.Job)
-A task or QTask refers to a Qarnot QTask (see qarnotUtils.QTask)
+This is a variant of the qarnotNodeSched that takes into account locality of the datasets
+to dispatch instances.
 '''
 
 class QarnotNodeSchedAndrei(BatsimScheduler):
@@ -54,6 +34,8 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
             #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
             #self.update_period = 600 # TODO every 10 minutes for testing
             self.update_period = 150 # TODO every 2.5 minutes for testing
+
+        self.output_path = options["output_path"] if "output_path" in options else None
 
         # For the manager
         self.dict_qboxes = {}        # Maps the QBox id to the QarnotBoxSched object
@@ -120,10 +102,12 @@ class QarnotNodeSchedAndrei(BatsimScheduler):
         print("Number of staging jobs created:", self.storage_controller._next_staging_job_id)
         print("Number of preempted jobs:", self.nb_preempted_jobs)
 
-        self.write_outputs_in_file()
+        if self.output_path != None:
+            self.write_output_to_file(self.output_path + "/out_pybatsim_andrei.csv")
 
-    def write_outputs_in_file(self):
-        with open(self.options["input_path"]+"/_schedule_plus.csv", 'w', newline='') as csvfile:
+    def write_output_to_file(self, filename):
+        print("Writing outputs to", filename)
+        with open(filename, 'w', newline='') as csvfile:
             fieldnames = ['update_period', 'nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created', 'nb_staging_jobs_created', 'nb_preempted_jobs']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()

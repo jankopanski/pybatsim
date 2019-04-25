@@ -8,34 +8,8 @@ import logging
 
 
 '''
-This is the qarnot QBox scheduler
-
-
-List of available mobos:
-- availBkgd: for each QBox number of mobos that are too cold and are running CPU burn tasks to heat
-  We start CPU burn if air_temp < target - 1                       start if diff >= 1
-  We stop the CPU burn if air_temp > target + 1                    stop if  diff < -1
-  We can start low and high priority tasks here as well
-
-- availLow: for each QBox number of mobos that are too hot to run cpu burn and are probably idle (or running cpu burn)
-  We can start low priority tasks if air_temp < target + 1         start low if diff >= -1
-  We stop the low priority tasks there if air_temp > target + 3    stop low if  diff < -3
-  We can start high priority tasks here as well
-
-- availHigh: for each QBox number of mobos that are too hot to run low priority tasks
-  We can start high priority tasks if air_temp < target + 4        start high if diff >= -4
-  We stop high priority tasks if air_temp > target + 10            stop high  if diff < -10
-
-
-When a task of higher priority is sent to a mobo that is already running something,
-wait for all the datasets to arrive before stopping the execution of the current task.
-
-
-#TODO when an event of type "machine_unavailable" is received
-# we should mark the qrad/mobos as unavailable as well 
-
-#TODO need to add a "warmup" time for booting the mobo when a new task is executed on it
-
+This is a simplification of the qarnotBoxSched scheduler that simply schedules instances on the same
+QMobo as for the real execution of the inputs on the Qarnot platform.
 '''
 
 class QarnotBoxSchedStatic():
