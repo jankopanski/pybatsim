@@ -13,7 +13,6 @@ import sys
 import os
 
 import csv
-
 import json
 '''
 This is the scheduler instanciated by Pybatsim for a simulation of the Qarnot platform and has two roles:
@@ -58,8 +57,10 @@ class QarnotNodeSched(BatsimScheduler):
             #self.update_period = 600 # TODO every 10 minutes for testing
             self.update_period = 150 # TODO every 2.5 minutes for testing
 
-        self.output_path = options["output_path"] if "output_path" in options else None
-
+        if "output_path" in options:
+            self.output_filename = options["output_path"] + "/out_pybatsim.csv"
+        else:
+            self.output_filename = None
 
         # For the manager
         self.dict_qboxes = {}        # Maps the QBox id to the QarnotBoxSched object
@@ -74,7 +75,7 @@ class QarnotNodeSched(BatsimScheduler):
         
         self.lists_available_mobos = [] # List of [qbox_name, slots bkgd, slots low, slots high]
                                         # This list is updated every 30 seconds from the reports of the QBoxes
-        
+        self.direct_dispatch_enabled = True # Whehter direct dispatch of intances is possible
 
         #NOT USED AT THE MOMENT:
         #self.qboxes_free_disk_space = {} # Maps the QBox id to the free disk space (in GB)
@@ -128,12 +129,12 @@ class QarnotNodeSched(BatsimScheduler):
         print("Number of preempted jobs:", self.nb_preempted_jobs)
         print("Update_period was:", self.update_period)
 
-        if self.output_path != None:
-            self.write_output_to_file(self.output_path + "/out_pybatsim.csv")
+        if self.output_filename != None:
+            self.write_output_to_file()
 
-    def write_output_to_file(self, filename):
-        print("Writing outputs to", filename)
-        with open(filename, 'w', newline='') as csvfile:
+    def write_output_to_file(self):
+        print("Writing outputs to", self.output_filename)
+        with open(self.output_filename, 'w', newline='') as csvfile:
             fieldnames = ['update_period', 'nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created', 'nb_staging_jobs_created', 'nb_preempted_jobs']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
@@ -255,8 +256,6 @@ class QarnotNodeSched(BatsimScheduler):
             qb.onNoMoreEvents()
 
         # If the simulation is not finished and we need to ask Batsim for the next waking up
-        #self.checkNoMoreInstances()
-        #self.checkSimulationFinished()
         if not self.end_of_simulation_asked and self.update_in_current_step:
             self.bs.wake_me_up_at(self.time_next_update)
             self.update_in_current_step = False
@@ -396,14 +395,10 @@ class QarnotNodeSched(BatsimScheduler):
                 qb = self.jobs_mapping.pop(job.id)
 
                 #Check if direct dispatch is possible
-                if len(qtask.waiting_instances) > 0 and not self.existsHigherPriority(qtask.priority):
+                if self.direct_dispatch_enabled:
                     ''' DIRECT DISPATCH '''
-                    #This Qtask still has instances to dispatch and it has the highest priority in the queue
-                    direct_job = qtask.instance_poped_and_dispatched()
-                    self.jobs_mapping[direct_job.id] = qb
-                    self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(self.bs.time(),direct_job.id, qb.name))
+                    direct_job = self.tryDirectDispatch(qtask, qb)
                     qb.onJobCompletion(job, direct_job)
-
                 else:
                     qb.onJobCompletion(job)
                     # A slot should be available, do a general dispatch
@@ -416,12 +411,21 @@ class QarnotNodeSched(BatsimScheduler):
                     if qtask.is_complete():
                         self.logger.info("[{}]    All instances of QTask {} have terminated, removing it from the queue".format(self.bs.time(), qtask.id))
                         del self.qtasks_queue[qtask.id]
-
             else:
                 # "Regular" instances are not supposed to have a walltime nor fail
                 assert False, "Job {} reached the state {}, this should not happen.".format(job.id, job.job_state)
         #End if/else on job.workload
     #End onJobCompletion
+
+    def tryDirectDispatch(self, qtask, qb):
+        if len(qtask.waiting_instances) > 0 and not self.existsHigherPriority(qtask.priority):
+            #This Qtask still has instances to dispatch and it has the highest priority in the queue
+            direct_job = qtask.instance_poped_and_dispatched()
+            self.jobs_mapping[direct_job.id] = qb
+            self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(self.bs.time(),direct_job.id, qb.name))
+            return direct_job
+        else:
+            return -1 # No job is directly dispatched
 
     def onJobsKilled(self, job):
         pass
