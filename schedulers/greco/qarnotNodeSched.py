@@ -13,7 +13,6 @@ import sys
 import os
 
 import csv
-
 import json
 '''
 This is the scheduler instanciated by Pybatsim for a simulation of the Qarnot platform and has two roles:
@@ -44,7 +43,7 @@ class QarnotNodeSched(BatsimScheduler):
     def __init__(self, options):
         super().__init__(options)
 
-        #self.logger.setLevel(logging.CRITICAL)
+        #self.logger.setLevel(logging.DEBUG)
 
         # Make sure the path to the datasets is passed
         assert "input_path" in options, "The path to the input files should be given as a CLI option as follows: [pybatsim command] -o \'{\"input_path\":\"path/to/input/files\"}\'"
@@ -58,6 +57,10 @@ class QarnotNodeSched(BatsimScheduler):
             #self.update_period = 600 # TODO every 10 minutes for testing
             self.update_period = 150 # TODO every 2.5 minutes for testing
 
+        if "output_path" in options:
+            self.output_filename = options["output_path"] + "/out_pybatsim.csv"
+        else:
+            self.output_filename = None
 
         # For the manager
         self.dict_qboxes = {}        # Maps the QBox id to the QarnotBoxSched object
@@ -66,13 +69,16 @@ class QarnotNodeSched(BatsimScheduler):
         self.dict_sites = defaultdict(list) # Maps the site name ("paris" or "bordeaux" for now) to a list of QarnotBoxSched object
         self.numeric_ids = {} # Maps the Qmobo name to its batid
 
+        self.qbox_sched_name = QarnotBoxSched
+        self.storage_controller_name = StorageController
+
         # Dispatcher
         self.qtasks_queue = {}     # Maps the QTask id to the QTask object that is waiting to be scheduled
         self.jobs_mapping = {}     # Maps the batsim job id to the QBox Object where it has been sent to
         
         self.lists_available_mobos = [] # List of [qbox_name, slots bkgd, slots low, slots high]
                                         # This list is updated every 30 seconds from the reports of the QBoxes
-        
+        self.direct_dispatch_enabled = True # Whehter direct dispatch of intances is possible
 
         #NOT USED AT THE MOMENT:
         #self.qboxes_free_disk_space = {} # Maps the QBox id to the free disk space (in GB)
@@ -126,12 +132,12 @@ class QarnotNodeSched(BatsimScheduler):
         print("Number of preempted jobs:", self.nb_preempted_jobs)
         print("Update_period was:", self.update_period)
 
-        self.write_output_to_file()
+        if self.output_filename != None:
+            self.write_output_to_file()
 
-
-    # TODO To correct the dictory to save the csv file.     
     def write_output_to_file(self):
-        with open(self.options["input_path"]+"_schedule_plus.csv", 'w', newline='') as csvfile:
+        print("Writing outputs to", self.output_filename)
+        with open(self.output_filename, 'w', newline='') as csvfile:
             fieldnames = ['update_period', 'nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created', 'nb_staging_jobs_created', 'nb_preempted_jobs']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
@@ -145,8 +151,7 @@ class QarnotNodeSched(BatsimScheduler):
 
     def initQBoxesAndStorageController(self):
         # Let's create the StorageController
-        self.storage_controller = StorageController(self.bs.machines["storage"], self.bs, self, self.options["input_path"])
-
+        self.storage_controller = self.storage_controller_name(self.bs.machines["storage"], self.bs, self, self.options["input_path"])
 
         # Retrieve the QBox ids and the associated list of QMobos Batsim ids
         dict_ids = defaultdict(lambda: defaultdict(list))
@@ -170,7 +175,7 @@ class QarnotNodeSched(BatsimScheduler):
         # Let's create the QBox Schedulers
         for (qb_name, dict_qrads) in dict_ids.items():
             site = self.site_from_qb_name(qb_name)
-            qb = QarnotBoxSched(qb_name, dict_qrads, site, self.bs, self, self.storage_controller)
+            qb = self.qbox_sched_name(qb_name, dict_qrads, site, self.bs, self, self.storage_controller)
 
             self.dict_qboxes[qb_name] = qb
             self.dict_sites[site].append(qb)
@@ -187,6 +192,7 @@ class QarnotNodeSched(BatsimScheduler):
 
         self.nb_qboxes = len(self.dict_qboxes)
         self.nb_computing_resources = len(self.dict_resources)
+
 
     def site_from_qb_name(self, qb_name):
         if qb_name.split('-')[1] == "2000":
@@ -253,8 +259,6 @@ class QarnotNodeSched(BatsimScheduler):
             qb.onNoMoreEvents()
 
         # If the simulation is not finished and we need to ask Batsim for the next waking up
-        #self.checkNoMoreInstances()
-        #self.checkSimulationFinished()
         if not self.end_of_simulation_asked and self.update_in_current_step:
             self.bs.wake_me_up_at(self.time_next_update)
             self.update_in_current_step = False
@@ -394,14 +398,10 @@ class QarnotNodeSched(BatsimScheduler):
                 qb = self.jobs_mapping.pop(job.id)
 
                 #Check if direct dispatch is possible
-                if len(qtask.waiting_instances) > 0 and not self.existsHigherPriority(qtask.priority):
+                if self.direct_dispatch_enabled:
                     ''' DIRECT DISPATCH '''
-                    #This Qtask still has instances to dispatch and it has the highest priority in the queue
-                    direct_job = qtask.instance_poped_and_dispatched()
-                    self.jobs_mapping[direct_job.id] = qb
-                    self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(self.bs.time(),direct_job.id, qb.name))
+                    direct_job = self.tryDirectDispatch(qtask, qb)
                     qb.onJobCompletion(job, direct_job)
-
                 else:
                     qb.onJobCompletion(job)
                     # A slot should be available, do a general dispatch
@@ -414,12 +414,21 @@ class QarnotNodeSched(BatsimScheduler):
                     if qtask.is_complete():
                         self.logger.info("[{}]    All instances of QTask {} have terminated, removing it from the queue".format(self.bs.time(), qtask.id))
                         del self.qtasks_queue[qtask.id]
-
             else:
                 # "Regular" instances are not supposed to have a walltime nor fail
                 assert False, "Job {} reached the state {}, this should not happen.".format(job.id, job.job_state)
         #End if/else on job.workload
     #End onJobCompletion
+
+    def tryDirectDispatch(self, qtask, qb):
+        if len(qtask.waiting_instances) > 0 and not self.existsHigherPriority(qtask.priority):
+            #This Qtask still has instances to dispatch and it has the highest priority in the queue
+            direct_job = qtask.instance_poped_and_dispatched()
+            self.jobs_mapping[direct_job.id] = qb
+            self.logger.info("[{}]- QNode asked direct dispatch of {} on QBox {}".format(self.bs.time(),direct_job.id, qb.name))
+            return direct_job
+        else:
+            return -1 # No job is directly dispatched
 
     def onJobsKilled(self, job):
         pass
@@ -454,12 +463,13 @@ class QarnotNodeSched(BatsimScheduler):
 
 
     def sortAvailableMobos(self, priority):
+        #self.lists_available_mobos.sort(key=lambda tup:tup[0])
         if priority == "bkgd":
-            self.lists_available_mobos.sort(key=lambda nb:nb[1])
+            self.lists_available_mobos.sort(key=lambda tup:(tup[0],tup[1]))
         elif priority == "low":
-            self.lists_available_mobos.sort(key=lambda nb:nb[2])
+            self.lists_available_mobos.sort(key=lambda tup:(tup[0],tup[2]))
         elif priority == "high":
-            self.lists_available_mobos.sort(key=lambda nb:nb[3])
+            self.lists_available_mobos.sort(key=lambda tup:(tup[0],tup[3]))
 
 
     def addJobsToMapping(self, jobs, qb):
