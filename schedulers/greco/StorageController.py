@@ -389,41 +389,34 @@ class StorageController:
 
         If we can't move the Dataset, then no job for it is scheduled
         """
+        self._logger.info("StorageController : Request for dataset {} to transfer from {} to {}"\
+                          .format(dataset_id, source_id, dest_id))
 
         source = self.get_storage(source_id)
         dest = self.get_storage(dest_id)
 
         # First check if destination exists
         if(dest == None):
-            self._logger.info("Destination storage with id {} not found".format(dest_id))
+            self._logger.info("StorageController : Destination storage with id {} not found".format(dest_id))
             return False
-
-        # Now check if destination has dataset
-        if(dest.get_dataset(dataset_id) != None):
-            self._logger.info("Dataset with id {} already present in destination with id {}.".format(dataset_id, dest_id))
-            return True
 
         # Now we know that destination is present and does not have the dataset
 
         # We check if the source exists
         if(source == None):
-            self._logger.info("Source storage with id {} not found".format(dest_id))
-            return False
-
-        # Now check if it is same as destination
-        if(source_id == dest_id):
-            self._logger.info("Source id and detination id are same = {} where Data with id {} not present".format(source_id, dataset_id))
+            self._logger.info("StorageController : Source storage with id {} not found".format(dest_id))
             return False
 
         # Now check if the source has the dataset required
         if(source.get_dataset(dataset_id) == None):
-            self._logger.info("Source with id {} does not have dataset with id {}.".format(source_id, dest_id))
+            self._logger.info("StorageController : Source with id {} does not have dataset with id {}.".format(source_id, dest_id))
             return False
 
         # Now we check if the destination has enough storage
         dataset = source.get_dataset(dataset_id)
 
-        assert dest.get_storage_capacity() >= dataset.get_size(), "The dataset %r is larger than the storage capacity, aborting." % dataset._id
+        assert dest.get_storage_capacity() >= dataset.get_size(), \
+            "StorageController : The dataset %r is larger than the storage capacity, aborting." % dataset._id
         
         # Clear storage to enable data transfer
         if not dest.has_enough_space(dataset.get_size()):
@@ -459,7 +452,7 @@ class StorageController:
         self._bs.execute_jobs([job1])
         self.moveRequested[jid1] = dataset.get_id()
 
-        self._logger.info("[ {} ] StorageController starting move dataset {} to qbox disk {}".format(self._bs.time(), dataset_id, dest_id))
+        self._logger.info("[ {} ] Storage Controller staging job for dataset {} from {} to {} started".format(self._bs.time(), dataset_id, source_id, dest_id))
 
         self.staging_map.add((dest_id, dataset_id))
 
@@ -603,7 +596,6 @@ class StorageController:
         self.staging_map.remove((dest_id, dataset_id))
 
         self.mappingQBoxes[dest_id].onDatasetArrivedOnDisk(dataset_id)
-
 
     def onSimulationBegins(self):
         pass
