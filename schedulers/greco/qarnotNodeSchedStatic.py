@@ -31,11 +31,9 @@ class QarnotNodeSchedStatic(QarnotNodeSched):
 
         self.direct_dispatch_enabled = False
 
-        self.do_dispatch = False
+        self.qbox_sched_name = QarnotBoxSchedStatic
 
-    # Used during init of the platform in onSimulationBegins
-    def create_qbox_sched(self, *args):
-        return QarnotBoxSchedStatic(*args)
+        self.do_dispatch = False
 
 
     def onBeforeEvents(self):
