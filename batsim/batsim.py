@@ -285,29 +285,6 @@ class Batsim(object):
             }
         )
 
-    def request_air_temperature_all(self):
-        self._events_to_send.append(
-            {
-                "timestamp": self.time(),
-                "type": "QUERY",
-                "data": {
-                    "requests": {"air_temperature_all": {}}
-                }
-            }
-        )
-
-    def request_processor_temperature_all(self):
-        self._events_to_send.append(
-            {
-                "timestamp": self.time(),
-                "type": "QUERY",
-                "data": {
-                    "requests": {"processor_temperature_all": {}}
-                }
-            }
-        )
-
-
     def notify_resources_added(self, resources):
         self._events_to_send.append(
             {
@@ -403,9 +380,6 @@ class Batsim(object):
         self.logger.info("Message Received from Batsim: {}".format(msg))
 
         self._current_time = msg["now"]
-
-        if "air_temperatures" in msg:
-            self.air_temperatures = msg["air_temperatures"]
 
         self._events_to_send = []
 
@@ -567,12 +541,6 @@ class Batsim(object):
                 if "consumed_energy" in event_data:
                     consumed_energy = event_data["consumed_energy"]
                     self.scheduler.onReportEnergyConsumed(consumed_energy)
-                elif "processor_temperature_all" in event_data:
-                    proc_temperature_all = event_data["processor_temperature_all"]
-                    self.scheduler.onAnswerProcessorTemperatureAll(proc_temperature_all)
-                elif "air_temperature_all" in event_data:
-                    air_temperature_all = event_data["air_temperature_all"]
-                    self.scheduler.onAnswerAirTemperatureAll(air_temperature_all)
 
             elif event_type == 'REQUESTED_CALL':
                 self.scheduler.onRequestedCall()
@@ -762,12 +730,6 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onReportEnergyConsumed(self, consumed_energy):
-        raise NotImplementedError()
-
-    def onAnswerProcessorTemperatureAll(self, proc_temperature_all):
-        raise NotImplementedError()
-
-    def onAnswerAirTemperatureAll(self, air_temperature_all):
         raise NotImplementedError()
 
     def onAddResources(self, to_add):
