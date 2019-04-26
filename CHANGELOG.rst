@@ -18,6 +18,8 @@ Additions
 ~~~~~~~~~
 
 - Added the handling of `machine_available` and `machine_unavailable` events.
+- `storage_mapping` of a job is not attached to an `EXECUTE_JOB` event.
+- `register_job` function now returns the created Job.
 
 ........................................................................................................................
 
