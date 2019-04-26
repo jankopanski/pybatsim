@@ -413,6 +413,7 @@ class Batsim(object):
                 self.profiles_forwarded_on_submission = self.batconf["profiles-forwarded-on-submission"]
                 self.dynamic_job_registration_enabled = self.batconf["dynamic-jobs-enabled"]
                 self.ack_of_dynamic_jobs = self.batconf["dynamic-jobs-acknowledged"]
+                self.forward_unknown_events = self.batconf["forward-unknown-events"]
 
                 if self.dynamic_job_registration_enabled:
                     self.logger.warning("Dynamic registration of jobs is ENABLED. The scheduler must send a NOTIFY event of type 'registration_finished' to let Batsim end the simulation.")
