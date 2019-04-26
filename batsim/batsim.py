@@ -227,6 +227,7 @@ class Batsim(object):
             walltime,
             profile_name,
             subtime=None):
+        """ Returns the registered Job """
 
         if subtime is None:
             subtime = self.time()
@@ -249,6 +250,7 @@ class Batsim(object):
         self.jobs[id] = Job.from_json_dict(job_dict)
         self.jobs[id].job_state = Job.State.IN_SUBMISSON
         self.nb_jobs_in_submission = self.nb_jobs_in_submission + 1
+        return self.jobs[id]
 
     def set_resource_state(self, resources, state):
         """ args:resources: is a ProcSet containing a list of resources.
@@ -280,7 +282,7 @@ class Batsim(object):
         return job, profile
 
 
-    def request_consumed_energy(self): #TODO CHANGE NAME 
+    def request_consumed_energy(self): #TODO CHANGE NAME
         self._events_to_send.append(
             {
                 "timestamp": self.time(),
