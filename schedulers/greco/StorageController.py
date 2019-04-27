@@ -633,6 +633,7 @@ class StorageController:
             #self._logger.info("{} contains the following Datasets:{}".format(storage._name,", ".join(storage._datasets.keys())))
             self._logger.info("{} is filled at {} / {}.".format(storage._name, (storage._storage_capacity-storage._available_space), storage._storage_capacity))
 
+        self._logger.info("Staging jobs collected : {}".format(self._traces.shape))
         self._traces.to_csv(self._input_path + '/staging_jobs.csv')
 
     def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
