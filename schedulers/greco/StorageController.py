@@ -411,7 +411,7 @@ class StorageController:
         # First check if destination exists
         if(dest == None):
             entry['status'] = 'null_dest'
-            self._traces.append(entry, ignore_index=True)
+            self._traces = self._traces.append(entry, ignore_index=True)
             self._logger.info("StorageController : Destination storage with id {} not found".format(dest_id))
             return False
 
@@ -420,21 +420,21 @@ class StorageController:
         # We check if the source exists
         if(source == None):
             entry['status'] = 'null_source'
-            self._traces.append(entry, ignore_index=True)
+            self._traces = self._traces.append(entry, ignore_index=True)
             self._logger.info("StorageController : Source storage with id {} not found".format(dest_id))
             return False
 
         # Now check if the source has the dataset required
         if(source.get_dataset(dataset_id) == None):
             entry['status'] = 'data_absent_source'
-            self._traces.append(entry, ignore_index=True)
+            self._traces = self._traces.append(entry, ignore_index=True)
             self._logger.info("StorageController : Source with id {} does not have dataset with id {}.".format(source_id, dest_id))
             return False
 
         # Now check if destination has dataset
         if(dest.get_dataset(dataset_id) != None):
             entry['status'] = 'data_present_dest'
-            self._traces.append(entry, ignore_index=True)
+            self._traces = self._traces.append(entry, ignore_index=True)
             self._logger.info("StorageController : Dataset with id {} already present in destination with id {}.".format(dataset_id, dest_id))
             return True
 
@@ -482,7 +482,7 @@ class StorageController:
 
         self.staging_map.add((dest_id, dataset_id))
 
-        self._traces.append(entry, ignore_index=True)
+        self._traces = self._traces.append(entry, ignore_index=True)
         return True
 
 
