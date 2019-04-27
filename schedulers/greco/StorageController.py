@@ -1,6 +1,7 @@
 from batsim.batsim import Job
 
 from procset import ProcSet
+import pandas as pd
 
 import xml.etree.ElementTree as ET
 
@@ -197,6 +198,11 @@ class Storage:
 class StorageController:
 
     def __init__(self, storage_resources, bs, qn, input_path):
+        self._input_path = input_path
+        self._traces = pd.DataFrame(columns=['count', 'name', 'dataset_id', 'source', 'dest',
+                                             'actually_transferred_size','transfer_size',
+                                             'direction', 'status'])
+        self._count = 0
         self._storages = dict()  # Maps the storage batsim id to the Storage object
         self._ceph_id = -1       # The batsim id of the storage_server
         self._next_staging_job_id = 0
@@ -394,9 +400,18 @@ class StorageController:
 
         source = self.get_storage(source_id)
         dest = self.get_storage(dest_id)
+        dataset = source.get_dataset(dataset_id)
+
+        self._count = self._count + 1
+
+        entry = {'count': self._count, 'name' : "", 'dataset_id': dataset_id, 'source': source_id, 'dest' : dest_id,
+                'actually_transferred_size' : 0, 'transfer_size' : dataset.get_size(),
+                'direction' : 'Down', 'status' : 'default'}
 
         # First check if destination exists
         if(dest == None):
+            entry['status'] = 'null_dest'
+            self._traces.append(entry)
             self._logger.info("StorageController : Destination storage with id {} not found".format(dest_id))
             return False
 
@@ -404,22 +419,33 @@ class StorageController:
 
         # We check if the source exists
         if(source == None):
+            entry['status'] = 'null_source'
+            self._traces.append(entry)
             self._logger.info("StorageController : Source storage with id {} not found".format(dest_id))
             return False
 
         # Now check if the source has the dataset required
         if(source.get_dataset(dataset_id) == None):
+            entry['status'] = 'data_absent_source'
+            self._traces.append(entry)
             self._logger.info("StorageController : Source with id {} does not have dataset with id {}.".format(source_id, dest_id))
             return False
 
+        # Now check if destination has dataset
+        if(dest.get_dataset(dataset_id) != None):
+            entry['status'] = 'data_present_dest'
+            self._traces.append(entry)
+            self._logger.info("StorageController : Dataset with id {} already present in destination with id {}.".format(dataset_id, dest_id))
+            return True
+
         # Now we check if the destination has enough storage
-        dataset = source.get_dataset(dataset_id)
 
         assert dest.get_storage_capacity() >= dataset.get_size(), \
             "StorageController : The dataset %r is larger than the storage capacity, aborting." % dataset._id
         
         # Clear storage to enable data transfer
         if not dest.has_enough_space(dataset.get_size()):
+            entry['status'] = 'insufficient_space'
             self.clear_storage(dest, dataset)
 
         # Now we are clear to do the transfer
@@ -456,6 +482,7 @@ class StorageController:
 
         self.staging_map.add((dest_id, dataset_id))
 
+        self._traces.append(entry)
         return True
 
 
@@ -606,6 +633,8 @@ class StorageController:
             #self._logger.info("{} contains the following Datasets:{}".format(storage._name,", ".join(storage._datasets.keys())))
             self._logger.info("{} is filled at {} / {}.".format(storage._name, (storage._storage_capacity-storage._available_space), storage._storage_capacity))
 
+        self._traces.to_csv(self._input_path + '/staging_jobs.csv')
+
     def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
         for machine_id in machines:
-            self.add_dataset(machine_id, Dataset(dataset_id, float(dataset_size)))
+            self.add_dataset(machine_id, Dataset(dataset_id, float(dataset_size)))\
