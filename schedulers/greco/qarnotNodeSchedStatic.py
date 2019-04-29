@@ -81,13 +81,25 @@ class QarnotNodeSchedStatic(QarnotNodeSched):
             self.logger.info("[{}]- QNode has nothing to dispatch".format(self.bs.time()))
             return
 
+        to_reject = []
+
         for qtask in self.qtasks_queue.values():
             for instance in qtask.waiting_instances.copy():
-                    # Dispatch the instance directly when it is submitted
-                    qb = self.dict_resources[instance.json_dict["real_allocation"]]
+                # Dispatch the instance directly when it is submitted
+                real_alloc = instance.json_dict["real_allocation"]
+                if real_alloc == -1:
+                    # The real allocation was not in the platform
+                    qtask.instances_dispatched([instance])
+                    to_reject.append(instance)
+                else:
+                    qb = self.dict_resources[real_alloc]
                     self.addJobsToMapping([instance], qb)
                     qtask.instances_dispatched([instance])
                     qb.onDispatchedInstanceStatic(instance, qtask.id)
+
+        if len(to_reject) > 0:
+            self.logger.info("[{}]- QNodeStatic has rejected {} instances because the QMobos are not in the platform".format(self.bs.time(), len(to_reject)))
+            self.bs.reject_jobs(to_reject)
 
     '''Just some guards to be sure '''
     def doDispatch(self):
