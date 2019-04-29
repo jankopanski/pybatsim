@@ -583,12 +583,8 @@ class StorageController:
         If the data staging of that dataset on this qbox disk was already asked, returns False but doesnt start
         another data staging job.
         '''
-
-        # If the data is already on disk
-        if(self.has_dataset(storage_id, dataset_id)):
-            return True
-        # Check if the data is being staged
-        elif((storage_id, dataset_id) in self.staging_map):
+    
+        if((storage_id, dataset_id) in self.staging_map):
             return False
         # Else add the dataset
         else:
