@@ -33,32 +33,25 @@ class QarnotBoxSchedStatic(QarnotBoxSched):
         if qtask_id in self.dict_subqtasks:
             sub_qtask = self.dict_subqtasks[qtask_id]
             sub_qtask.waiting_instances.append(instance)
-            #if len(sub_qtask.waiting_datasets) == 0:
-            #    self.scheduleInstancesStatic()
         else:
             # This is a QTask "unknown" to the QBox.
             # Create and add the SubQTask to the dict
-            list_datasets = self.bs.profiles[instance.workload][instance.profile]["datasets"]
-            if list_datasets is None:
-                list_datasets = []
-
-            sub_qtask = SubQTask(qtask_id, PriorityGroup.fromValue(instance.profile_dict["priority"]), [instance], list_datasets)
+            sub_qtask = SubQTask(qtask_id, PriorityGroup.fromValue(instance.profile_dict["priority"]), [instance],
+                                 self.bs.profiles[instance.workload][instance.profile]["datasets"])
             self.dict_subqtasks[qtask_id] = sub_qtask
 
-            # Then ask for the data staging of the required datasets
-            for dataset_id in list_datasets:
-                if self.storage_controller.onQBoxAskDataset(self.disk_batid, dataset_id):
-                    # The dataset is already on disk, ask for a hardlink
-                    self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id, sub_qtask.id)
-                else:
-                    # The dataset is not on disk yet, put it in the lists of waiting datasets
-                    sub_qtask.waiting_datasets.append(dataset_id)
-                    self.waiting_datasets.append(dataset_id)
+        # Then ask for the data staging of the required datasets
+        new_waiting_datasets = []
+        for dataset_id in sub_qtask.datasets:
+            if self.storage_controller.onQBoxAskDataset(self.disk_batid, dataset_id):
+                # The dataset is already on disk, ask for a hardlink
+                self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id, sub_qtask.id)
+            else:
+                # The dataset is not on disk yet, put it in the lists of waiting datasets
+                new_waiting_datasets.append(dataset_id)
+                self.waiting_datasets.append(dataset_id)
+        sub_qtask.update_waiting_datasets(new_waiting_datasets)
 
-            # If all required datasets are on disk, launch the instances
-            # a round of scheduling will be done everytime the schedulers are woken up
-            #if len(sub_qtask.waiting_datasets) == 0:
-            #    self.scheduleInstancesStatic()
 
     def onDatasetArrivedOnDisk(self, dataset_id):
         '''
@@ -75,22 +68,12 @@ class QarnotBoxSchedStatic(QarnotBoxSched):
                     sub_qtask.waiting_datasets.remove(dataset_id)
                     self.waiting_datasets.remove(dataset_id)
                     self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id, sub_qtask.id)
-                    if len(sub_qtask.waiting_datasets) == 0:
-                        # The SubQTask has all the datasets, launch it
-                        to_launch.append(sub_qtask)
 
                     n-= 1
                     if n == 0:
                         # All SubQTasks waiting for this dataset were found, stop
                         assert dataset_id not in self.waiting_datasets # TODO remove this at some point?
                         break
-
-            # For each SubQTask from the highest priority, launch the instances
-            # a round of scheduling will be done everytime the schedulers are woken up
-            #for sub_qtask in sorted(to_launch, key=lambda qtask:-qtask.priority_group):
-            #    self.scheduleInstancesStatic()
-        #else
-        # The dataset is no longer required by a QTask. Do nothing
 
 
     def scheduleInstancesStatic(self):
