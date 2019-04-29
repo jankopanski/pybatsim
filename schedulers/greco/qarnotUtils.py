@@ -82,8 +82,10 @@ class SubQTask:
         self.waiting_instances = instances     # List of batsim jobs that are waiting to be started
         self.running_instances = []            # List of batsim jobs that are currently running
         self.waiting_datasets = []             # Datasets that are waiting to be on disk
-        self.datasets = list_datasets          # List of input datasets
+        self.datasets = [] if list_datasets is None else list_datasets # List of input datasets
 
+    def update_waiting_datasets(self, new_waiting_datasets):
+        self.waiting_datasets = new_waiting_datasets
 
     def pop_waiting_instance(self):
         return self.waiting_instances.pop()

@@ -248,31 +248,28 @@ class QarnotBoxSched():
             # Some instances of this QTask have already been received by this QBox
             sub_qtask = self.dict_subqtasks[qtask_id]
             sub_qtask.waiting_instances.extend(instances.copy()) #TODO maybe don't need this copy since we do extend
-            if len(sub_qtask.waiting_datasets) == 0:
-                self.scheduleInstances(sub_qtask)
         else:
             # This is a QTask "unknown" to the QBox.
             # Create and add the SubQTask to the dict
-            list_datasets = self.bs.profiles[instances[0].workload][instances[0].profile]["datasets"]
-            if list_datasets is None:
-                list_datasets = []
-
-            sub_qtask = SubQTask(qtask_id, priority_group, instances.copy(), list_datasets)
+            sub_qtask = SubQTask(qtask_id, priority_group, instances.copy(),
+                                 self.bs.profiles[instances[0].workload][instances[0].profile]["datasets"])
             self.dict_subqtasks[qtask_id] = sub_qtask
 
-            # Then ask for the data staging of the required datasets
-            for dataset_id in list_datasets:
-                if self.storage_controller.onQBoxAskDataset(self.disk_batid, dataset_id):
-                    # The dataset is already on disk, ask for a hardlink
-                    self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id, sub_qtask.id)
-                else:
-                    # The dataset is not on disk yet, put it in the lists of waiting datasets
-                    sub_qtask.waiting_datasets.append(dataset_id)
-                    self.waiting_datasets.append(dataset_id)
-
-            # If all required datasets are on disk, launch the instances
-            if len(sub_qtask.waiting_datasets) == 0:
-                self.scheduleInstances(sub_qtask)
+        # Then ask for the data staging of the required datasets
+        # Even if all datasets were on disk before, that doesn't mean they are still there
+        new_waiting_datasets = []
+        for dataset_id in sub_qtask.datasets:
+            if self.storage_controller.onQBoxAskDataset(self.disk_batid, dataset_id):
+                # The dataset is already on disk, ask for a hardlink
+                self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id, sub_qtask.id)
+            else:
+                # The dataset is not on disk yet, put it in the lists of waiting datasets
+                new_waiting_datasets.append(dataset_id)
+                self.waiting_datasets.append(dataset_id)
+        sub_qtask.update_waiting_datasets(new_waiting_datasets)
+        # If all required datasets are on disk, launch the instances
+        if len(new_waiting_datasets) == 0:
+            self.scheduleInstances(sub_qtask)
 
 
     def onDatasetArrivedOnDisk(self, dataset_id):
@@ -313,6 +310,7 @@ class QarnotBoxSched():
         Execute an instance HIGH on the coolest QRad (if possible without preempting LOW instance, don't care about BKGD)
         Execute an instance BKGD/LOW on the warmest QRad (preempt BKGD task if any)
         '''
+        assert sub_qtask.waiting_datasets == [], "Trying to schedule instances"
         n = len(sub_qtask.waiting_instances)
         if sub_qtask.priority_group == PriorityGroup.HIGH:
             # Find coolest QRad which is not running LOW instance, i.e. the QRad with the greatest diffTemp
