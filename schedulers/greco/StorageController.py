@@ -483,7 +483,7 @@ class StorageController:
         self.staging_map.add((dest_id, dataset_id))
 
         self._traces = self._traces.append(entry, ignore_index=True)
-        return True
+        return False
 
 
     def clear_strategy(self, storage):
@@ -578,8 +578,7 @@ class StorageController:
         '''
         This function is called from a QBox scheduler and asks for a dataset to be on disk.
         
-        If the dataset is already on disk, returns True
-        If not, start data staging job and returns False
+        Only returns true if the dataset is already present in the Qbox.
         If the data staging of that dataset on this qbox disk was already asked, returns False but doesnt start
         another data staging job.
         '''
@@ -588,9 +587,7 @@ class StorageController:
             return False
         # Else add the dataset
         else:
-            self.copy_from_CEPH_to_dest([dataset_id], storage_id)
-            return False
-
+            return self.copy_from_CEPH_to_dest([dataset_id], storage_id)
 
     def onKillAllStagingJobs(self):
         # This is called by the QNode scheduler upon receiving a 'stop_simulation' external event
