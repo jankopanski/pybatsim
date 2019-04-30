@@ -29,15 +29,16 @@ class QarnotBoxSchedStatic(QarnotBoxSched):
             self.jobs_to_execute = []
 
 
-    def onDispatchedInstanceStatic(self, instance, qtask_id):
+    def onDispatchedInstancesStatic(self, instances, qtask_id):
         if qtask_id in self.dict_subqtasks:
             sub_qtask = self.dict_subqtasks[qtask_id]
-            sub_qtask.waiting_instances.append(instance)
+            sub_qtask.waiting_instances.extend(instances.copy()) #TODO maybe don't need this copu since we extend
         else:
             # This is a QTask "unknown" to the QBox.
             # Create and add the SubQTask to the dict
-            sub_qtask = SubQTask(qtask_id, PriorityGroup.fromValue(instance.profile_dict["priority"]), [instance],
-                                 self.bs.profiles[instance.workload][instance.profile]["datasets"])
+            i = instances[0]
+            sub_qtask = SubQTask(qtask_id, PriorityGroup.fromValue(i.profile_dict["priority"]), instances,
+                                 self.bs.profiles[i.workload][i.profile]["datasets"])
             self.dict_subqtasks[qtask_id] = sub_qtask
 
         # Then ask for the data staging of the required datasets

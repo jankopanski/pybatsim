@@ -4,17 +4,10 @@ from StorageController import StorageController
 from qarnotBoxSchedStatic import QarnotBoxSchedStatic
 from qarnotUtils import *
 
-from procset import ProcSet
 from collections import defaultdict
-from copy import deepcopy
 
 import math
-import logging
-import sys
-import os
 
-import csv
-import json
 '''
 This is a simplification of the qarnotNodeSched scheduler that simply schedules instances on the same
 QMobo as for the real execution of the inputs on the Qarnot platform.
@@ -49,8 +42,6 @@ class QarnotNodeSchedStatic(QarnotNodeSched):
             qb.onBeforeEvents()
 
         if self.bs.time() >= self.time_next_update:
-            #self.updateAllQBoxes()
-
             self.time_next_update = math.floor(self.bs.time()) + self.update_period
 
             if self.very_first_update: # First update at t=1, next updates every 30 seconds starting at t=30
@@ -82,6 +73,8 @@ class QarnotNodeSchedStatic(QarnotNodeSched):
             return
 
         to_reject = []
+        dict_dispatch = defaultdict(lambda: defaultdict(list)) # Maps the QBoxSched to a dict
+                                                       # that maps the QTask id to a list of instances to be dispatched there
 
         for qtask in self.qtasks_queue.values():
             for instance in qtask.waiting_instances.copy():
@@ -93,9 +86,13 @@ class QarnotNodeSchedStatic(QarnotNodeSched):
                     to_reject.append(instance)
                 else:
                     qb = self.dict_resources[real_alloc]
-                    self.addJobsToMapping([instance], qb)
-                    qtask.instances_dispatched([instance])
-                    qb.onDispatchedInstanceStatic(instance, qtask.id)
+                    dict_dispatch[qb][qtask.id].append(instance)
+
+        for qb, sub_dict in dict_dispatch.items():
+            for qid, instances in sub_dict.items():
+                self.addJobsToMapping(instances, qb)
+                self.qtasks_queue[qid].instances_dispatched(instances)
+                qb.onDispatchedInstancesStatic(instances, qid)
 
         if len(to_reject) > 0:
             self.logger.info("[{}]- QNodeStatic has rejected {} instances because the QMobos are not in the platform".format(self.bs.time(), len(to_reject)))
