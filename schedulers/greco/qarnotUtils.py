@@ -91,6 +91,8 @@ class SubQTask:
         return self.waiting_instances.pop()
 
     def mark_running_instance(self, job):
+        if job in self.waiting_instances:
+            self.waiting_instances.remove(job)
         self.running_instances.append(job)
 
     def instance_finished(self, job):
@@ -99,11 +101,11 @@ class SubQTask:
 
 
 class QMoboState:
-    OFF, IDLE, LAUNCHING, RUNBKGD, RUNLOW, RUNHIGH = range(6)
+    OFF, IDLE, RUNBKGD, LAUNCHING, RUNLOW, RUNHIGH = range(6)
     # When in OFF, the batsim host should be in the last pstate or marked as unavailable
     fromPriority = {
         PriorityGroup.BKGD : RUNBKGD,
-        PriorityGroup.LOW : RUNLOW,
+        PriorityGroup.LOW  : RUNLOW,
         PriorityGroup.HIGH : RUNHIGH
     }
 
@@ -127,7 +129,7 @@ class QMobo:
         self.max_pstate = max_pstate # The last power state (corresponds to the state OFF)
         self.state = QMoboState.OFF  # The state of the mobo
         self.running_job = -1        # The Job running on this mobo
-
+        self.reserved_job = -1       # The Job that reserved this mobo
 
     def push_job(self, job):
         assert self.running_job == -1, "Job {} placed on mobo {} {} that was already executing job {}".format(self.running_job.id, self.batid, self.name, job.id)
@@ -164,3 +166,12 @@ class QMobo:
         assert self.running_job != -1, "Asked to launch job but no one was pushed on mobo {} {}.".format(self.batid, self.name)
         self.state = QMoboState.fromPriority[self.running_job.priority_group]
         self.pstate = 0
+
+    def is_reserved(self):
+        return self.reserved_job != -1
+
+    def is_reserved_low(self):
+        return (self.reserved_job != -1) and (self.reserved_job.priority_group == PriorityGroup.LOW)
+
+    def is_reserved_high(self):
+        return (self.reserved_job != -1) and (self.reserved_job.priority_group == PriorityGroup.HIGH)

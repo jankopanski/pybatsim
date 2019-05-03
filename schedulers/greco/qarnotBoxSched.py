@@ -58,7 +58,6 @@ class QarnotBoxSched():
         # Global counts of all mobos under my watch
         self.mobosAvailable = ProcSet()       # Whether the mobos are available or not (from the QRad hotness and external events point of view)
         self.mobosUnavailable = ProcSet()     # Mobos unavailable due to the QRad being too warm (or from external events)
-        #self.mobosRunning = ProcSet()         # List of mobos that are computing an instance. TODO maybe we need to keep track of that list with BKGD/LOW/HIGH
 
         # TODO maybe we can directly use lists of QRads, may be easier to sort by temperature and get the coolest/warmest when scheduling an instance
         self.availBkgd = ProcSet()
@@ -102,6 +101,7 @@ class QarnotBoxSched():
         self.dict_subqtasks = {} # Maps the QTask id to the SubQTask object
         self.waiting_datasets = [] # List of datasets for which data staging has been asked
                                    # If a dataset appears multiple times in the list, it means that multiple QTasks are waiting for this dataset
+        self.dict_reserved_jobs_mobos = defaultdict(list) # Maps a sub_qtask id to a list of reservation pairs (qm, job)
 
         # Tells the StorageController who we are and retrieve the batid of our disk
         self.disk_batid = self.storage_controller.onQBoxRegistration(self.name, self)
@@ -206,13 +206,13 @@ class QarnotBoxSched():
                         jobs_to_kill.add(job)
 
             for qm in qr.dict_mobos.values():
-                if (qr.diffTemp >= 1) and (qm.state < QMoboState.RUNBKGD) and (qm.state != QMoboState.LAUNCHING):
+                if (qr.diffTemp >= 1) and (qm.state < QMoboState.RUNBKGD) and not qm.is_reserved():
                     # This mobo is available for BKGD instances
                     self.availBkgd.insert(qm.batid)
-                elif (qr.diffTemp >= -1) and (qm.state < QMoboState.RUNLOW) and (qm.state != QMoboState.LAUNCHING):
+                elif (qr.diffTemp >= -1) and (qm.state < QMoboState.RUNLOW) and not qm.is_reserved():
                     # This mobo is available for LOW instances
                     self.availLow.insert(qm.batid)
-                elif (qr.diffTemp >= -4) and (qm.state < QMoboState.RUNHIGH) and (qm.state != QMoboState.LAUNCHING):
+                elif (qr.diffTemp >= -4) and (qm.state < QMoboState.RUNHIGH) and not qm.is_reserved_high():
                     # This mobo is available for HIGH
                     self.availHigh.insert(qm.batid)
 
@@ -267,50 +267,19 @@ class QarnotBoxSched():
                 new_waiting_datasets.append(dataset_id)
                 self.waiting_datasets.append(dataset_id)
         sub_qtask.update_waiting_datasets(new_waiting_datasets)
-        # If all required datasets are on disk, launch the instances
-        if len(new_waiting_datasets) == 0:
-            self.scheduleInstances(sub_qtask)
 
-
-    def onDatasetArrivedOnDisk(self, dataset_id):
-        '''
-        The Storage Controller notifies that the required dataset arrived on the disk.
-        Ask for a hard link on this dataset if there are tasks that were waiting for this dataset.
-        Then check if we can launch instances.
-        '''
-        to_launch = []
-        if dataset_id in self.waiting_datasets:
-            n = self.waiting_datasets.count(dataset_id)
-            self.logger.info("[{}]--- Dataset {} arrived on QBox {} and was waited by {} SubQTasks".format(self.bs.time(), dataset_id, self.name, n))
-            for sub_qtask in self.dict_subqtasks.values():
-                if dataset_id in sub_qtask.waiting_datasets:
-                    sub_qtask.waiting_datasets.remove(dataset_id)
-                    self.waiting_datasets.remove(dataset_id)
-                    self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id, sub_qtask.id)
-                    if len(sub_qtask.waiting_datasets) == 0:
-                        # The SubQTask has all the datasets, launch it
-                        to_launch.append(sub_qtask)
-
-                    n-= 1
-                    if n == 0:
-                        # All SubQTasks waiting for this dataset were found, stop
-                        assert dataset_id not in self.waiting_datasets # TODO remove this at some point?
-                        break
-
-            # For each SubQTask from the highest priority, launch the instances
-            for sub_qtask in sorted(to_launch, key=lambda qtask:-qtask.priority_group):
-                self.scheduleInstances(sub_qtask)
-        #else
-        # The dataset is no longer required by a QTask. Do nothing
+        # Then schedule the instances
+        self.scheduleInstances(sub_qtask)
 
 
     def scheduleInstances(self, sub_qtask):
         '''
-        All datasets required by this sub_qtask are on disk and hard links were already requested.
-        Execute an instance HIGH on the coolest QRad (if possible without preempting LOW instance, don't care about BKGD)
-        Execute an instance BKGD/LOW on the warmest QRad (preempt BKGD task if any)
+        All datasets were already requested.
+        Make reservations of mobos for each instance and then start them if the datasets are already on disk.
+        Execute an instance HIGH on the coolest QRad that is available for HIGH (if possible without preempting LOW instance, don't care about BKGD)
+        Execute an instance BKGD/LOW on the warmest QRad that is available for BKGD/LOW (preempt BKGD task if necessary)
         '''
-        assert sub_qtask.waiting_datasets == [], "Trying to schedule instances"
+        datasets_on_disk = (sub_qtask.waiting_datasets == []) # If no waiting datasets, they are all on disk
         n = len(sub_qtask.waiting_instances)
         if sub_qtask.priority_group == PriorityGroup.HIGH:
             # Find coolest QRad which is not running LOW instance, i.e. the QRad with the greatest diffTemp
@@ -320,23 +289,37 @@ class QarnotBoxSched():
             for qr in qr_list:
                 for batid in (qr.pset_mobos & available_slots):
                     qm = qr.dict_mobos[batid]
-                    if (qm.state <= QMoboState.RUNBKGD) and (qm.state != QMoboState.LAUNCHING): # Either OFF/IDLE or running BKGD
+                    if (qm.state <= QMoboState.RUNBKGD) and not qm.is_reserved_high(): # Either OFF/IDLE or running BKGD and not reserved for HIGH instance
                         job = sub_qtask.pop_waiting_instance()
-                        sub_qtask.mark_running_instance(job)
-                        self.startInstance(qm, job)
+                        if datasets_on_disk:
+                            #Start the instance immediately
+                            sub_qtask.mark_running_instance(job)
+                            self.startInstance(qm, job)
+                        else:
+                            # Make a reservation
+                            assert job not in self.dict_reserved_jobs_mobos, "A mobo is already reserved for this instance"
+                            self.reserveInstance(qm, job)
+                            self.logger.info("[{}] Adding reservation for {} on {} ({})".format(self.bs.time(), job.id, qm.name, qm.batid))
                         n-=1
                         if n == 0:
-                            return # All instances have been started
-                    elif qm.state == QMoboState.RUNLOW:
+                            return # All instances have been scheduled
+                    elif (qm.state == QMoboState.RUNLOW):
                         running_low.append(batid)
             # There are still instances to start, take mobos that are running LOW instances.
             for batid in running_low: # Mobos in this list are already sorted by coolest QRad first
                 job = sub_qtask.pop_waiting_instance()
-                sub_qtask.mark_running_instance(job)
-                self.startInstance(self.dict_ids[batid].dict_mobos[batid], job)
+                qm = self.dict_ids[batid].dict_mobos[batid]
+                if datasets_on_disk:
+                    sub_qtask.mark_running_instance(job)
+                    self.startInstance(qm, job)
+                else:
+                    # Make a reservation
+                    assert job not in self.dict_reserved_jobs_mobos, "A mobo is already reserved for this instance"
+                    self.reserveInstance(qm, job)
+                    self.logger.info("[{}] Adding reservation for {} on {} ({})".format(self.bs.time(), job.id, qm.name, qm.batid))
                 n-=1
                 if n == 0:
-                    return # All instances have been started
+                    return # All instances have been scheduled
 
         else: # This is a LOW instance
             # Find warmest QRad among the availLow and availBkgd
@@ -345,15 +328,22 @@ class QarnotBoxSched():
             for qr in qr_list:
                 for batid in (qr.pset_mobos & available_slots):
                     qm = qr.dict_mobos[batid]
-                    if (qm.state <= QMoboState.RUNBKGD) and (qm.state != QMoboState.LAUNCHING): # Either OFF/IDLE or running BKGD
+                    if (qm.state <= QMoboState.RUNBKGD) and not qm.is_reserved(): # Either OFF/IDLE or running BKGD and not reserved
                         job = sub_qtask.pop_waiting_instance()
-                        sub_qtask.mark_running_instance(job)
-                        self.startInstance(qm, job)
+                        if datasets_on_disk:
+                            sub_qtask.mark_running_instance(job)
+                            self.startInstance(qm, job)
+                        else:
+                            # Make a reservation
+                            assert job not in self.dict_reserved_jobs_mobos, "A mobo is already reserved for this instance"
+                            self.reserveInstance(qm, job)
+                            self.logger.info("[{}] Adding reservation for {} on {} ({})".format(self.bs.time(), job.id, qm.name, qm.batid))
                         n-=1
                         if n == 0:
-                            return # All instances have been started
+                            return # All instances have been scheduled
 
-        # Some instances were dispatched by cannot be started yet, return them to the QNode
+
+        # Some instances were dispatched by cannot be scheduled yet, return them to the QNode
         self.logger.info("[{}]--- {} still has {} instances of {} to start, rejecting these instances back to the QNode but this should not happen.".format(self.bs.time(), self.name, len(sub_qtask.waiting_instances), sub_qtask.id))
         self.logger.info("[{}]--- {} has available slots for bkgd/low/high: {}/{}/{}".format(self.bs.time(), self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)))
 
@@ -362,12 +352,56 @@ class QarnotBoxSched():
         sub_qtask.waiting_instances = []
 
 
+    def onDatasetArrivedOnDisk(self, dataset_id):
+        '''
+        The Storage Controller notifies that a required dataset arrived on the disk.
+        Ask for a hard link on this dataset if there are tasks that were waiting for this dataset.
+        Then check if we can launch instances.
+        '''
+        if dataset_id in self.waiting_datasets:
+            n = self.waiting_datasets.count(dataset_id)
+            self.logger.info("[{}]--- Dataset {} arrived on QBox {} and was waited by {} SubQTasks".format(self.bs.time(), dataset_id, self.name, n))
+
+            for subqtask_id in self.dict_reserved_jobs_mobos.keys():
+                if subqtask_id not in self.dict_subqtasks:
+                    continue # Guard since the dict of reservations is a defaultdict
+
+                sub_qtask = self.dict_subqtasks[subqtask_id]
+                if dataset_id in sub_qtask.waiting_datasets:
+                    sub_qtask.waiting_datasets.remove(dataset_id)
+                    self.waiting_datasets.remove(dataset_id)
+                    self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id, sub_qtask.id)
+                    if len(sub_qtask.waiting_datasets) == 0:
+                        # The SubQTask has all the datasets, launch the reservations that have been made
+                        reservations = self.dict_reserved_jobs_mobos[subqtask_id].copy()
+                        for pair in reservations:
+                            self.logger.info("[{} {} starting {} on reserved mobo {} {}]".format(self.bs.time(), self.name, pair[1].id, pair[0].batid, pair[0].name))
+                            pair[0].reserved_job = -1
+                            sub_qtask.mark_running_instance(pair[1])
+                            self.startInstance(pair[0], pair[1])
+                            self.dict_reserved_jobs_mobos[subqtask_id].remove(pair)
+                    #else
+                    # There is more datasets waited by this SubQTask
+                    n-= 1
+                    if n == 0:
+                        # All SubQTasks waiting for this dataset were found, stop
+                        assert dataset_id not in self.waiting_datasets # TODO remove this at some point?
+                        break
+        #else
+        # The dataset is no longer required by a QTask. Do nothing
+
+
     def startInstance(self, qm, job):
         '''
+        If an instance was reserved on the qmobo, reject it back to the QNode sched.
         If an instance is running on the qmobo, kill it (the check of priorities has been made before).
         If the qmobo was OFF, change state to RUNXXX.
         The choice of the pstate will be made by the frequency regulator at the end of the scheduling phase
         '''
+        if qm.reserved_job != -1:
+            # An instance was reserved, reject it back to the QNode sched
+            self.rejectReservedInstance(qm)
+
         if qm.running_job != -1:
             # A job is running
             self.logger.debug("[{}]------- Mobo {} killed Job {} because another instance arrived".format(self.bs.time(), qm.name, qm.running_job.id))
@@ -378,9 +412,27 @@ class QarnotBoxSched():
 
         job.allocation = ProcSet(qm.batid)
         qm.push_job(job)
-        #self.mobosRunning.insert(qm.batid) # TODO May not be useful to track the list of mobos running,
         self.jobs_to_execute.append(job)
 
+
+    def reserveInstance(self, qm, job):
+        '''
+        If an instance is already reserved on the qmobo, reject it and remove the entry in the dict of reservations.
+        Then reserve the qmobo for the job given in argument.
+        '''
+        if qm.reserved_job != -1:
+            # An instance was reserved, reject it back to the QNode sched
+            self.rejectReservedInstance(qm)
+
+        self.dict_reserved_jobs_mobos[job.qtask_id].append((qm, job))
+        qm.reserved_job = job
+
+    def rejectReservedInstance(self, qm):
+        old_job = qm.reserved_job
+        qm.reserved_job = -1
+        self.onQBoxRejectedInstances([old_job], self.name)
+        self.dict_reserved_jobs_mobos[old_job.qtask_id].remove((qm, old_job))
+        self.logger.info("[{}]------- Mobo {} rejected Job {} because another instance of higher priority needed it ({})".format(self.bs.time(), qm.name, old_job.id, job.id))
 
 
     def onJobCompletion(self, job, direct_job = -1):
@@ -430,10 +482,13 @@ class QarnotBoxSched():
         Check whether it was the last running of the SubQTask in this QBox.
         If yes, clean the SubQTask and release the hardlinks on the datasets.
         '''
+
         if len(sub_qtask.running_instances) == 0 and len(sub_qtask.waiting_instances) == 0:
             self.logger.debug("[{}]--- QBox {} executed all dispatched instances of {}, releasing the hardlinks.".format(self.bs.time(), self.name, sub_qtask.id))
             self.storage_controller.onQBoxReleaseHardLinks(self.disk_batid, sub_qtask.id)
             del self.dict_subqtasks[sub_qtask.id]
+            if sub_qtask.id in self.dict_reserved_jobs_mobos:
+                del self.dict_reserved_jobs_mobos[sub_qtask.id]
 
 
     def doFrequencyRegulation(self):

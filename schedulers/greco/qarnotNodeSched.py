@@ -440,7 +440,7 @@ class QarnotNodeSched(BatsimScheduler):
         to_reject = []
         to_kill = []
         for qb in self.dict_qboxes.values():
-            (qb_reject,qb_kill) = qb.killOrRejectAllJobs()
+            (qb_reject, qb_kill) = qb.killOrRejectAllJobs()
             to_reject.extend(qb_reject)
             to_kill.extend(qb_kill)
 
@@ -458,6 +458,7 @@ class QarnotNodeSched(BatsimScheduler):
         if len(to_kill) > 0:
             self.logger.info("Killing {} jobs".format(len(to_kill)))
             self.bs.kill_jobs(to_kill)
+
 
         self.logger.info("Now Batsim should stop the simulation on next message (or after next REQUESTED_CALL)")
 
