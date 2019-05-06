@@ -1,6 +1,9 @@
 from batsim.batsim import Job
 
 from procset import ProcSet
+import pandas as pd
+
+import xml.etree.ElementTree as ET
 
 import math
 import json
@@ -195,6 +198,11 @@ class Storage:
 class StorageController:
 
     def __init__(self, storage_resources, bs, qn, input_path):
+        self._input_path = input_path
+        self._traces = pd.DataFrame(columns=['count', 'name', 'dataset_id', 'source', 'dest',
+                                             'actually_transferred_size','transfer_size',
+                                             'direction', 'status'])
+        self._count = 0
         self._storages = dict()  # Maps the storage batsim id to the Storage object
         self._ceph_id = -1       # The batsim id of the storage_server
         self._next_staging_job_id = 0
@@ -225,6 +233,15 @@ class StorageController:
 
         self._logger.info("[{}]- StorageController initialization completed, CEPH id is {} and there are {} QBox disks".format(self._bs.time(),self._ceph_id, len(self._storages)-1))
 
+        # Now parse the platform file to get the bandwidth values
+
+        tree = ET.parse(input_path+'/platform.xml')
+
+        self.bandwidth = {}
+
+        for child in tree.getroot().iter('link'):
+            if ('wan_link' in child.attrib['id']) and ('bandwidth' in child.attrib):
+                self.bandwidth[child.attrib['id'][:-9]] = float(child.attrib['bandwidth'][:-4])
 
     def get_storage(self, storage_id):
         """ Returns the Storage corresponding to given storage_id if it exists or returns None. """
@@ -314,6 +331,41 @@ class StorageController:
         else:
             return storage.has_dataset(dataset_id)
 
+    def get_free_bandwidth_between_storages(self, source_id, dest_id):
+        '''
+        Gets a rough estimate of the free bandwidth (in bits/sec) to move from one storage to other.
+        Uses staged jobs to find which of the network links are congested.
+        If source_id is not CEPH, then dest_id is replaced by CEPH
+        TODO: Update this function to enable qbox to qbox transfers.
+
+        :param source_id: Source of the transfer
+        :param dest_id: Destination of the transfer
+        :return: Cost of free bandwidth assuming equal share
+        '''
+
+        if source_id == dest_id:
+            return 1000000000       # 1Tbps
+
+        id = source_id
+        if source_id == self._ceph_id:
+            id = dest_id
+
+        speed = 1000.0        # 1Gbps
+
+        if dest_id in self.bandwidth:
+            speed = self.bandwidth[dest_id]
+
+        transfers = 0
+        for val in self.staging_map:
+            if val[0] == id:
+                transfers = transfers + 1
+            elif val[1] == id:
+                transfers = transfers + 1
+
+        transfers = transfers + 1   # Assuming the current one starts
+        return float(speed)/float(transfers)
+
+
     def copy_from_CEPH_to_dest(self, dataset_ids, dest_id):
         """ Method used to move datasets from the CEPH to the disk of a QBox
 
@@ -343,48 +395,58 @@ class StorageController:
 
         If we can't move the Dataset, then no job for it is scheduled
         """
+        self._logger.info("StorageController : Request for dataset {} to transfer from {} to {}"\
+                          .format(dataset_id, source_id, dest_id))
 
         source = self.get_storage(source_id)
         dest = self.get_storage(dest_id)
+        dataset = source.get_dataset(dataset_id)
+
+        self._count = self._count + 1
+
+        entry = {'count': self._count, 'name' : "", 'dataset_id': dataset_id, 'source': source_id, 'dest' : dest_id,
+                'actually_transferred_size' : 0, 'transfer_size' : dataset.get_size(),
+                'direction' : 'Down', 'status' : 'default'}
 
         # First check if destination exists
         if(dest == None):
-            self._logger.info("Destination storage with id {} not found".format(dest_id))
+            entry['status'] = 'null_dest'
+            self._traces = self._traces.append(entry, ignore_index=True)
+            self._logger.info("StorageController : Destination storage with id {} not found".format(dest_id))
             return False
-
-        # Now check if destination has dataset
-        if(dest.get_dataset(dataset_id) != None):
-            self._logger.info("Dataset with id {} already present in destination with id {}.".format(dataset_id, dest_id))
-            return True
 
         # Now we know that destination is present and does not have the dataset
 
         # We check if the source exists
         if(source == None):
-            self._logger.info("Source storage with id {} not found".format(dest_id))
-            return False
-
-        # Now check if it is same as destination
-        if(source_id == dest_id):
-            self._logger.info("Source id and detination id are same = {} where Data with id {} not present".format(source_id, dataset_id))
+            entry['status'] = 'null_source'
+            self._traces = self._traces.append(entry, ignore_index=True)
+            self._logger.info("StorageController : Source storage with id {} not found".format(dest_id))
             return False
 
         # Now check if the source has the dataset required
         if(source.get_dataset(dataset_id) == None):
-            self._logger.info("Source with id {} does not have dataset with id {}.".format(source_id, dest_id))
+            entry['status'] = 'data_absent_source'
+            self._traces = self._traces.append(entry, ignore_index=True)
+            self._logger.info("StorageController : Source with id {} does not have dataset with id {}.".format(source_id, dest_id))
             return False
 
-        # Now we check if the destination has enough storage
-        dataset = source.get_dataset(dataset_id)
+        # Now check if destination has dataset
+        if(dest.get_dataset(dataset_id) != None):
+            entry['status'] = 'data_present_dest'
+            self._traces = self._traces.append(entry, ignore_index=True)
+            self._logger.info("StorageController : Dataset with id {} already present in destination with id {}.".format(dataset_id, dest_id))
+            return True
 
-        assert dest.get_storage_capacity() >= dataset.get_size(), "The dataset %r is larger than the storage capacity, aborting." % dataset._id
+        # Now we check if the destination has enough storage
+
+        assert dest.get_storage_capacity() >= dataset.get_size(), \
+            "StorageController : The dataset %r is larger than the storage capacity, aborting." % dataset._id
         
         # Clear storage to enable data transfer
         if not dest.has_enough_space(dataset.get_size()):
+            entry['status'] = 'insufficient_space'
             self.clear_storage(dest, dataset)
-
-        # Now we are clear to do the transfer
-        self.add_dataset(dest_id, dataset)
 
         # Profile Submit
         profile_name = "staging" + str(self._next_staging_job_id + 1)
@@ -413,11 +475,12 @@ class StorageController:
         self._bs.execute_jobs([job1])
         self.moveRequested[jid1] = dataset.get_id()
 
-        self._logger.info("[ {} ] StorageController starting move dataset {} to qbox disk {}".format(self._bs.time(), dataset_id, dest_id))
+        self._logger.info("[ {} ] Storage Controller staging job for dataset {} from {} to {} started".format(self._bs.time(), dataset_id, source_id, dest_id))
 
         self.staging_map.add((dest_id, dataset_id))
 
-        return True
+        self._traces = self._traces.append(entry, ignore_index=True)
+        return False
 
 
     def clear_strategy(self, storage):
@@ -512,23 +575,16 @@ class StorageController:
         '''
         This function is called from a QBox scheduler and asks for a dataset to be on disk.
         
-        If the dataset is already on disk, returns True
-        If not, start data staging job and returns False
+        Only returns true if the dataset is already present in the Qbox.
         If the data staging of that dataset on this qbox disk was already asked, returns False but doesnt start
         another data staging job.
         '''
-
-        # If the data is already on disk
-        if(self.has_dataset(storage_id, dataset_id)):
-            return True
-        # Check if the data is being staged
-        elif((storage_id, dataset_id) in self.staging_map):
+    
+        if((storage_id, dataset_id) in self.staging_map):
             return False
         # Else add the dataset
         else:
-            self.copy_from_CEPH_to_dest([dataset_id], storage_id)
-            return False
-
+            return self.copy_from_CEPH_to_dest([dataset_id], storage_id)
 
     def onKillAllStagingJobs(self):
         # This is called by the QNode scheduler upon receiving a 'stop_simulation' external event
@@ -558,7 +614,6 @@ class StorageController:
 
         self.mappingQBoxes[dest_id].onDatasetArrivedOnDisk(dataset_id)
 
-
     def onSimulationBegins(self):
         pass
 
@@ -568,6 +623,9 @@ class StorageController:
             #self._logger.info("{} contains the following Datasets:{}".format(storage._name,", ".join(storage._datasets.keys())))
             self._logger.info("{} is filled at {} / {}.".format(storage._name, (storage._storage_capacity-storage._available_space), storage._storage_capacity))
 
+        self._logger.info("Staging jobs collected : {}".format(self._traces.shape))
+        self._traces.to_csv(self._input_path + '/staging_jobs.csv')
+
     def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
         for machine_id in machines:
-            self.add_dataset(machine_id, Dataset(dataset_id, float(dataset_size)))
+            self.add_dataset(machine_id, Dataset(dataset_id, float(dataset_size)))\
