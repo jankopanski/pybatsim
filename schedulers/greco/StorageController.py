@@ -448,9 +448,6 @@ class StorageController:
             entry['status'] = 'insufficient_space'
             self.clear_storage(dest, dataset)
 
-        # Now we are clear to do the transfer
-        self.add_dataset(dest_id, dataset)
-
         # Profile Submit
         profile_name = "staging" + str(self._next_staging_job_id + 1)
         move_profile = {
