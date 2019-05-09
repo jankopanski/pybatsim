@@ -1,7 +1,19 @@
 from batsim.batsim import BatsimScheduler
+from batsim.batsim import Job
+
+from procset import ProcSet
+import pandas as pd
+
+import xml.etree.ElementTree as ET
+
+import math
+import json
 
 
 class TransferHistoryStatic(BatsimScheduler):
+
+    def __init__(self, options):
+        super().__init__(options)
 
     def onAfterBatsimInit(self):
         # You now have access to self.bs and all other functions
