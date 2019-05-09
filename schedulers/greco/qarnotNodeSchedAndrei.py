@@ -532,7 +532,10 @@ class QarnotNodeSchedAndrei(QarnotNodeSched):
 
         # Sort the jobs by decreasing priority (hence the '-' sign) and then by increasing number of running instances
         self.logger.info("[{}]- QNode starting doDispatch".format(self.bs.time()))
-        for qtask in sorted(self.qtasks_queue.values(),key=lambda qtask:(-qtask.priority, qtask.nb_dispatched_instances)):
+        
+        #!!! Here
+        #for qtask in sorted(self.qtasks_queue.values(),key=lambda qtask:(-qtask.priority, qtask.nb_dispatched_instances)):
+        for qtask in self.qtasks_queue.values():
             nb_instances_left = len(qtask.waiting_instances)
             if nb_instances_left > 0:
                 self.logger.debug("[{}]- QNode trying to dispatch {} of priority {} having {} waiting and {} dispatched instances".format(self.bs.time(),qtask.id, qtask.priority, len(qtask.waiting_instances), qtask.nb_dispatched_instances))
@@ -548,6 +551,7 @@ class QarnotNodeSchedAndrei(QarnotNodeSched):
                             available_mobos.append(mobo)
 
                 for tup in available_mobos:
+                #for tup in self.lists_available_mobos:
                     qb = self.dict_qboxes[tup[0]]
                     nb_slots = tup[1]
                     if nb_slots >= nb_instances_left:
@@ -574,7 +578,7 @@ class QarnotNodeSchedAndrei(QarnotNodeSched):
                     # There are more instances to dispatch and the qtask is either low or high priority
                     self.sortAvailableMobos("low")
                     list_qboxes = self.get_qboxes_with_dataset(qtask)
-                    if(len(list_qboxes) == 0):
+                    f(len(list_qboxes) == 0):
                         available_mobo = self.lists_available_mobos
                     else:
                         available_mobos = self.get_available_mobos_with_ds(list_qboxes)
@@ -583,6 +587,7 @@ class QarnotNodeSchedAndrei(QarnotNodeSched):
                                 available_mobos.append(mobo)
 
                     for tup in available_mobos:
+                    #for tup in self.lists_available_mobos:
                         qb = self.dict_qboxes[tup[0]]
                         nb_slots = tup[2]
                         if nb_slots >= nb_instances_left:
@@ -618,6 +623,7 @@ class QarnotNodeSchedAndrei(QarnotNodeSched):
                                     available_mobos.append(mobo)  
 
                         for tup in available_mobos:
+                        #for tup in self.lists_available_mobos:
                             qb = self.dict_qboxes[tup[0]]
                             nb_slots = tup[3]
                             if nb_slots >= nb_instances_left:
