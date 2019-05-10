@@ -47,6 +47,12 @@ class TransferHistoryStatic(BatsimScheduler):
     def onReportEnergyConsumed(self, consumed_energy):
         raise NotImplementedError()
 
+    def onAnswerHostTemperatureAll(self, host_temperature_all):
+        raise NotImplementedError()
+
+    def onAnswerAirTemperatureAll(self, air_temperature_all):
+        raise NotImplementedError()
+
     def onAddResources(self, to_add):
         raise NotImplementedError()
 
@@ -57,15 +63,24 @@ class TransferHistoryStatic(BatsimScheduler):
         raise NotImplementedError()
 
     def onNoMoreJobsInWorkloads(self):
-        self.logger.info("There is no more static jobs in the workoad")
+        self.logger.info("There is no more static jobs in the workload")
 
     def onNoMoreExternalEvents(self):
         self.logger.info("There is no more external events to occur")
 
-    def onNotifyEventMachineUnavailable(self, machines):
+    def onNotifyEventMachineUnavailable(self, machines:ProcSet):
         raise NotImplementedError()
 
-    def onNotifyEventMachineAvailable(self, machines):
+    def onNotifyEventMachineAvailable(self, machines:ProcSet):
+        raise NotImplementedError()
+
+    def onNotifyEventTargetTemperatureChanged(self, qrad:str, new_temperature:float):
+        raise NotImplementedError()
+
+    def onNotifyEventOutsideTemperatureChanged(self, site:str, new_temperature:float):
+        raise NotImplementedError()
+
+    def onNotifyGenericEvent(self, event_data):
         raise NotImplementedError()
 
     def onBeforeEvents(self):
@@ -73,4 +88,3 @@ class TransferHistoryStatic(BatsimScheduler):
 
     def onNoMoreEvents(self):
         pass
-
