@@ -42,4 +42,7 @@ class TransferHistoryStatic(BatsimScheduler):
         job_new.storage_mapping[to_str] = dest_id
 
         self.bs.execute_jobs([job_new])
+    
+    def onJobCompletion(self, job):
+        pass
 
