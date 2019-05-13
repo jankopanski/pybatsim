@@ -27,9 +27,9 @@ class TransferHistoryStatic(BatsimScheduler):
         
         if job.json_dict['direction'] != 'Up':
             from_str = "storage_server"
-            to_str = job.json_dict['node']
+            to_str = job.json_dict['node'] + "_disk"
         else:
-            from_str = job.json_dict['node']
+            from_str = job.json_dict['node'] + "_disk"
             to_str = "storage_server"
         
         source_id = self.resources_mapping[from_str]
