@@ -20,8 +20,10 @@ class TransferHistoryStatic(BatsimScheduler):
         print(self.resources_mapping)
         
     def onJobSubmission(self, job):
-        print(job.json_dict)
-        
+        if "LAST_NOTIFY" in job.json_dict['id']:
+            self.bs.reject_jobs([job])
+            return
+    
         from_str = ""
         to_str = ""
         
