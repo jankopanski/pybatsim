@@ -28,6 +28,10 @@ class QarnotBoxSchedStatic(QarnotBoxSched):
             self.bs.execute_jobs(self.jobs_to_execute)
             self.jobs_to_execute = []
 
+        for pstate, resources in self.stateChanges.items():
+            self.bs.set_resource_state(resources, pstate)
+        self.stateChanges.clear()
+
 
     def onDispatchedInstancesStatic(self, instances, qtask_id):
         if qtask_id in self.dict_subqtasks:
@@ -96,3 +100,15 @@ class QarnotBoxSchedStatic(QarnotBoxSched):
                             sub_qtask.waiting_instances.remove(instance)
                             sub_qtask.mark_running_instance(instance)
                             self.startInstance(qm, instance)
+                            pstate = computePState(instance.json_dict["real_avg_speed"])
+                            self.logger.info("{} started on {} with pstate {} (corresponding to speed {}), real speed {}".format(
+                                instance.id, qm.batid, pstate, (100*(40-pstate)), instance.json_dict["real_avg_speed"]))
+                            self.stateChanges[pstate].insert(qm.batid)
+
+
+def computePState(real_speed):
+    if real_speed > 4000:
+        real_speed = 4000
+    elif real_speed < 0:
+        real_speed = 0
+    return round(40 - (real_speed/100))
