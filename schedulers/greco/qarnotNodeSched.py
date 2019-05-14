@@ -137,6 +137,8 @@ class QarnotNodeSched(BatsimScheduler):
 
     def write_output_to_file(self):
         print("Writing outputs to", self.output_filename)
+        if not os.path.exists(os.path.dirname(self.output_filename)):
+            os.makedirs(os.path.dirname(self.output_filename))
         with open(self.output_filename, 'w', newline='') as csvfile:
             fieldnames = ['update_period', 'nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created', 'nb_staging_jobs_created', 'nb_preempted_jobs']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)

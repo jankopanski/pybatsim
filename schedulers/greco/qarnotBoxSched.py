@@ -70,7 +70,7 @@ class QarnotBoxSched():
 
             # Get properties of the first mobo, since all mobos should be identical
             properties = mobos_list[0][2]
-            watts = (properties["watt_per_state"]).split(', ')
+            watts = (properties["watt_per_state"]).split(',')
             properties["watt_per_state"] = [float((x.split(':'))[-1]) for x in watts]
             properties["nb_pstates"] = len(watts)
             qr.properties = properties
@@ -526,7 +526,7 @@ class QarnotBoxSched():
                     # A new instance was started during this scheduling step. Update the state and set pstate to 0 (max speed)
                     qm.launch_job()
                     self.stateChanges[0].insert(qm.batid)
-                    #self.logger.debug("++++++++ Change state of {} to {} {} (launch job)".format(qm.batid, 0, qm.pstate))
+                    #self.logger.debug("++++++++ Change state of {} to {} (launch job)".format(qm.batid, qm.pstate))
 
                 elif qm.state >= QMoboState.RUNLOW:
                     # Check if we can increase/decrease the processor speed
@@ -534,13 +534,13 @@ class QarnotBoxSched():
                         # Increase speed
                         qm.pstate -= 1
                         self.stateChanges[qm.pstate].insert(qm.batid)
-                        #self.logger.debug("++++++++ Change state of {} to {} {} (increase speed)".format(qm.batid, qm.pstate, qm.pstate))
+                        self.logger.info("++++++++ Change state of {} to {} (increase speed)".format(qm.batid, qm.pstate))
 
                     elif qr.diffTemp <= -1 and qm.pstate < (qm.max_pstate-1):
                         # Decrease speed
                         qm.pstate += 1
                         self.stateChanges[qm.pstate].insert(qm.batid)
-                        #self.logger.debug("++++++++ Change state of {} to {} {} (decrease speed)".format(qm.batid, qm.pstate, qm.pstate))
+                        self.logger.info("++++++++ Change state of {} to {} (decrease speed)".format(qm.batid, qm.pstate))
                     # Else we stay in this pstate
 
                 else:

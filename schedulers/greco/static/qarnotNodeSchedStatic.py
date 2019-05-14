@@ -17,11 +17,6 @@ class QarnotNodeSchedStatic(QarnotNodeSched):
     def __init__(self, options):
         super().__init__(options)
 
-        if "output_path" in options:
-            self.output_filename = options["output_path"] + "/out_pybatsim_static.csv"
-        else:
-            self.output_filename = None
-
         self.direct_dispatch_enabled = False
 
         self.qbox_sched_name = QarnotBoxSchedStatic
