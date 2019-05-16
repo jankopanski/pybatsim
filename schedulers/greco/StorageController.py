@@ -534,6 +534,18 @@ class StorageController:
 
         assert False, "QBox {} registered but no corresponding disk was found".format(qbox_name)
 
+    def replicateAllDatasetsAtStart(self):
+        '''
+        Used by the FullReplicate version.
+        Simply copies instantaneously all datasets on all QBox disks.
+        '''
+        ceph = self.get_storage(self._ceph_id)
+        
+        for storage_id in self.get_storages().keys():
+            for dataset in ceph.get_datasets().values():
+                self.add_dataset(storage_id, dataset)
+
+
 
     def onQBoxAskHardLink(self, storage_id, dataset_id, qtask_id):
         '''

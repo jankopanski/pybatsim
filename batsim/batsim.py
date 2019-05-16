@@ -31,7 +31,7 @@ class Batsim(object):
         self.logger = logging.getLogger(__name__)
 
         self.running_simulation = False
-        self.network = NetworkHandler(network_endpoint, timeout=20000)#timeout)
+        self.network = NetworkHandler(network_endpoint, timeout=2000000)#timeout)
         self.network.bind()
 
         # event hendler is optional
