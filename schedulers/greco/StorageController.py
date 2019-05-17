@@ -395,7 +395,7 @@ class StorageController:
 
         If we can't move the Dataset, then no job for it is scheduled
         """
-        self._logger.info("StorageController : Request for dataset {} to transfer from {} to {}"\
+        self._logger.debug("StorageController : Request for dataset {} to transfer from {} to {}"\
                           .format(dataset_id, source_id, dest_id))
 
         source = self.get_storage(source_id)
@@ -435,7 +435,7 @@ class StorageController:
         if(dest.get_dataset(dataset_id) != None):
             entry['status'] = 'data_present_dest'
             self._traces = self._traces.append(entry, ignore_index=True)
-            self._logger.info("StorageController : Dataset with id {} already present in destination with id {}.".format(dataset_id, dest_id))
+            self._logger.debug("StorageController : Dataset with id {} already present in destination with id {}.".format(dataset_id, dest_id))
             return True
 
         # Now we check if the destination has enough storage
@@ -534,17 +534,13 @@ class StorageController:
 
         assert False, "QBox {} registered but no corresponding disk was found".format(qbox_name)
 
-    def replicateAllDatasetsAtStart(self):
+    def replicateDatasetOnAllDisks(self, dataset_id):
         '''
         Used by the FullReplicate version.
-        Simply copies instantaneously all datasets on all QBox disks.
+        Simply asks to replicate the given dataset onto all QBox disks.
         '''
-        ceph = self.get_storage(self._ceph_id)
-        
         for storage_id in self.get_storages().keys():
-            for dataset in ceph.get_datasets().values():
-                self.add_dataset(storage_id, dataset)
-
+            self.onQBoxAskDataset(storage_id, dataset_id)
 
 
     def onQBoxAskHardLink(self, storage_id, dataset_id, qtask_id):
