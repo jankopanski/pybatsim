@@ -71,8 +71,8 @@ class Storage:
 
         if(self._name == "storage_server"):
             self.is_ceph = True
-            self._storage_capacity = math.inf           # Capacity set to infinite (float)
-            self._available_space = math.inf            # Available space set to infinite (float)
+            self._storage_capacity = 1e15           # Capacity set to 1000TB (should be enough) (float)
+            self._available_space = 1e15            # Available space set to 1000TB (float)
         else:
             self.is_ceph = False
             self._storage_capacity = storage_capacity   # Capacity of the storage in bytes (float)
