@@ -22,22 +22,31 @@ class QarnotNodeSchedFullReplicate(QarnotNodeSched):
 
         self.qbox_sched_name = QarnotBoxSchedFullReplicate
 
-    def onSimulationBegins(self):
-        assert self.bs.dynamic_job_registration_enabled, "Registration of dynamic jobs must be enabled for this scheduler to work"
-        assert self.bs.ack_of_dynamic_jobs == False, "Acknowledgment of dynamic jobs must be disabled for this scheduler to work"
 
-        # Register the profile of the cpu-burn jobs. CPU value is 1e20 because it's supposed to be endless and killed when needed.
-        self.bs.register_profiles("dyn-burn", {"burn":{"type":"parallel_homogeneous", "cpu":1e20, "com":0, "priority": -23}})
-        self.bs.wake_me_up_at(1)
+    def onJobSubmission(self, job, resubmit=False):
+        qtask_id = job.id.split('_')[0]
+        job.qtask_id = qtask_id
 
-        self.initQBoxesAndStorageController()
-        for qb in self.dict_qboxes.values():
-            qb.onBeforeEvents()
+        # Retrieve or create the corresponding QTask
+        if not qtask_id in self.qtasks_queue:
+            assert resubmit == False, "QTask id not found during resubmission of an instance"
 
-        self.storage_controller.onSimulationBegins()
-        self.storage_controller.replicateAllDatasetsAtStart()
+            list_datasets = self.bs.profiles[job.workload][job.profile]["datasets"]
+            if list_datasets is None:
+                list_datasets = []
 
-        self.logger.info("[{}]- QNode: End of SimulationBegins".format(self.bs.time()))
+            qtask = QTask(qtask_id, job.profile_dict["priority"], list_datasets)
+            self.qtasks_queue[qtask_id] = qtask
+            self.nb_received_qtasks += 1
+        else:
+            qtask = self.qtasks_queue[qtask_id]
+        self.nb_received_instances += 1
+
+        qtask.instance_submitted(job, resubmit)
+
+        self.do_dispatch = True
+        #TODO maybe we'll need to disable this dispatch, same reason as when a job completes
+
 
 
 
