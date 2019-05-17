@@ -92,6 +92,8 @@ class QarnotNodeSched(BatsimScheduler):
         self.next_burn_job_id = 0
         self.nb_rejected_jobs_by_qboxes = 0 # Just to keep track of the count
         self.nb_preempted_jobs = 0
+        self.nb_received_qtasks = 0
+        self.nb_received_instances = 0
 
         #self.max_simulation_time = 87100 # 1 day
         self.max_simulation_time = 1211000 # 2 weeks TODO remove this guard?
@@ -126,6 +128,8 @@ class QarnotNodeSched(BatsimScheduler):
 
         self.storage_controller.onSimulationEnds()
 
+        print("Number of received QTasks:", self.nb_received_qtasks)
+        print("number of recevied instances:", self.nb_received_instances)
         print("Number of rejected instances by QBoxes during dispatch:", self.nb_rejected_jobs_by_qboxes)
         print("Number of burn jobs created:", self.next_burn_job_id)
         print("Number of staging jobs created:", self.storage_controller._next_staging_job_id)
@@ -140,11 +144,15 @@ class QarnotNodeSched(BatsimScheduler):
         if not os.path.exists(os.path.dirname(self.output_filename)):
             os.makedirs(os.path.dirname(self.output_filename))
         with open(self.output_filename, 'w', newline='') as csvfile:
-            fieldnames = ['update_period', 'nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created', 'nb_staging_jobs_created', 'nb_preempted_jobs']
+            fieldnames = ['update_period', 'nb_received_qtasks', 'nb_received_instances',
+                          'nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created',
+                          'nb_staging_jobs_created', 'nb_preempted_jobs']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerow({
                 'update_period': self.update_period,
+                'nb_received_qtasks': self.nb_received_qtasks,
+                'nb_received_instances': self.nb_received_instances,
                 'nb_rejected_instances_during_dispatch': self.nb_rejected_jobs_by_qboxes,
                 'nb_burn_jobs_created': self.next_burn_job_id,
                 'nb_staging_jobs_created': self.storage_controller._next_staging_job_id,
@@ -320,8 +328,10 @@ class QarnotNodeSched(BatsimScheduler):
             
             qtask = QTask(qtask_id, job.profile_dict["priority"], list_datasets)
             self.qtasks_queue[qtask_id] = qtask
+            self.nb_received_qtasks += 1
         else:
             qtask = self.qtasks_queue[qtask_id]
+        self.nb_received_instances += 1
 
         qtask.instance_submitted(job, resubmit)
 
