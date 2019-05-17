@@ -93,6 +93,9 @@ class Storage:
                 # Store this object in the dataset with timestamp 0
                 self.add_dataset(Dataset(parsed["id"], parsed["size"]), 0)
 
+    def get_id(self):
+        return self._id
+
     def get_available_space(self):
         """ Returns the remaining space on the Storage """
 
@@ -522,6 +525,31 @@ class StorageController:
                 storage.delete_dataset(dataset_to_delete)
             else:
                 break
+
+    def getNMostEmptyStorages(self, n=1):
+        '''
+        Gets the list of storages with the most empty space remaining.
+        If the remaining space is same, sorted ascending with storage_id.
+
+        n is truncated to the available number of qboxes if it is greater than it.
+        :param n: Value of n
+        :return: list of qbox ids
+        '''
+
+        # Maps the empty size to qbox_id
+        size_map = dict()
+
+        for batsim_id, storage in self.get_storages().items():
+            size_map[storage.get_id()] = storage.get_available_space()
+
+        # Now sort
+        sorted_list = sorted(size_map, key=size_map.__getitem__)
+        sorted_list.reverse()
+
+        # Check if requested number is greater than the qboxes, if yes, truncate
+        ret_len = min(n, len(sorted_list))
+        return sorted_list[0:ret_len]
+
 
     ''' This function should be called during init of the QBox Scheduler '''
     def onQBoxRegistration(self, qbox_name, qbox):
