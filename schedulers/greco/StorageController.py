@@ -494,7 +494,7 @@ class StorageController:
         dataset_final = -1
         min_valid_timestamp = None
 
-        for dataset_id, dataset in storage.get_datasets():
+        for dataset_id, dataset in storage.get_datasets().items():
 
             # This is to find the first valid dataset
             if dataset_final == -1:
