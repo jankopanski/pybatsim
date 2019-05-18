@@ -551,16 +551,6 @@ class StorageController:
         return sorted_list[0:ret_len]
 
 
-    ''' This function should be called during init of the QBox Scheduler '''
-    def onQBoxRegistration(self, qbox_name, qbox):
-        qbox_disk_name = qbox_name + "_disk"
-        for disk in self._storages.values():
-            if (disk._name == qbox_disk_name):
-                #TODO we will also need king of the inverse mapping from the qbox_id to the storage
-                self.mappingQBoxes[disk._id] = qbox
-                return disk._id
-
-        assert False, "QBox {} registered but no corresponding disk was found".format(qbox_name)
 
     def replicateDatasetOnAllDisks(self, dataset_id):
         '''
@@ -569,6 +559,18 @@ class StorageController:
         '''
         for storage_id in self.get_storages().keys():
             self.onQBoxAskDataset(storage_id, dataset_id)
+
+    ''' This function should be called during init of the QBox Scheduler '''
+    def onQBoxRegistration(self, qbox_name, qbox):
+        qbox_disk_name = qbox_name + "_disk"
+        for disk in self._storages.values():
+            if (disk._name == qbox_disk_name):
+                #TODO we will also need kind of the inverse mapping from the qbox_id to the storage
+                self.mappingQBoxes[disk._id] = qbox
+                disk._qb_name = qbox.name
+                return disk._id
+
+        assert False, "QBox {} registered but no corresponding disk was found".format(qbox_name)
 
 
     def onQBoxAskHardLink(self, storage_id, dataset_id, qtask_id):
