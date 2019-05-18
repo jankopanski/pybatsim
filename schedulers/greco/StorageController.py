@@ -254,36 +254,6 @@ class StorageController:
         """ Returns the Storages in the Storage Controller """
         return self._storages
 
-
-    def get_storages_by_dataset(self, required_dataset):
-        """ Returns the list of storages that already has the required dataset """
-
-        # The dict of all qboxes with the required dataset
-        qboxes_list = []
-        
-        # Removing CEPH from this dict
-        storages = {}
-        for s in self.get_storages():
-            if (s != self._ceph_id):
-                storages[s] = self.get_storage(s)
-        
-        # Iterate over all the storages
-        for storage in storages.values():
-            hasDataset = True
-
-            # To check if this storage has all the datasets required.
-            for dataset in required_dataset:
-                if (storage.get_dataset(dataset) == None):
-                    hasDataset = False
-                    break
-            # If true, the storage has all required datasets.
-            if(hasDataset):
-                #self._logger.debug("[{}]     QBOX {} has the required datasets.".format(self._bs.time(), self.mappingQBoxes[storage._id]))
-                qboxes_list.append(self.mappingQBoxes[storage._id])
-        
-        return qboxes_list
-
-
     def add_storage(self, storage):
         """ Add storage to storages list """
         self._storages[storage._id] = storage
@@ -559,6 +529,28 @@ class StorageController:
         '''
         for storage_id in self.get_storages().keys():
             self.onQBoxAskDataset(storage_id, dataset_id)
+
+
+    def onGetStoragesHavingDatasets(self, datasets):
+        """ Returns the list of storages (without CEPH) that already has the required datasets """
+
+        # The list of all qboxes with the required dataset
+        qboxes_list = []
+
+        # Iterate over all the storages
+        for storage in self.get_storages().values():
+            # Check if this storage has all the required datasets.
+            hasDataset = True
+            for dataset_id in datasets:
+                if storage.has_dataset(dataset_id):
+                    hasDataset = False
+                    break
+            if hasDataset:
+                # If true, this storage has all the required datasets, add it to the list
+                qboxes_list.append(storage._qb_name)
+
+        return qboxes_list
+
 
     ''' This function should be called during init of the QBox Scheduler '''
     def onQBoxRegistration(self, qbox_name, qbox):
