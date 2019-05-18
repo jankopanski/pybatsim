@@ -506,7 +506,7 @@ class StorageController:
         :return: list of qbox ids
         '''
 
-        # Maps the empty size to qbox_id
+        # Maps the empty size to disk_id
         size_map = dict()
 
         for batsim_id, storage in self.get_storages().items():
@@ -520,6 +520,11 @@ class StorageController:
         ret_len = min(n, len(sorted_list))
         return sorted_list[0:ret_len]
 
+
+    def replicateDatasetOnStorages(self, dataset_id, storage_ids):
+        ''' Replicate the Dataset on given storages '''
+        for storage_id in storage_ids:
+            self.onQBoxAskDataset(storage_id, dataset_id)
 
 
     def replicateDatasetOnAllDisks(self, dataset_id):
