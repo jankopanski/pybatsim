@@ -141,14 +141,18 @@ class QarnotBoxSched():
     '''
 
 
-    def onNotifyMachineUnavailable(self, machine_batid):
+    def onNotifyMachineUnavailable(self, machines):
         # The QRad became too hot (from external event), need to kill the instance running on it, if any
         # Then mark this machine as unavailable
-        pass
+        self.logger.info(f"[{self.bs.time()}] New unavailable mobos: {machines} to be removed to {self.mobosAvailable}")
+        self.mobosAvailable.difference_update(machines)
+        self.mobosUnavailable.insert(machines)
 
-    def onNotifyMachineAvailable(self, machine_batid):
+    def onNotifyMachineAvailable(self, machines):
         # Put the machine back available
-        pass
+        self.logger.info(f"[{self.bs.time()}] New available mobos: {machines} to be added to {self.mobosAvailable}")
+        self.mobosAvailable.insert(machines)
+        self.mobosUnavailable.difference_update(machines)
 
 
     def killOrRejectAllJobs(self):
@@ -285,6 +289,7 @@ class QarnotBoxSched():
             # Find coolest QRad which is not running LOW instance, i.e. the QRad with the greatest diffTemp
             running_low = [] # List of mobos that are running LOW instances
             available_slots = self.availBkgd | self.availLow | self.availHigh # Get all mobos on which we can start a HIGH instance
+            available_slots.difference_update(self.mobosUnavailable)
             qr_list = sorted(self.dict_qrads.values(), key=lambda qr:-qr.diffTemp) # Take QRads by decreasing temperature difference (i.e., increasing heating capacity)
             for qr in qr_list:
                 for batid in (qr.pset_mobos & available_slots):
@@ -324,6 +329,7 @@ class QarnotBoxSched():
         else: # This is a LOW instance
             # Find warmest QRad among the availLow and availBkgd
             available_slots = self.availBkgd | self.availLow # Get all mobos in which we can start a LOW instance
+            available_slots.difference_update(self.mobosUnavailable)
             qr_list = sorted(self.dict_qrads.values(), key=lambda qr:qr.diffTemp) # Take QRads by increasing temperature difference (i.e., decreasing heat capacity)
             for qr in qr_list:
                 for batid in (qr.pset_mobos & available_slots):
@@ -500,7 +506,16 @@ class QarnotBoxSched():
             start_cpu_burn = self.qn.do_dispatch and (qr.diffTemp >= 1)
             # Don't start cpu_burn jobs if a dispatch has not been done during this scheduling step
             for qm in qr.dict_mobos.values():
-                if start_cpu_burn and (qm.state <= QMoboState.IDLE):
+                if qm.batid in self.mobosUnavailable:
+                    # Put if OFF if it is not already and kill the running job, if any
+                    if qm.state != QMoboState.OFF:# and qm.pstate != qm.max_pstate:
+                        if qm.running_job != -1:
+                            job = qm.pop_job()
+                            self.jobs_to_kill.append(job)
+                        qm.turn_off()
+                        self.stateChanges[qm.max_pstate].insert(qm.batid)
+
+                elif start_cpu_burn and (qm.state <= QMoboState.IDLE):
                     # If the mobo is IDLE/OFF and heating is required, start a cpu_burn job
                     jid = "dyn-burn!" + str(self.qn.next_burn_job_id)
                     self.qn.next_burn_job_id += 1

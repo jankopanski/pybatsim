@@ -62,10 +62,16 @@ class QarnotNodeSched(BatsimScheduler):
         else:
             self.output_filename = None
 
+        if "handle_availability" in options:
+            self.forward_availability_events = True if options["handle_availability"] == 1 else False
+        else:
+            self.forward_availability_events = False
+
         # For the manager
         self.dict_qboxes = {}        # Maps the QBox id to the QarnotBoxSched object
-        self.dict_resources = {} # Maps the Batsim resource id to the QarnotBoxSched object
         self.dict_qrads = {}         # Maps the QRad name to the QarnotBoxSched object
+        self.dict_resources = {} # Maps the Batsim resource id to the QarnotBoxSched object
+        self.dict_procsets = defaultdict(ProcSet) # Maps the QBox id to a ProcSet of its QMobos
         self.dict_sites = defaultdict(list) # Maps the site name ("paris" or "bordeaux" for now) to a list of QarnotBoxSched object
         self.numeric_ids = {} # Maps the Qmobo name to its batid
 
@@ -105,8 +111,6 @@ class QarnotNodeSched(BatsimScheduler):
         assert self.bs.dynamic_job_registration_enabled, "Registration of dynamic jobs must be enabled for this scheduler to work"
         assert self.bs.allow_storage_sharing, "Storage sharing must be enabled for this scheduler to work"
         assert self.bs.ack_of_dynamic_jobs == False, "Acknowledgment of dynamic jobs must be disabled for this scheduler to work"
-        #assert len(self.bs.air_temperatures) > 0, "Temperature option '-T 1' of Batsim should be set for this scheduler to work"
-        # TODO maybe change the option to send every 30 seconds instead of every message of Batsim (see TODO list)
 
         # Register the profile of the cpu-burn jobs. CPU value is 1e20 because it's supposed to be endless and killed when needed.
         self.bs.register_profiles("dyn-burn", {"burn":{"type":"parallel_homogeneous", "cpu":1e20, "com":0, "priority": -23}})
@@ -196,8 +200,10 @@ class QarnotNodeSched(BatsimScheduler):
             for mobos_list in dict_qrads.values():
                 for (batid, qm_name, _) in mobos_list:
                     self.dict_resources[batid] = qb
-                    numeric_id = self.numeric_ids[qm_name]
+                    self.dict_procsets[qb_name].insert(batid)
+
                     # Just a guard to be sure.
+                    numeric_id = self.numeric_ids[qm_name]
                     assert batid == numeric_id, "{} and {} are different (types are {} {})".format(batid, numeric_id, type(batid), type(numeric_id))
 
         self.nb_qboxes = len(self.dict_qboxes)
@@ -295,12 +301,20 @@ class QarnotNodeSched(BatsimScheduler):
         '''
 
     def onNotifyEventMachineUnavailable(self, machines):
-        for machine_id in machines:
-            self.dict_resources[machine_id].onNotifyMachineUnavailable(machine_id)
+        if not self.forward_availability_events:
+            return
+
+        for qb_name, procset_mobos in self.dict_procsets.items():
+            p = (machines & procset_mobos) # Computes the intersection
+            self.dict_qboxes[qb_name].onNotifyMachineUnavailable(p)
 
     def onNotifyEventMachineAvailable(self, machines):
-        for machine_id in machines:
-            self.dict_resources[machine_id].onNotifyMachineAvailable(machine_id)
+        if not self.forward_availability_events:
+            return
+
+        for qb_name, procset_mobos in self.dict_procsets.items():
+            p = (machines & procset_mobos) # Computes the intersection
+            self.dict_qboxes[qb_name].onNotifyMachineAvailable(p)
 
     def onMachinePStateChanged(self, nodeid, pstate):
         pass
