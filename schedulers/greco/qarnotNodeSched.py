@@ -165,7 +165,7 @@ class QarnotNodeSched(BatsimScheduler):
 
     def initQBoxesAndStorageController(self):
         # Let's create the StorageController
-        self.storage_controller = self.storage_controller_name(self.bs.machines["storage"], self.bs, self, self.options["input_path"])
+        self.storage_controller = self.storage_controller_name(self.bs.machines["storage"], self.bs, self, self.options)
 
         # Retrieve the QBox ids and the associated list of QMobos Batsim ids
         dict_ids = defaultdict(lambda: defaultdict(list))
