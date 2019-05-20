@@ -201,7 +201,7 @@ class Storage:
 class StorageController:
 
     def __init__(self, storage_resources, bs, qn, options):
-        self._input_path = otions["input_path"]
+        self._input_path = options["input_path"]
         self._output_path = options["output_path"]
         self._traces = pd.DataFrame(columns=['count', 'name', 'dataset_id', 'source', 'dest',
                                              'actually_transferred_size','transfer_size',
@@ -231,7 +231,7 @@ class StorageController:
                 # Store the CEPH ID
                 self._ceph_id = res["id"]
                 # Parse the dataset file
-                new_storage.load_datasets_from_json(input_path+"/datasets.json")
+                new_storage.load_datasets_from_json(self._input_path+"/datasets.json")
 
             self.add_storage(new_storage)
 
@@ -239,7 +239,7 @@ class StorageController:
 
         # Now parse the platform file to get the bandwidth values
 
-        tree = ET.parse(input_path+'/platform.xml')
+        tree = ET.parse(self._input_path+'/platform.xml')
 
         self.bandwidth = {}
 
