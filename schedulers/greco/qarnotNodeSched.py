@@ -130,7 +130,7 @@ class QarnotNodeSched(BatsimScheduler):
         for qb in self.dict_qboxes.values():
             qb.onSimulationEnds()
 
-        self.storage_controller.onSimulationEnds()
+        (nb_transfers_zero, nb_transfers_real, total_transferred_from_CEPH) = self.storage_controller.onSimulationEnds()
 
         print("Number of received QTasks:", self.nb_received_qtasks)
         print("number of recevied instances:", self.nb_received_instances)
@@ -141,16 +141,17 @@ class QarnotNodeSched(BatsimScheduler):
         print("Update_period was:", self.update_period)
 
         if self.output_filename != None:
-            self.write_output_to_file()
+            self.write_output_to_file(nb_transfers_zero, nb_transfers_real, total_transferred_from_CEPH)
 
-    def write_output_to_file(self):
+    def write_output_to_file(self, nb_transfers_zero, nb_transfers_real, total_transferred_from_CEPH):
         print("Writing outputs to", self.output_filename)
         if not os.path.exists(os.path.dirname(self.output_filename)):
             os.makedirs(os.path.dirname(self.output_filename))
         with open(self.output_filename, 'w', newline='') as csvfile:
             fieldnames = ['update_period', 'nb_received_qtasks', 'nb_received_instances',
                           'nb_rejected_instances_during_dispatch', 'nb_burn_jobs_created',
-                          'nb_staging_jobs_created', 'nb_preempted_jobs']
+                          'nb_staging_jobs_created', 'nb_preempted_jobs',
+                          'nb_transfers_zero', 'nb_transfers_real', 'total_transferred_GB']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerow({
@@ -160,7 +161,12 @@ class QarnotNodeSched(BatsimScheduler):
                 'nb_rejected_instances_during_dispatch': self.nb_rejected_jobs_by_qboxes,
                 'nb_burn_jobs_created': self.next_burn_job_id,
                 'nb_staging_jobs_created': self.storage_controller._next_staging_job_id,
-                'nb_preempted_jobs': self.nb_preempted_jobs})
+                'nb_preempted_jobs': self.nb_preempted_jobs,
+                'nb_transfers_zero' : nb_transfers_zero,
+                'nb_transfers_real' : nb_transfers_real,
+                'total_transferred_GB' : (total_transferred_from_CEPH / 1e9),
+
+                })
 
 
     def initQBoxesAndStorageController(self):

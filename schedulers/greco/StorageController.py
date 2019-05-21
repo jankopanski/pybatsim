@@ -213,6 +213,9 @@ class StorageController:
         self._bs = bs            # Pybatsim
         self._qn = qn            # The QNode Scheduler
         self._logger = bs.logger
+        self._total_transferred_from_CEPH = 0 # In Bytes
+        self._nb_transfers_zero = 0 # The number of times a dataset was already present on disk
+        self._nb_transfers_real = 0 # The number of "real" transfers
 
         # Stores the requests that have been staged.
         # If transfer from CEPH to storage_id i fro dataset_id j
@@ -410,6 +413,7 @@ class StorageController:
             entry['status'] = 'data_present_dest'
             self._traces = self._traces.append(entry, ignore_index=True)
             self._logger.debug("StorageController : Dataset with id {} already present in destination with id {}.".format(dataset_id, dest_id))
+            self._nb_transfers_zero+=1
             return True
 
         # Now we check if the destination has enough storage
@@ -450,6 +454,9 @@ class StorageController:
         self.moveRequested[jid1] = dataset.get_id()
 
         self._logger.info("[ {} ] Storage Controller staging job for dataset {} from {} to {} started".format(self._bs.time(), dataset_id, source_id, dest_id))
+
+        self._nb_transfers_real+=1
+        self._total_transferred_from_CEPH+=dataset.get_size()
 
         self.staging_map.add((dest_id, dataset_id))
 
@@ -617,6 +624,7 @@ class StorageController:
         '''
     
         if((storage_id, dataset_id) in self.staging_map):
+            self._nb_transfers_zero+=1
             return False
         # Else add the dataset
         else:
@@ -661,6 +669,7 @@ class StorageController:
 
         self._logger.info("Staging jobs collected : {}".format(self._traces.shape))
         self._traces.to_csv(self._output_path + '/staging_jobs.csv')
+        return (self._nb_transfers_zero, self._nb_transfers_real, self._total_transferred_from_CEPH)
 
     def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
         for machine_id in machines:
