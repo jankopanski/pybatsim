@@ -18,7 +18,7 @@ This is a variant of the qarnotNodeSched that takes into account locality of the
 to dispatch instances.
 '''
 
-class QarnotNodeSchedReplicateLeastLoaded(QarnotNodeSched):
+class QarnotNodeSchedReplicate10LeastLoaded(QarnotNodeSched):
     def __init__(self, options):
         super().__init__(options)
 
@@ -27,7 +27,7 @@ class QarnotNodeSchedReplicateLeastLoaded(QarnotNodeSched):
         else:
             self.output_filename = None
 
-        self.nb_least_loaded = 5
+        self.nb_least_loaded = 10
 
 
 
