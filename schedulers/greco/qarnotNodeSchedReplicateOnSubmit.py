@@ -16,7 +16,7 @@ class QarnotNodeSchedReplicateOnSubmit(QarnotNodeSched):
         super().__init__(options)
 
         if "output_path" in options:
-            self.output_filename = options["output_path"] + "/out_pybatsim_full_replicate.csv"
+            self.output_filename = options["output_path"] + "/out_pybatsim.csv"
         else:
             self.output_filename = None
 
