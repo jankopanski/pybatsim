@@ -175,3 +175,14 @@ class QMobo:
 
     def is_reserved_high(self):
         return (self.reserved_job != -1) and (self.reserved_job.priority_group == PriorityGroup.HIGH)
+
+
+class QUser:
+    # Used to manage quotas, limits etc by user
+    def __init__(self, id, max_running_instances):
+        self.id = id
+        self.max_running_instances = int(max_running_instances)
+
+    def print_infos(self, logger):
+        logger.info("QUser: {}, max running instances: {}".format(
+            self.id, self.max_running_instances))
