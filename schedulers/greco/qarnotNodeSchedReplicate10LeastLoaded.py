@@ -42,8 +42,9 @@ class QarnotNodeSchedReplicate10LeastLoaded(QarnotNodeSched):
             list_datasets = self.bs.profiles[job.workload][job.profile]["datasets"]
             if list_datasets is None:
                 list_datasets = []
+            user_id = job.profile_dict["user"]
 
-            qtask = QTask(qtask_id, job.profile_dict["priority"], list_datasets)
+            qtask = QTask(qtask_id, job.profile_dict["priority"], list_datasets, user_id)
             self.qtasks_queue[qtask_id] = qtask
             self.nb_received_qtasks += 1
             # Ask for the replication of its datasets

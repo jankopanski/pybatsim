@@ -13,7 +13,7 @@ class PriorityGroup:
 
 class QTask:
     # Used by the QNode scheduler
-    def __init__(self, id, priority, list_datasets):
+    def __init__(self, id, priority, list_datasets, user_id):
         self.id = id
         self.waiting_instances = [] # List of Batsim Jobs waiting to be scheduled
         self.nb_received_instances = 0    # Number of jobs submitted by Batsim
@@ -25,6 +25,7 @@ class QTask:
 
         self.priority = int(priority)
         self.priority_group = PriorityGroup.fromValue(self.priority)
+        self.user_id = user_id
 
 
         #TODO
