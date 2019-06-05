@@ -436,9 +436,9 @@ class QarnotBoxSched():
     def rejectReservedInstance(self, qm):
         old_job = qm.reserved_job
         qm.reserved_job = -1
-        self.onQBoxRejectedInstances([old_job], self.name)
+        self.qn.onQBoxRejectedInstances([old_job], self.name)
         self.dict_reserved_jobs_mobos[old_job.qtask_id].remove((qm, old_job))
-        self.logger.info("[{}]------- Mobo {} rejected Job {} because another instance of higher priority needed it ({})".format(self.bs.time(), qm.name, old_job.id, job.id))
+        self.logger.info("[{}]------- Mobo {} rejected Job {} because another instance of higher priority needed it".format(self.bs.time(), qm.name, old_job.id))
 
 
     def onJobCompletion(self, job, direct_job = -1):
