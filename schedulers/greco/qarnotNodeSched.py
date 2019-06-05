@@ -346,7 +346,9 @@ class QarnotNodeSched(BatsimScheduler):
             if list_datasets is None:
                 list_datasets = []
             
-            qtask = QTask(qtask_id, job.profile_dict["priority"], list_datasets)
+            user_id = job.profile_dict["user"]
+
+            qtask = QTask(qtask_id, job.profile_dict["priority"], list_datasets, user_id)
             self.qtasks_queue[qtask_id] = qtask
             self.nb_received_qtasks += 1
         else:

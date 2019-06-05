@@ -460,6 +460,7 @@ class StorageController:
 
         self.staging_map.add((dest_id, dataset_id))
 
+        entry['actually_transferred_size'] = dataset.get_size()
         self._traces = self._traces.append(entry, ignore_index=True)
         return False
 
