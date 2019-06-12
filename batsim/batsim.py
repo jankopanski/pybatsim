@@ -360,7 +360,7 @@ class Batsim(object):
         if len(splitted_id) == 1:
             new_job_name = deepcopy(job.id)
         else:
-            # This job as already an attempt number
+            # This job has already an attempt number
             new_job_name = splitted_id[0]
             assert splitted_id[1] == str(metadata["nb_resubmit"] - 1)
         new_job_name =  new_job_name + Batsim.ATTEMPT_JOB_SEPARATOR + str(metadata["nb_resubmit"])
@@ -498,7 +498,7 @@ class Batsim(object):
                 killed_jobs = []
                 for jid in event_data["job_ids"]:
                     j = self.jobs[jid]
-                    # The job_progress can only be empty if the has completed
+                    # The job_progress can only be empty if the job has completed
                     # between the order of killing and the killing itself.
                     # So in that case just dont put it in the killed jobs
                     # because it was already mark as complete.
@@ -755,7 +755,7 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onNoMoreJobsInWorkloads(self):
-        self.logger.info("There is no more static jobs in the workoad")
+        self.logger.info("There is no more static jobs in the workload")
 
     def onNoMoreExternalEvents(self):
         self.logger.info("There is no more external events to occur")
