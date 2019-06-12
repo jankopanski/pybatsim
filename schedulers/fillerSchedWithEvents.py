@@ -75,5 +75,8 @@ class FillerSchedWithEvents(BatsimScheduler):
         self.unavailableResources -= machines
         self.availableResources |= machines
 
+    def onNotifyGenericEvent(self, event_data):
+        pass
+
     def onNoMoreEvents(self):
         self.scheduleJobs()

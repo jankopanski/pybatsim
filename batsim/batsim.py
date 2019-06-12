@@ -576,7 +576,10 @@ class Batsim(object):
                     self.scheduler.onNotifyEventMachineUnavailable(ProcSet.from_str(event_data["resources"]))
                 elif notify_type == "event_machine_available":
                     self.scheduler.onNotifyEventMachineAvailable(ProcSet.from_str(event_data["resources"]))
-
+                elif self.forward_unknown_events:
+                    self.scheduler.onNotifyGenericEvent(event_data)
+                else:
+                    raise Exception("Unknown NOTIFY type {}".format(notify_type))
             else:
                 raise Exception("Unknown event type {}".format(event_type))
 
@@ -764,6 +767,9 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onNotifyEventMachineAvailable(self, machines):
+        raise NotImplementedError()
+
+    def onNotifyGenericEvent(self, event_data):
         raise NotImplementedError()
 
     def onBeforeEvents(self):
