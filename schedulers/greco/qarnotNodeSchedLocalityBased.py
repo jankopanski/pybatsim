@@ -18,7 +18,7 @@ This is a variant of the qarnotNodeSched that takes into account locality of the
 to dispatch instances.
 '''
 
-class QarnotNodeSchedAndrei(QarnotNodeSched):
+class QarnotNodeSchedLocalityBased(QarnotNodeSched):
     def __init__(self, options):
         super().__init__(options)
 
