@@ -202,7 +202,11 @@ class StorageController:
 
     def __init__(self, storage_resources, bs, qn, options):
         self._input_path = options["input_path"]
-        self._output_path = options["output_path"]
+        if "output_path" in options:
+            self._output_path = options["output_path"]
+        else:
+            self._output_path = None
+
         self._traces = pd.DataFrame(columns=['count', 'name', 'dataset_id', 'source', 'dest',
                                              'actually_transferred_size','transfer_size',
                                              'direction', 'status'])
@@ -669,7 +673,8 @@ class StorageController:
             self._logger.info("{} is filled at {} / {}.".format(storage._name, (storage._storage_capacity-storage._available_space), storage._storage_capacity))
 
         self._logger.info("Staging jobs collected : {}".format(self._traces.shape))
-        self._traces.to_csv(self._output_path + '/staging_jobs.csv')
+        if self._output_path != None:
+            self._traces.to_csv(self._output_path + '/staging_jobs.csv')
         return (self._nb_transfers_zero, self._nb_transfers_real, self._total_transferred_from_CEPH)
 
     def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
