@@ -154,6 +154,10 @@ class Batsim(object):
             if io_jobs is not None and job.id in io_jobs:
                 message["data"]["additional_io_job"] = io_jobs[job.id]
 
+            if hasattr(job, "mapping"):
+                message["data"]["mapping"] = job.mapping
+                self.jobs[job.id].mapping = job.mapping
+
             if hasattr(job, "storage_mapping"):
                 message["data"]["storage_mapping"] = job.storage_mapping
                 self.jobs[job.id].storage_mapping = job.storage_mapping
