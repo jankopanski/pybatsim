@@ -235,24 +235,48 @@ class QarnotBoxSched():
         return [self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)]
 
 
-    def onDispatchedInstance(self, instances, priority_group, qtask_id):
+    def onDispatchedInstance(self, instances, priority_group, qtask_id, is_cluster = False):
         '''
         Instances is a list of Batsim jobs corresponding to the instances dispatched to this QBox.
         Priority_group of the instances
 
         Datasets are shared between the instances of the same QTask. So we only need to retrive the datasets once for all instances
+
+        If the instances list has only one instance, it may be a cluster task. In that case, it requires more than one resource.
         '''
-        self.logger.info("[{}]--- {} received {} instances of {} for the priority group {}".format(self.bs.time(), self.name, len(instances), qtask_id, priority_group))
-        if qtask_id in self.dict_subqtasks:
-            # Some instances of this QTask have already been received by this QBox
-            sub_qtask = self.dict_subqtasks[qtask_id]
-            sub_qtask.waiting_instances.extend(instances.copy()) #TODO maybe don't need this copy since we do extend
-        else:
-            # This is a QTask "unknown" to the QBox.
-            # Create and add the SubQTask to the dict
-            sub_qtask = SubQTask(qtask_id, priority_group, instances.copy(),
-                                 self.bs.profiles[instances[0].workload][instances[0].profile]["datasets"])
+        if is_cluster:
+            # This is a cluster task requiring multiple resources
+            self.logger.info("[{}]--- {} received a cluster task {} for the priority group {}".format(self.bs.time(), self.name, qtask_id, priority_group))
+            assert qtask_id not in self.dict_subqtasks, f"{self.name} received a cluster task {qtask_id} but other instances of this cluster were received previously, aborting."
+
+            # First check if there is enough available mobos
+            nb_requested_res = instances[0].requested_resources
+            if (priority_group == PriorityGroup.HIGH) and (len(self.mobosAvailable) < nb_requested_res) or
+            (priority_group < PriorityGroup.HIGH) and ( (len(self.availBkgd) + len(self.availLow)) < nb_requested_res):
+                self.logger.info(f"[{self.bs.time()}]--- {self.name} does not have available mobos for cluster taks {qtask_id}, rejecting it.")
+                self.qn.onQBoxRejectedInstances(instances, self.name)
+
+
+
+            batjob = instances[0]
+            sub_qtask = SubQTask(qtask_id, priority_group, batjob,
+                                 self.bs.profiles[batjob.workload][batjob.profile]["datasets"])
+            sub_qtask.is_cluster = True
             self.dict_subqtasks[qtask_id] = sub_qtask
+
+        else:
+            #This is a regular dispatch of instances
+            self.logger.info("[{}]--- {} received {} instances of {} for the priority group {}".format(self.bs.time(), self.name, len(instances), qtask_id, priority_group))
+            if qtask_id in self.dict_subqtasks:
+                # Some instances of this QTask have already been received by this QBox
+                sub_qtask = self.dict_subqtasks[qtask_id]
+                sub_qtask.waiting_instances.extend(instances.copy()) #TODO maybe don't need this copy since we do extend
+            else:
+                # This is a QTask "unknown" to the QBox.
+                # Create and add the SubQTask to the dict
+                sub_qtask = SubQTask(qtask_id, priority_group, instances.copy(),
+                                     self.bs.profiles[instances[0].workload][instances[0].profile]["datasets"])
+                self.dict_subqtasks[qtask_id] = sub_qtask
 
         # Then ask for the data staging of the required datasets
         # Even if all datasets were on disk before, that doesn't mean they are still there
@@ -268,7 +292,10 @@ class QarnotBoxSched():
         sub_qtask.update_waiting_datasets(new_waiting_datasets)
 
         # Then schedule the instances
-        self.scheduleInstances(sub_qtask)
+        if sub_qtask.is_cluster():
+            self.scheduleClusterInstance(sub_qtask)
+        else:
+            self.scheduleInstances(sub_qtask)
 
 
     def scheduleInstances(self, sub_qtask):
@@ -353,6 +380,68 @@ class QarnotBoxSched():
         sub_qtask.waiting_instances = []
 
 
+    def scheduleClusterInstance(self, sub_qtask):
+        '''
+        As for regular instances, all datasets were already requested.
+        Make reservations for all mobos requested by this cluster or reject it and then start them if the datasets are already on disk.
+        For HIGH priority, take mobos on the coolest QRads that are available for HIGH (if possible without preempting LOW instance, don't care about BKGD)
+        For BKGD/LOW priority, take mobos on the warmest QRads that are available for BKGD/LOW (preempt BKGD task if necessary)
+        '''
+        job = sub_qtask.pop_waiting_instance()
+        allocation = ProcSet()
+        remaining_requested_res = job.requested_resources
+        # At this moment, we are sure there is enough available mobos for this cluster, reserve them
+        if sub_qtask.Priority_group == PriorityGroup.HIGH:
+            # Sort the QRads by coolest first and assign all available mobos to the cluster
+            available_slots = self.availBkgd | self.availLow | self.availHigh
+            available_slots.difference_update(self.mobosUnavailable)
+            qr_list = sorted(self.dict_qrads.values(), key=lambda qr:-qr.diffTemp)
+            for qr in qr_list:
+                for batid in (qr.pset_mobos & available_slots): # Available mobos of this QRad
+                    qm = qr.dict_mobos[batid]
+                    if (qm.state <= QMoboState.RUNBKGD) and not qm.is_reserved_high():
+                        allocation.insert(batid)
+                        remaining_requested_res-=1
+                        if remaining_requested_res == 0:
+                            break
+
+                if remaining_requested_res == 0:
+                    break
+            # End for qr in qr_list
+        else:
+            # This is a LOW priority cluster, sort QRads by warmest first
+            available_slots = self.availBkgd | self.availLow
+            available_slots.difference_update(self.mobosUnavailable)
+            qr_list = sorted(self.dict_qrads.values(), key=lambda qr:qr.diffTemp)
+            for qr in qr_list:
+                for batid in (qr.pset_mobos & available_slots):
+                    qm = qr.dict_mobos[batid]
+                    if (qm.state <= QMoboState.RUNBKGD) and not qm.is_reserved():
+                        allocation.insert(batid)
+                        remaining_requested_res-=1
+                        if remaining_requested_res == 0:
+                            break
+
+                if remaining_requested_res == 0:
+                    break
+            # End for qr in qr_list
+
+        assert len(allocation) == job.requested_resources, f"Found only {len(allocation)} available mobos for cluster {sub_qtask.id} out of {job.requested_resources}."
+
+        if sub_qtask.waiting_datasets == []:
+            # We can start the cluster now
+            sub_qtask.mark_running_instance(job)
+            self.startCluster(allocation, job)
+            self.logger.info(f"[{self.bs.time()}] Successfully started cluster {sub_qtask.id} on {len(allocation)} mobos")
+        else:
+            # Make reservations
+            for batid in allocation:
+                qm = self.dict_mobos[batid]
+                self.reserveInstance(qm, job)
+            self.logger.info("[{}] Adding reservation for cluster {} on {} mobos".format(self.bs.time(), sub_qtask.id, len(allocation)))
+
+
+
     def onDatasetArrivedOnDisk(self, dataset_id):
         '''
         The Storage Controller notifies that a required dataset arrived on the disk.
@@ -392,6 +481,27 @@ class QarnotBoxSched():
         # The dataset is no longer required by a QTask. Do nothing
 
 
+    def startCluster(self, allocation, job):
+        '''
+        Allocation is a ProcSet containing the batid of the mobos.
+        Does pretty much the same as startInstances but for a cluster job.
+        '''
+        for batid in allocation:
+            qm = self.dict_mobos[batid]
+            if qm.reserved_job != -1:
+                self.rejectReservedInstance(qm)
+            if qm.running_job != -1:
+                self.logger.debug(f"[{self.bs.time()}]------ Mobo {qm.name} killed Job {qm.running_job.id} because a cluster arrived")
+                old_job = qm.pop_job()
+                self.jobs_to_kill.append(old_job)
+                self.burning_jobs/discard(old_job)
+
+            qm.push_job(job)
+
+        job.allocation = allocation
+        self.jobs_to_execute.append(job)
+
+
     def startInstance(self, qm, job):
         '''
         If an instance was reserved on the qmobo, reject it back to the QNode sched.
@@ -428,11 +538,22 @@ class QarnotBoxSched():
         self.dict_reserved_jobs_mobos[job.qtask_id].append((qm, job))
         qm.reserved_job = job
 
+
     def rejectReservedInstance(self, qm):
         old_job = qm.reserved_job
         qm.reserved_job = -1
+
+        sub_qtask = self.dict_subqtasks[old_job.qtask_id]
+        if sub_qtask.is_cluster():
+            # Need to remove all reservations
+            # TODO verify if all this works...
+            # TODO as we do not have LOW priority cluster tasks for now it should no cause problem
+            del self.dict_reserved_jobs_mobos[old_job.qtask_id]
+
+        else:
+            self.dict_reserved_jobs_mobos[old_job.qtask_id].remove((qm, old_job))
+
         self.qn.onQBoxRejectedInstances([old_job], self.name)
-        self.dict_reserved_jobs_mobos[old_job.qtask_id].remove((qm, old_job))
         self.logger.info("[{}]------- Mobo {} rejected Job {} because another instance of higher priority needed it".format(self.bs.time(), qm.name, old_job.id))
 
 

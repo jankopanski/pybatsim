@@ -21,6 +21,10 @@ class QTask:
         self.nb_terminated_instances = 0  # Number of jobs that have finished correctly (not killed)
         self.nb_killed_instances = 0
 
+        self.is_cluster = False # Whether it is a cluster or a regular QTask
+        self.execution_time = 0 # Targetted execution time. Only relevant if it is a cluster task.
+        self.nb_requested_resources = 1 # 1 for regular instances, more if it is a cluster.
+
         self.datasets = list_datasets          # List of input datasets
 
         self.priority = int(priority)
@@ -70,6 +74,11 @@ class QTask:
         self.nb_killed_instances += 1
 
 
+    # Cluster-related functions
+    def is_cluster(self):
+        return self.is_cluster
+
+
 class SubQTask:
     # Used by the QBox scheduler
     def __init__(self, id, priority_group, instances, list_datasets):
@@ -79,6 +88,7 @@ class SubQTask:
         self.running_instances = []            # List of batsim jobs that are currently running
         self.waiting_datasets = []             # Datasets that are waiting to be on disk
         self.datasets = [] if list_datasets is None else list_datasets # List of input datasets
+        self.is_cluster = False                # Whether it is a cluster instance or not
 
     def update_waiting_datasets(self, new_waiting_datasets):
         self.waiting_datasets = new_waiting_datasets
@@ -94,6 +104,9 @@ class SubQTask:
     def instance_finished(self, job):
         self.running_instances.remove(job)
 
+    # Cluster-related functions
+    def is_cluster(self):
+        return self.is_cluster
 
 
 class QMoboState:
