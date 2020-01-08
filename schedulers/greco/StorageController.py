@@ -446,7 +446,7 @@ class StorageController:
         # Job Submit
         self._next_staging_job_id += 1
         jid1 = "dyn-staging!" + str(self._next_staging_job_id)
-        self._bs.register_job(id=jid1, res=1, walltime=-1, profile_name=profile_name)
+        self._bs.register_job(id=jid1, res=2, walltime=-1, profile_name=profile_name)
 
         # Job Execution
         job1 = Job(jid1, 0, -1, 1, "", "")

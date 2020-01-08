@@ -30,10 +30,6 @@ List of available mobos:
 When a task of higher priority is sent to a mobo that is already running something,
 wait for all the datasets to arrive before stopping the execution of the current task.
 
-
-#TODO when an event of type "machine_unavailable" is received
-# we should mark the qrad/mobos as unavailable as well 
-
 #TODO need to add a "warmup" time for booting the mobo when a new task is executed on it
 
 '''
@@ -136,17 +132,15 @@ class QarnotBoxSched():
         qr.targetTemp = new_temperature
         qr.diffTemp = new_temperature - self.bs.air_temperatures[str(qr.temperature_master)]
 
-    '''def onOutsideTemperatureChanged(self, new_temperature):
-        pass # This is not used by the qarnot schedulers
-    '''
-
 
     def onNotifyMachineUnavailable(self, machines):
-        # The QRad became too hot (from external event), need to kill the instance running on it, if any
+        # The QRad became too hot (from external event)
         # Then mark this machine as unavailable
+        # If instances were running on these machines, they will be killed during the frequency regulation
         self.logger.info(f"[{self.bs.time()}] New unavailable mobos: {machines} to be removed to {self.mobosAvailable}")
         self.mobosAvailable.difference_update(machines)
         self.mobosUnavailable.insert(machines)
+        # TODO need to kill the instance that was running on this mobo and re-submit it.
 
     def onNotifyMachineAvailable(self, machines):
         # Put the machine back available
@@ -178,6 +172,7 @@ class QarnotBoxSched():
         and returned back to the QNode.
         The frequency regulation will be done when all events are treated, called in onNoMoreEvents
         Returns a list [qbox_name, slots bkgd, slots low, slots high]
+        The sum of the slots for bkgd, low and high equals the total number of mobos that are not reserved or running instances.
         '''
         self.availBkgd.clear()
         self.availLow.clear()
@@ -349,7 +344,7 @@ class QarnotBoxSched():
                             return # All instances have been scheduled
 
 
-        # Some instances were dispatched by cannot be scheduled yet, return them to the QNode
+        # Some instances were dispatched but cannot be scheduled yet, return them to the QNode
         self.logger.info("[{}]--- {} still has {} instances of {} to start, rejecting these instances back to the QNode but this should not happen.".format(self.bs.time(), self.name, len(sub_qtask.waiting_instances), sub_qtask.id))
         self.logger.info("[{}]--- {} has available slots for bkgd/low/high: {}/{}/{}".format(self.bs.time(), self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)))
 
@@ -501,6 +496,10 @@ class QarnotBoxSched():
         # TODO Need to check for all mobos if there is one IDLE.
         # If so, put CPU burn if heating required or turn it off and ask for pstate change
         # For mobos that are still computing something, need to check if a change in pstate is needed
+
+
+        #TODO We also should retrieve the CPU temperature and check if it's lower than 90 degrees, and lower the speed or shut down the CPU if it's above...
+
         to_execute = set()
         for qr in self.dict_qrads.values():
             start_cpu_burn = self.qn.do_dispatch and (qr.diffTemp >= 1)
@@ -527,7 +526,8 @@ class QarnotBoxSched():
                     qm.push_burn_job(burn_job)
 
                     # Then set the pstate of the mobo to 0 (corresponding to full speed)
-                    self.stateChanges[0].insert(qm.batid)
+                    #TODO Pstate is set to 1 because 0 is turbo boost, which is disabled for now
+                    self.stateChanges[1].insert(qm.batid)
                     #self.logger.debug("++++++++ Change state of {} to {} {} (burn job)".format(qm.batid, 0, qm.pstate))
 
                 elif qm.state == QMoboState.IDLE:
@@ -539,8 +539,9 @@ class QarnotBoxSched():
 
                 elif qm.state == QMoboState.LAUNCHING:
                     # A new instance was started during this scheduling step. Update the state and set pstate to 0 (max speed)
+                    #TODO Pstate is set to 1 because 0 is turbo boost, which is disabled for now
                     qm.launch_job()
-                    self.stateChanges[0].insert(qm.batid)
+                    self.stateChanges[1].insert(qm.batid)
                     #self.logger.debug("++++++++ Change state of {} to {} (launch job)".format(qm.batid, qm.pstate))
 
                 elif qm.state >= QMoboState.RUNLOW:

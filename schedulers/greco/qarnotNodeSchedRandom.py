@@ -15,8 +15,7 @@ import os
 import csv
 import random
 '''
-This is a variant of the qarnotNodeSched that takes into account locality of the datasets
-to dispatch instances.
+This is a variant of the qarnotNodeSched that takes available mobos in a random order to dispatch instances.
 '''
 
 class QarnotNodeSchedRandom(QarnotNodeSched):
@@ -30,8 +29,4 @@ class QarnotNodeSchedRandom(QarnotNodeSched):
 
 
     def sortAvailableMobos(self, priority, increasing_slots=True):
-        '''
-        Sorts the list of QBoxes by the number of available mobos (=slots) ofr a given priority.
-        Sorts in increasing number of slots if increasing_slots is set to True, in decreasing order otherwise.
-        '''
         random.shuffle(self.lists_available_mobos)

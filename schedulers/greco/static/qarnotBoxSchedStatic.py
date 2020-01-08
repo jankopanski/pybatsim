@@ -36,7 +36,7 @@ class QarnotBoxSchedStatic(QarnotBoxSched):
     def onDispatchedInstancesStatic(self, instances, qtask_id):
         if qtask_id in self.dict_subqtasks:
             sub_qtask = self.dict_subqtasks[qtask_id]
-            sub_qtask.waiting_instances.extend(instances.copy()) #TODO maybe don't need this copu since we extend
+            sub_qtask.waiting_instances.extend(instances.copy()) #TODO maybe don't need this copy since we use extend
         else:
             # This is a QTask "unknown" to the QBox.
             # Create and add the SubQTask to the dict
@@ -83,8 +83,8 @@ class QarnotBoxSchedStatic(QarnotBoxSched):
 
     def scheduleInstancesStatic(self):
         '''
-        Try to start instances that have all the datasets and for whose time is >= starting time
-        to the mobo specified by the real_allocation.
+        Try to start instances that have all the datasets and for whose time is >= real_start_time
+        to the mobo specified by real_allocation.
         '''
 
         for sub_qtask in self.dict_subqtasks.values():

@@ -301,10 +301,7 @@ class QarnotNodeSched(BatsimScheduler):
 
     def onNotifyEventOutsideTemperatureChanged(self, machines, new_temperature):
         pass
-        ''' This is not used by the qarnot schedulers
-        for machine_id in machines:
-            self.dict_resources[machine_id].onOutsideTemperatureChanged(new_temperature)
-        '''
+
 
     def onNotifyEventMachineUnavailable(self, machines):
         if not self.forward_availability_events:
@@ -340,7 +337,7 @@ class QarnotNodeSched(BatsimScheduler):
 
         # Retrieve or create the corresponding QTask
         if not qtask_id in self.qtasks_queue:
-            assert resubmit == False, "QTask id not found during resubmission of an instance"
+            assert resubmit == False, f"QTask id {qtask_id} not found during resubmission of an instance"
             
             list_datasets = self.bs.profiles[job.workload][job.profile]["datasets"]
             if list_datasets is None:
@@ -378,7 +375,7 @@ class QarnotNodeSched(BatsimScheduler):
         if len(splitted_id) == 1:
             new_job_id = deepcopy(job.id)
         else:
-            # This job as already an attempt number
+            # This job has already an attempt number
             new_job_id = splitted_id[0]
             assert splitted_id[1] == str(metadata["nb_resubmit"] - 1)
 

@@ -28,11 +28,6 @@ class QTask:
         self.user_id = user_id
 
 
-        #TODO
-        ''' At some point we'll need to re-submit dynamic jobs that have been killed
-        due to a rad too hot or a higher priority jobs scheduled on the mobo.
-        '''
-
     def print_infos(self, logger):
         logger.info("QTask: {}, {} received, {} waiting, {} dispatched, {} terminated, {} killed.".format(
             self.id, self.nb_received_instances, len(self.waiting_instances), self.nb_dispatched_instances, self.nb_terminated_instances, self.nb_killed_instances))
@@ -126,7 +121,8 @@ class QMobo:
     def __init__(self, name, batid, max_pstate):
         self.name = name             # The name of the mobo
         self.batid = batid           # The Batsim id of the mobo
-        self.pstate = 0              # The current power state of the mobo
+        self.pstate = 1              # The current power state of the mobo
+        #TODO For now the initial pstate is 1 (because 0 is the turbo boost, disabled for now)
         self.max_pstate = max_pstate # The last power state (corresponds to the state OFF)
         self.state = QMoboState.OFF  # The state of the mobo
         self.running_job = -1        # The Job running on this mobo
