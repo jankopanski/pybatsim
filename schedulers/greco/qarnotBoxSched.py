@@ -189,6 +189,7 @@ class QarnotBoxSched():
                     if qm.running_job != -1:
                         job = qm.pop_job()
                         jobs_to_kill.add(job)
+                        self.logger.debug("Asked to kill {} of priority {} because {} too hot ({} < -10)".format(job.id, job.profile_dict["priority"], qr.name, qr.diffTemp))
 
             elif  qr.diffTemp < -3:
                 # QRad is too hot to run LOW and BKGD, kill instances if any
@@ -196,6 +197,7 @@ class QarnotBoxSched():
                     if qm.state == QMoboState.RUNLOW or qm.state == QMoboState.RUNBKGD:
                         job = qm.pop_job()
                         jobs_to_kill.add(job)
+                        self.logger.debug("Asked to kill {} of priority {} because {} too hot ({} < -3) for LOW BKGD".format(job.id, job.profile_dict["priority"], qr.name, qr.diffTemp))
 
             elif qr.diffTemp < -1:
                 # QRad is too hot to run BKGD, kill those CPU burns!
@@ -203,6 +205,7 @@ class QarnotBoxSched():
                     if qm.state == QMoboState.RUNBKGD:
                         job = qm.pop_job()
                         jobs_to_kill.add(job)
+                        self.logger.debug("Asked to kill {} of priority {} because {} too hot ({} < -1) for BKGD".format(job.id, job.profile_dict["priority"], qr.name, qr.diffTemp))
 
             for qm in qr.dict_mobos.values():
                 if (qr.diffTemp >= 1) and (qm.state < QMoboState.RUNBKGD) and not qm.is_reserved():
@@ -223,7 +226,6 @@ class QarnotBoxSched():
             #    self.logger.info("[{}]----- QRad {} {} target: {}, air: {}, diff: {}".format(self.bs.time(), qr.name, qr.temperature_master, qr.targetTemp, self.bs.air_temperatures[str(qr.temperature_master)], qr.diffTemp))
             self.jobs_to_kill.extend(jobs_to_kill)
             self.burning_jobs.difference_update(jobs_to_kill)
-            #self.burning_jobs -= jobs_to_kill
 
         # Filter out mobos that are marked as unavailable
         self.availBkgd -= self.mobosUnavailable
@@ -251,17 +253,16 @@ class QarnotBoxSched():
 
             # First check if there is enough available mobos
             nb_requested_res = instances[0].requested_resources
-            if (priority_group == PriorityGroup.HIGH) and (len(self.mobosAvailable) < nb_requested_res) or
-            (priority_group < PriorityGroup.HIGH) and ( (len(self.availBkgd) + len(self.availLow)) < nb_requested_res):
+            if (priority_group == PriorityGroup.HIGH) and (len(self.mobosAvailable) < nb_requested_res) or \
+               (priority_group < PriorityGroup.HIGH) and ( (len(self.availBkgd) + len(self.availLow)) < nb_requested_res):
                 self.logger.info(f"[{self.bs.time()}]--- {self.name} does not have available mobos for cluster taks {qtask_id}, rejecting it.")
                 self.qn.onQBoxRejectedInstances(instances, self.name)
 
-
-
             batjob = instances[0]
-            sub_qtask = SubQTask(qtask_id, priority_group, batjob,
+            sub_qtask = SubQTask(qtask_id, priority_group, instances,
                                  self.bs.profiles[batjob.workload][batjob.profile]["datasets"])
-            sub_qtask.is_cluster = True
+            sub_qtask.cluster_task = True
+            self.logger.debug(f"== Adding SubQTask Cluster {qtask_id} in the dict of qb {self.name}")
             self.dict_subqtasks[qtask_id] = sub_qtask
 
         else:
@@ -276,6 +277,7 @@ class QarnotBoxSched():
                 # Create and add the SubQTask to the dict
                 sub_qtask = SubQTask(qtask_id, priority_group, instances.copy(),
                                      self.bs.profiles[instances[0].workload][instances[0].profile]["datasets"])
+                self.logger.debug(f"== Adding SubQTask {qtask_id} in the dict of qb {self.name}")
                 self.dict_subqtasks[qtask_id] = sub_qtask
 
         # Then ask for the data staging of the required datasets
@@ -391,7 +393,7 @@ class QarnotBoxSched():
         allocation = ProcSet()
         remaining_requested_res = job.requested_resources
         # At this moment, we are sure there is enough available mobos for this cluster, reserve them
-        if sub_qtask.Priority_group == PriorityGroup.HIGH:
+        if sub_qtask.priority_group == PriorityGroup.HIGH:
             # Sort the QRads by coolest first and assign all available mobos to the cluster
             available_slots = self.availBkgd | self.availLow | self.availHigh
             available_slots.difference_update(self.mobosUnavailable)
@@ -436,9 +438,9 @@ class QarnotBoxSched():
         else:
             # Make reservations
             for batid in allocation:
-                qm = self.dict_mobos[batid]
+                qm = self.dict_ids[batid].dict_mobos[batid]
                 self.reserveInstance(qm, job)
-            self.logger.info("[{}] Adding reservation for cluster {} on {} mobos".format(self.bs.time(), sub_qtask.id, len(allocation)))
+            self.logger.info("[{}] Adding reservation for cluster {} on {} mobos ({})".format(self.bs.time(), sub_qtask.id, len(allocation), str(allocation)))
 
 
 
@@ -452,6 +454,7 @@ class QarnotBoxSched():
             n = self.waiting_datasets.count(dataset_id)
             self.logger.info("[{}]--- Dataset {} arrived on QBox {} and was waited by {} SubQTasks".format(self.bs.time(), dataset_id, self.name, n))
 
+            entries_to_remove = []
             for subqtask_id in self.dict_reserved_jobs_mobos.keys():
                 if subqtask_id not in self.dict_subqtasks:
                     continue # Guard since the dict of reservations is a defaultdict
@@ -464,19 +467,37 @@ class QarnotBoxSched():
                     if len(sub_qtask.waiting_datasets) == 0:
                         # The SubQTask has all the datasets, launch the reservations that have been made
                         reservations = self.dict_reserved_jobs_mobos[subqtask_id].copy()
-                        for pair in reservations:
-                            self.logger.info("[{} {} starting {} on reserved mobo {} {}]".format(self.bs.time(), self.name, pair[1].id, pair[0].batid, pair[0].name))
-                            pair[0].reserved_job = -1
-                            sub_qtask.mark_running_instance(pair[1])
-                            self.startInstance(pair[0], pair[1])
-                            self.dict_reserved_jobs_mobos[subqtask_id].remove(pair)
+
+                        if sub_qtask.is_cluster():
+                            self.logger.info(f"[{self.bs.time()}] {self.name} starting cluster {sub_qtask.id} on {len(reservations)} reserved mobos")
+                            job = reservations[0][1] # All pairs in reservations have the same job since it's a cluster
+                            list_alloc = []
+                            for pair in reservations:
+                                pair[0].reserved_job = -1
+                                list_alloc.append(pair[0].batid)
+
+                            allocation = ProcSet(*list_alloc)
+                            sub_qtask.mark_running_instance(job)
+                            self.startCluster(allocation, job)
+                            entries_to_remove.append(subqtask_id)
+
+                        else: # It's a qtask with instances
+                            for pair in reservations:
+                                self.logger.info("[{}] {} starting {} on reserved mobo {} {}".format(self.bs.time(), self.name, pair[1].id, pair[0].batid, pair[0].name))
+                                pair[0].reserved_job = -1
+                                sub_qtask.mark_running_instance(pair[1])
+                                self.startInstance(pair[0], pair[1])
+                                self.dict_reserved_jobs_mobos[subqtask_id].remove(pair)
                     #else
-                    # There is more datasets waited by this SubQTask
+                    #   There are more datasets waited by this SubQTask, so do nothing
                     n-= 1
                     if n == 0:
                         # All SubQTasks waiting for this dataset were found, stop
                         assert dataset_id not in self.waiting_datasets # TODO remove this at some point?
                         break
+
+            for entry in entries_to_remove:
+                del self.dict_reserved_jobs_mobos[entry]
         #else
         # The dataset is no longer required by a QTask. Do nothing
 
@@ -487,18 +508,21 @@ class QarnotBoxSched():
         Does pretty much the same as startInstances but for a cluster job.
         '''
         for batid in allocation:
-            qm = self.dict_mobos[batid]
+            qm = self.dict_ids[batid].dict_mobos[batid]
             if qm.reserved_job != -1:
+                self.logger.debug(f"+++++ Rejecting {qm.reserved_job.id} to run cluster {job.id}")
                 self.rejectReservedInstance(qm)
             if qm.running_job != -1:
-                self.logger.debug(f"[{self.bs.time()}]------ Mobo {qm.name} killed Job {qm.running_job.id} because a cluster arrived")
+                self.logger.debug(f"[{self.bs.time()}]------ Mobo {qm.name} {qm.batid} killed Job {qm.running_job.id} because a cluster arrived")
                 old_job = qm.pop_job()
                 self.jobs_to_kill.append(old_job)
-                self.burning_jobs/discard(old_job)
+                self.burning_jobs.discard(old_job)
 
             qm.push_job(job)
 
+        self.logger.info(f"+++++ Starting cluster {job.id}")
         job.allocation = allocation
+        job.start_time = self.bs.time()
         self.jobs_to_execute.append(job)
 
 
@@ -581,8 +605,10 @@ class QarnotBoxSched():
             sub_qtask.mark_running_instance(direct_job)
             self.jobs_to_execute.append(direct_job)
         else:
-            self.logger.debug("[{}] {} just completed with job_state {} on alloc {} on mobo {} {} with pstate {}".format(self.bs.time(), job.id, job.job_state, str(job.allocation), qm.name, qm.batid, qm.pstate))
-            qm.pop_job()
+            self.logger.info("[{}] {} just completed with job_state {} on alloc {} on mobo {} {} with pstate {}".format(self.bs.time(), job.id, job.job_state, str(job.allocation), qm.name, qm.batid, qm.pstate))
+            for batid in job.allocation:
+                qm = self.dict_ids[batid].dict_mobos[batid]
+                qm.pop_job()
             self.checkCleanSubQTask(sub_qtask)
 
 
@@ -608,6 +634,7 @@ class QarnotBoxSched():
         if len(sub_qtask.running_instances) == 0 and len(sub_qtask.waiting_instances) == 0:
             self.logger.debug("[{}]--- QBox {} executed all dispatched instances of {}, releasing the hardlinks.".format(self.bs.time(), self.name, sub_qtask.id))
             self.storage_controller.onQBoxReleaseHardLinks(self.disk_batid, sub_qtask.id)
+            self.logger.debug(f"== Del SubQTask {sub_qtask.id} in the dict of qb {self.name}")
             del self.dict_subqtasks[sub_qtask.id]
             if sub_qtask.id in self.dict_reserved_jobs_mobos:
                 del self.dict_reserved_jobs_mobos[sub_qtask.id]
@@ -632,6 +659,7 @@ class QarnotBoxSched():
                         if qm.running_job != -1:
                             job = qm.pop_job()
                             self.jobs_to_kill.append(job)
+                            self.logger.debug("Killing {} on {} ({}) because mobo made unavailable".format(job.id, qm.name, qm.batid))
                         qm.turn_off()
                         self.stateChanges[qm.max_pstate].insert(qm.batid)
 
@@ -639,8 +667,7 @@ class QarnotBoxSched():
                     # If the mobo is IDLE/OFF and heating is required, start a cpu_burn job
                     jid = "dyn-burn!" + str(self.qn.next_burn_job_id)
                     self.qn.next_burn_job_id += 1
-                    self.bs.register_job(jid, 1, -1, "burn")
-                    burn_job = Job(jid, 0, -1, 1, "", "")
+                    burn_job = self.bs.register_job(jid, 1, -1, "burn")
                     burn_job.allocation = ProcSet(qm.batid)
                     burn_job.priority_group = PriorityGroup.BKGD
                     to_execute.add(burn_job)
@@ -669,13 +696,13 @@ class QarnotBoxSched():
                         # Increase speed
                         qm.pstate -= 1
                         self.stateChanges[qm.pstate].insert(qm.batid)
-                        self.logger.info("++++++++ Change state of {} to {} (increase speed)".format(qm.batid, qm.pstate))
+                        self.logger.debug("++++++++ Change state of {} to {} (increase speed)".format(qm.batid, qm.pstate))
 
                     elif qr.diffTemp <= -1 and qm.pstate < (qm.max_pstate-1):
                         # Decrease speed
                         qm.pstate += 1
                         self.stateChanges[qm.pstate].insert(qm.batid)
-                        self.logger.info("++++++++ Change state of {} to {} (decrease speed)".format(qm.batid, qm.pstate))
+                        self.logger.debug("++++++++ Change state of {} to {} (decrease speed)".format(qm.batid, qm.pstate))
                     # Else we stay in this pstate
 
                 else:
