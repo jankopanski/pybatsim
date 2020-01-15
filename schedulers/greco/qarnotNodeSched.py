@@ -229,6 +229,8 @@ class QarnotNodeSched(BatsimScheduler):
     def site_from_qb_name(self, qb_name):
         if qb_name.split('-')[1] == "2000":
             return "bordeaux"
+        elif qb_name.split('-')[1] == "4000":
+            return "reau"
         else:
             return "paris"
 

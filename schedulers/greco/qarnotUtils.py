@@ -134,8 +134,10 @@ class QMobo:
     def __init__(self, name, batid, max_pstate):
         self.name = name             # The name of the mobo
         self.batid = batid           # The Batsim id of the mobo
-        self.pstate = 1              # The current power state of the mobo
         #TODO For now the initial pstate is 1 (because 0 is the turbo boost, disabled for now)
+        self.pstate = 1              # The current power state of the mobo
+        # TODO min_pstate set to 1 because 0 is turbo boost and is disabled for now.
+        self.min_pstate = 1          # The first power state (corresponds to max speed)
         self.max_pstate = max_pstate # The last power state (corresponds to the state OFF)
         self.state = QMoboState.OFF  # The state of the mobo
         self.running_job = -1        # The Job running on this mobo
@@ -169,13 +171,13 @@ class QMobo:
         job.priority_group = PriorityGroup.BKGD
         self.running_job = job
         self.state = QMoboState.RUNBKGD
-        self.pstate = 0
+        self.pstate = self.min_pstate
 
     def launch_job(self):
         assert self.state == QMoboState.LAUNCHING, "Asked to launch a job but mobo {} {} is not in LAUNCHING state.".format(self.batid, self.name)
         assert self.running_job != -1, "Asked to launch job but no one was pushed on mobo {} {}.".format(self.batid, self.name)
         self.state = QMoboState.fromPriority[self.running_job.priority_group]
-        self.pstate = 0
+        self.pstate = self.min_pstate
 
     def is_reserved(self):
         return self.reserved_job != -1

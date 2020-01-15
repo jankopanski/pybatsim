@@ -647,8 +647,7 @@ class QarnotBoxSched():
                     qm.push_burn_job(burn_job)
 
                     # Then set the pstate of the mobo to 0 (corresponding to full speed)
-                    #TODO Pstate is set to 1 because 0 is turbo boost, which is disabled for now
-                    self.stateChanges[1].insert(qm.batid)
+                    self.stateChanges[qm.min_pstate].insert(qm.batid)
                     #self.logger.debug("++++++++ Change state of {} to {} {} (burn job)".format(qm.batid, 0, qm.pstate))
 
                 elif qm.state == QMoboState.IDLE:
@@ -659,15 +658,14 @@ class QarnotBoxSched():
                     #self.logger.debug("++++++++ Change state of {} to {} {} (off)".format(qm.batid, qm.max_pstate, qm.pstate))
 
                 elif qm.state == QMoboState.LAUNCHING:
-                    # A new instance was started during this scheduling step. Update the state and set pstate to 0 (max speed)
-                    #TODO Pstate is set to 1 because 0 is turbo boost, which is disabled for now
+                    # A new instance was started during this scheduling step. Update the state and set pstate to qm.min_pstate (max speed)
                     qm.launch_job()
-                    self.stateChanges[1].insert(qm.batid)
+                    self.stateChanges[qm.min_pstate].insert(qm.batid)
                     #self.logger.debug("++++++++ Change state of {} to {} (launch job)".format(qm.batid, qm.pstate))
 
                 elif qm.state >= QMoboState.RUNLOW:
                     # Check if we can increase/decrease the processor speed
-                    if qr.diffTemp >= 1 and qm.pstate > 0:
+                    if qr.diffTemp >= 1 and qm.pstate > qm.min_pstate:
                         # Increase speed
                         qm.pstate -= 1
                         self.stateChanges[qm.pstate].insert(qm.batid)
