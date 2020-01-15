@@ -154,6 +154,7 @@ class Batsim(object):
             }
 
             self.jobs[job.id].allocation = job.allocation
+            self.jobs[job.id].state = Job.State.RUNNING
 
             if io_jobs is not None and job.id in io_jobs:
                 message["data"]["additional_io_job"] = io_jobs[job.id]
@@ -178,6 +179,7 @@ class Batsim(object):
                 }
             })
             self.nb_jobs_rejected += 1
+            self.jobs[job.id].state = Job.State.REJECTED
 
     def change_job_state(self, job, state):
         """Change the state of a job."""
@@ -248,14 +250,21 @@ class Batsim(object):
             }
         }
         self._events_to_send.append(msg)
-        self.jobs[id] = Job.from_json_dict(job_dict)
-        self.jobs[id].job_state = Job.State.IN_SUBMISSON
+        job = Job.from_json_dict(job_dict)
+        job.job_state = Job.State.IN_SUBMISSON
+
+        # Keep a pointer in the job structure
+        assert job.profile in self.profiles[job.workload]
+        job.profile_dict = self.profiles[job.workload][job.profile]
+
+        self.jobs[id] = job
+
         if self.ack_of_dynamic_jobs:
             self.nb_jobs_in_submission += 1
         else:
             self.nb_jobs_submitted += 1
             self.nb_jobs_submitted_from_scheduler += 1
-        return self.jobs[id]
+        return job
 
     def set_resource_state(self, resources, state):
         """ args:resources: is a ProcSet containing a list of resources.
@@ -519,7 +528,7 @@ class Batsim(object):
                 # Warning: override dynamic job but keep metadata
                 if job_id in self.jobs:
                     self.logger.warn(
-                        "The job '{}' was alredy in the job list. "
+                        "The job '{}' was already in the job list. "
                         "Probaly a dynamic job that was submitted "
                         "before: \nOld job: {}\nNew job: {}".format(
                             job_id,
