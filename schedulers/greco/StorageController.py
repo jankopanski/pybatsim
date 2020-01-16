@@ -102,7 +102,7 @@ class Storage:
         return self._available_space
 
     def get_storage_capacity(self):
-        """ Returns the storage cpacity of the Storage """
+        """ Returns the storage capacity of the Storage """
 
         return self._storage_capacity
 
@@ -135,7 +135,7 @@ class Storage:
 
 
     def delete_dataset(self, dataset_id):
-        """ Delete the Dataset on Storage corresponding to the dataset_key 
+        """ Delete the Dataset on Storage corresponding to the dataset_id 
         
         When deleting a Dataset, its size is added to remaining storage space on Storage.
         Returns False if the Dataset was not present in this Storage.
@@ -153,11 +153,9 @@ class Storage:
         return True
 
     def has_dataset(self, dataset_id):
-        '''
-
-        :param dataset_id: The id of the dataset
-        :return: True if this storage has the storage of that id
-        '''
+        """
+        Return True if the storage has the dataset corresponding to the dataset_id.
+        """
         dataset = self.get_dataset(dataset_id)
 
         if(dataset == None):
@@ -172,11 +170,10 @@ class Storage:
         return (self._available_space - size) >= 0
 
     def update_timestamp(self, dataset_id, timestamp):
-        '''
-
-        :param dataset_id: Datasetid to update timestamp with
-        :return: False if dataset with id not present, True else
-        '''
+        """
+        Updates the timestamp of dataset corresponding to dataset_id and return True. 
+        Returns False if the dataset is not in the storage.
+        """
         if(self.get_dataset(dataset_id) == None):
             return False
 
@@ -185,13 +182,9 @@ class Storage:
         self.add_dataset(dataset, timestamp)
 
     def releaseHardLinks(self, qtask_id):
-        '''
+        """ 
         Releases hardlinks to a given qtask_id
-
-        :param qtask_id: The qtask id of the task
-        :return: True
-        '''
-
+        """
         for dataset in self.get_datasets().values():
             dataset.delete_running_job(qtask_id)
 
@@ -218,6 +211,7 @@ class StorageController:
         self._qn = qn            # The QNode Scheduler
         self._logger = bs.logger
         self._total_transferred_from_CEPH = 0 # In Bytes
+        self._total_transferred = 0 # In Bytes
         self._nb_transfers_zero = 0 # The number of times a dataset was already present on disk
         self._nb_transfers_real = 0 # The number of "real" transfers
 
@@ -253,6 +247,9 @@ class StorageController:
         for child in tree.getroot().iter('link'):
             if ('wan_link' in child.attrib['id']) and ('bandwidth' in child.attrib):
                 self.bandwidth[child.attrib['id'][:-9]] = float(child.attrib['bandwidth'][:-4])
+
+        print('!!!!!!!!!!!!!!!!!!!!!!!! Bandwidth', self.bandwidth)
+        print('!!!!!!!!!!!!!!!!!!!!!!!! Storages', self._storages)
 
     def get_storage(self, storage_id):
         """ Returns the Storage corresponding to given storage_id if it exists or returns None. """
@@ -324,9 +321,15 @@ class StorageController:
         :return: Cost of free bandwidth assuming equal share
         '''
 
+        
+
+        print("!!!!!!!! get_free_bandwidth_between_storages")
+
+        # Why???
         if source_id == dest_id:
             return 1000000000       # 1Tbps
 
+        # Why???
         id = source_id
         if source_id == self._ceph_id:
             id = dest_id
@@ -361,6 +364,19 @@ class StorageController:
 
         return status
 
+    def copy_dataset_to_dest(self, dataset_ids, source_id, dest_id):
+        """ Method used to move datasets from the source_id to the disk of a QBox
+
+        A false return indicates that one of the inserts had an issue.
+        See the documentation of the copy_dataset function
+        """
+        status = True
+        
+        for dataset_id in dataset_ids:
+            temp = self.copy_dataset(dataset_id, source_id, dest_id)
+            status = (status & temp)
+
+        return status
 
     def copy_dataset(self, dataset_id, source_id, dest_id):
         """
@@ -446,7 +462,7 @@ class StorageController:
         # Job Submit
         self._next_staging_job_id += 1
         jid1 = "dyn-staging!" + str(self._next_staging_job_id)
-        self._bs.register_job(id=jid1, res=1, walltime=-1, profile_name=profile_name)
+        self._bs.register_job(id=jid1, res=2, walltime=-1, profile_name=profile_name)
 
         # Job Execution
         job1 = Job(jid1, 0, -1, 1, "", "")
@@ -459,8 +475,8 @@ class StorageController:
 
         self._logger.info("[ {} ] Storage Controller staging job for dataset {} from {} to {} started".format(self._bs.time(), dataset_id, source_id, dest_id))
 
-        self._nb_transfers_real+=1
-        self._total_transferred_from_CEPH+=dataset.get_size()
+        self._nb_transfers_real += 1
+        self._total_transferred += dataset.get_size()
 
         self.staging_map.add((dest_id, dataset_id))
 
@@ -618,7 +634,6 @@ class StorageController:
 
         storage.releaseHardLinks(qtask_id)
 
-
     def onQBoxAskDataset(self, storage_id, dataset_id):
         '''
         This function is called from a QBox scheduler and asks for a dataset to be on disk.
@@ -633,7 +648,47 @@ class StorageController:
             return False
         # Else add the dataset
         else:
+
+            # Check if this storage has all the required datasets.
+            faster = self._ceph_id
+            faster_bw = self.get_free_bandwidth_between_storages(self._ceph_id, storage_id)
+
+            for storage in self.get_storages().values():
+                if(storage.has_dataset(dataset_id)):
+                    storage_bw = self.get_free_bandwidth_between_storages(storage, storage_id)
+                    print('----------------------------')
+                    print(str(storage) + 'tem ' + ' dataset_id ' + str(dataset_id) + '----')
+                    print('faster: ' + str(faster) + ' bw: ' + str(faster_bw))
+                    print('compared: ' + str(storage) + 'bw: ' + str(storage_bw))
+                    print('----------------------------')
+
+                    if(storage_bw < faster_bw):
+                        faster = storage
+                        faster_bw = storage_bw
+
+            print('----------------------------')
+            print('final faster: ' + str(faster) + ' bw: ' + str(faster_bw))
+            print('----------------------------')
+
+            return self.copy_dataset_to_dest([dataset_id], faster, storage_id)
+
+    '''
+    def onQBoxAskDataset(self, storage_id, dataset_id):
+        
+        This function is called from a QBox scheduler and asks for a dataset to be on disk.
+        
+        Only returns true if the dataset is already present in the Qbox.
+        If the data staging of that dataset on this qbox disk was already asked, returns False but doesnt start
+        another data staging job.
+        
+    
+        if((storage_id, dataset_id) in self.staging_map):
+            self._nb_transfers_zero+=1
+            return False
+        # Else add the dataset
+        else:
             return self.copy_from_CEPH_to_dest([dataset_id], storage_id)
+    '''
 
     def onKillAllStagingJobs(self):
         # This is called by the QNode scheduler upon receiving a 'stop_simulation' external event
@@ -675,6 +730,10 @@ class StorageController:
         self._logger.info("Staging jobs collected : {}".format(self._traces.shape))
         if self._output_path != None:
             self._traces.to_csv(self._output_path + '/staging_jobs.csv')
+
+        print("Total of transferred from CEPH:", self._total_transferred_from_CEPH)
+        print("Total of transferred from others:", self._total_transferred)
+        #print("Number of received QTasks:", self.nb_received_qtasks)
         return (self._nb_transfers_zero, self._nb_transfers_real, self._total_transferred_from_CEPH)
 
     def onNotifyEventNewDatasetOnStorage(self, machines, dataset_id, dataset_size):
