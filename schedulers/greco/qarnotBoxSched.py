@@ -159,6 +159,7 @@ class QarnotBoxSched():
 
         for sub_qtask in self.dict_subqtasks.values():
             to_reject.extend(sub_qtask.waiting_instances)
+            to_reject.extend(sub_qtask.reserved_instances)
             to_kill.extend(sub_qtask.running_instances)
 
         return (to_reject, to_kill)
@@ -328,6 +329,7 @@ class QarnotBoxSched():
                             # Make a reservation
                             assert job not in self.dict_reserved_jobs_mobos, "A mobo is already reserved for this instance"
                             self.reserveInstance(qm, job)
+                            sub_qtask.mark_reserved_instance(job)
                             self.logger.info("[{}] Adding reservation for {} on {} ({})".format(self.bs.time(), job.id, qm.name, qm.batid))
                         n-=1
                         if n == 0:
@@ -345,6 +347,7 @@ class QarnotBoxSched():
                     # Make a reservation
                     assert job not in self.dict_reserved_jobs_mobos, "A mobo is already reserved for this instance"
                     self.reserveInstance(qm, job)
+                    sub_qtask.mark_reserved_instance(job)
                     self.logger.info("[{}] Adding reservation for {} on {} ({})".format(self.bs.time(), job.id, qm.name, qm.batid))
                 n-=1
                 if n == 0:
@@ -367,6 +370,7 @@ class QarnotBoxSched():
                             # Make a reservation
                             assert job not in self.dict_reserved_jobs_mobos, "A mobo is already reserved for this instance"
                             self.reserveInstance(qm, job)
+                            sub_qtask.mark_reserved_instance(job)
                             self.logger.info("[{}] Adding reservation for {} on {} ({})".format(self.bs.time(), job.id, qm.name, qm.batid))
                         n-=1
                         if n == 0:
@@ -440,6 +444,7 @@ class QarnotBoxSched():
             for batid in allocation:
                 qm = self.dict_ids[batid].dict_mobos[batid]
                 self.reserveInstance(qm, job)
+            sub_qtask.mark_reserved_instance(job)
             self.logger.info("[{}] Adding reservation for cluster {} on {} mobos ({})".format(self.bs.time(), sub_qtask.id, len(allocation), str(allocation)))
 
 
@@ -471,6 +476,8 @@ class QarnotBoxSched():
                         if sub_qtask.is_cluster():
                             self.logger.info(f"[{self.bs.time()}] {self.name} starting cluster {sub_qtask.id} on {len(reservations)} reserved mobos")
                             job = reservations[0][1] # All pairs in reservations have the same job since it's a cluster
+
+                            assert job in sub_qtask.reserved_instances, f"A reservation for {job.id} was made but it was not marked as reserved in the SubQTask."
                             list_alloc = []
                             for pair in reservations:
                                 pair[0].reserved_job = -1
@@ -484,6 +491,7 @@ class QarnotBoxSched():
                         else: # It's a qtask with instances
                             for pair in reservations:
                                 self.logger.info("[{}] {} starting {} on reserved mobo {} {}".format(self.bs.time(), self.name, pair[1].id, pair[0].batid, pair[0].name))
+                                assert pair[1] in sub_qtask.reserved_instances, f"A reservation for {pair[1].id} was made but it was not marked as reserved in the SubQTask."
                                 pair[0].reserved_job = -1
                                 sub_qtask.mark_running_instance(pair[1])
                                 self.startInstance(pair[0], pair[1])
@@ -510,7 +518,7 @@ class QarnotBoxSched():
         for batid in allocation:
             qm = self.dict_ids[batid].dict_mobos[batid]
             if qm.reserved_job != -1:
-                self.logger.debug(f"+++++ Rejecting {qm.reserved_job.id} to run cluster {job.id}")
+                self.logger.debug(f"[{self.bs.time()}] +++++ Rejecting {qm.reserved_job.id} to run cluster {job.id}")
                 self.rejectReservedInstance(qm)
             if qm.running_job != -1:
                 self.logger.debug(f"[{self.bs.time()}]------ Mobo {qm.name} {qm.batid} killed Job {qm.running_job.id} because a cluster arrived")
@@ -520,7 +528,7 @@ class QarnotBoxSched():
 
             qm.push_job(job)
 
-        self.logger.info(f"+++++ Starting cluster {job.id}")
+        self.logger.info(f"[{self.bs.time()}] +++++ Starting cluster {job.id}")
         job.allocation = allocation
         job.start_time = self.bs.time()
         self.jobs_to_execute.append(job)
@@ -576,6 +584,8 @@ class QarnotBoxSched():
 
         else:
             self.dict_reserved_jobs_mobos[old_job.qtask_id].remove((qm, old_job))
+
+        sub_qtask.reject_reserved_instance(old_job)
 
         self.qn.onQBoxRejectedInstances([old_job], self.name)
         self.logger.info("[{}]------- Mobo {} rejected Job {} because another instance of higher priority needed it".format(self.bs.time(), qm.name, old_job.id))

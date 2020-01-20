@@ -335,8 +335,37 @@ class QarnotNodeSched(BatsimScheduler):
         else:
             pass # TODO need to handle jobs already running somewhere here (with dynamic jobs?)
 
+    def killOrRejectAllJobs(self):
+        self.logger.info(f"[{self.bs.time()}] Killing all running jobs and rejecting all waiting ones.")
+
+        to_reject = []
+        to_kill = []
+        for qb in self.dict_qboxes.values():
+            (qb_reject, qb_kill) = qb.killOrRejectAllJobs()
+            to_reject.extend(qb_reject)
+            to_kill.extend(qb_kill)
+
+        for qtask in self.qtasks_queue.values():
+            #qtask.print_infos(self.logger)
+            if len(qtask.waiting_instances) > 0:
+                to_reject.extend(qtask.waiting_instances)
+
+        to_kill.extend(self.storage_controller.onKillAllStagingJobs())
+
+        if len(to_reject) > 0:
+            self.logger.info(f"[{self.bs.time()}] Rejecting {len(to_reject)} jobs")
+            self.bs.reject_jobs(to_reject)
+
+        if len(to_kill) > 0:
+            self.logger.info(f"[{self.bs.time()}] Killing {len(to_kill)} jobs")
+            self.bs.kill_jobs(to_kill)
+
+        self.logger.info(f"[{self.bs.time()}] Now Batsim should stop the simulation on next message (or after next REQUESTED_CALL)")
+
+
+
     def onJobSubmission(self, job, resubmit=False):
-        qtask_id = (job.id.split('_')[0])#.split('#')[0] # To remove the instance number and resubmission number, if any
+        qtask_id = (job.id.split('_')[0]).split('#')[0] # To remove the instance number and resubmission number, if any
         job.qtask_id = qtask_id
 
         # Retrieve or create the corresponding QTask
@@ -393,17 +422,26 @@ class QarnotNodeSched(BatsimScheduler):
                 metadata["parent_job"] = job.id
 
         # Keep the current workload and add a resubmit number
-        splitted_id = job.id.split(self.bs.ATTEMPT_JOB_SEPARATOR)
+        splitted_id = job.id.split(Batsim.ATTEMPT_JOB_SEPARATOR)
         if len(splitted_id) == 1:
             new_job_id = deepcopy(job.id)
+            new_profile_id = deepcopy(job.profile)
         else:
-            # This job has already an attempt number
-            new_job_id = splitted_id[0]
             assert splitted_id[1] == str(metadata["nb_resubmit"] - 1)
 
-        # Since ACK of dynamic jobs registration is disabled, submit it manually
+            # This job has already an attempt number
+            new_job_id = splitted_id[0]
+            new_profile_id = job.profile.split(Batsim.ATTEMPT_JOB_SEPARATOR)[0]
+
         new_job_id = new_job_id + Batsim.ATTEMPT_JOB_SEPARATOR + str(metadata["nb_resubmit"])
-        new_job = self.bs.register_job(new_job_id, job.requested_resources, job.requested_time, job.profile)
+        new_profile_id = new_profile_id + Batsim.ATTEMPT_JOB_SEPARATOR + str(metadata["nb_resubmit"])
+
+        # Since ACK of dynamic jobs registration is disabled, submit it manually
+        # Submit a copy of the profile first
+        #self.logger.info(f"\n[{self.bs.time()}] Profiles:\n{self.bs.profiles[job.workload].keys()}")
+        copy_profile = self.bs.profiles[job.workload][job.profile]
+        self.bs.register_profile(job.workload, new_profile_id, copy_profile)
+        new_job = self.bs.register_job(new_job_id, job.requested_resources, job.requested_time, new_profile_id)
         new_job.metadata = metadata
 
         if job.requested_resources > 1:
@@ -449,9 +487,9 @@ class QarnotNodeSched(BatsimScheduler):
                 qb = self.jobs_mapping.pop(job.id)
                 qb.onJobKilled(job)
 
+                self.nb_killed_jobs += 1
                 if self.end_of_simulation_asked == False:
                     #This should be an instance killed because the rad was too hot or preempted by an instance of higher priority
-                    self.nb_killed_jobs += 1
                     self.resubmitJob(job)
 
             elif job.job_state == Job.State.COMPLETED_SUCCESSFULLY:
@@ -511,34 +549,6 @@ class QarnotNodeSched(BatsimScheduler):
     def onJobsKilled(self, job):
         pass
         #TODO pass?
-
-
-    def killOrRejectAllJobs(self):
-        self.logger.info("Killing all running jobs and rejecting all waiting ones.")
-        to_reject = []
-        to_kill = []
-        for qb in self.dict_qboxes.values():
-            (qb_reject, qb_kill) = qb.killOrRejectAllJobs()
-            to_reject.extend(qb_reject)
-            to_kill.extend(qb_kill)
-
-        for qtask in self.qtasks_queue.values():
-            qtask.print_infos(self.logger)
-            if len(qtask.waiting_instances) > 0:
-                to_reject.extend(qtask.waiting_instances)
-
-        to_kill.extend(self.storage_controller.onKillAllStagingJobs())
-
-        if len(to_reject) > 0:
-            self.logger.info("Rejecting {} jobs".format(len(to_reject)))
-            self.bs.reject_jobs(to_reject)
-
-        if len(to_kill) > 0:
-            self.logger.info("Killing {} jobs".format(len(to_kill)))
-            self.bs.kill_jobs(to_kill)
-
-
-        self.logger.info("Now Batsim should stop the simulation on next message (or after next REQUESTED_CALL)")
 
 
     def sortAvailableMobos(self, priority):

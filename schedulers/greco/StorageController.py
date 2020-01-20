@@ -639,7 +639,9 @@ class StorageController:
         # This is called by the QNode scheduler upon receiving a 'stop_simulation' external event
         # return the list of data staging jobs to be killed in order to finish the simulation
         self._logger.info("[{}] StorageController returns {} data staging jobs to be killed".format(self._bs.time(), len(self.moveRequested.keys())))
-        return self.moveRequested.keys()
+        jobs_to_kill = [self._bs.jobs[x] for x in self.moveRequested.keys()]
+
+        return jobs_to_kill
         
 
 # Handlers of Batsim-related events
@@ -662,6 +664,14 @@ class StorageController:
         self.staging_map.remove((dest_id, dataset_id))
 
         self.mappingQBoxes[dest_id].onDatasetArrivedOnDisk(dataset_id)
+
+    def onDataStagingKilled(self, job):
+        if self._qn.end_of_simulation_asked:
+            # Just do nothing?
+            pass
+        else:
+            raise NotImplementedYet()
+            # TODO Maybe change it to an assert False because this should never happen
 
     def onSimulationBegins(self):
         pass

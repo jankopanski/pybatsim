@@ -84,7 +84,8 @@ class SubQTask:
     def __init__(self, id, priority_group, instances, list_datasets):
         self.id = id
         self.priority_group = priority_group
-        self.waiting_instances = instances     # List of batsim jobs that are waiting to be started
+        self.waiting_instances = instances     # List of batsim jobs that are waiting to be scheduled
+        self.reserved_instances = []           # List of batsim jobs that are scheduled and a mobos have been reserved
         self.running_instances = []            # List of batsim jobs that are currently running
         self.waiting_datasets = []             # Datasets that are waiting to be on disk
         self.datasets = [] if list_datasets is None else list_datasets # List of input datasets
@@ -96,9 +97,17 @@ class SubQTask:
     def pop_waiting_instance(self):
         return self.waiting_instances.pop()
 
+    def mark_reserved_instance(self, job):
+        self.reserved_instances.append(job)
+
+    def reject_reserved_instance(self, job):
+        self.reserved_instances.remove(job)
+
     def mark_running_instance(self, job):
         if job in self.waiting_instances:
             self.waiting_instances.remove(job)
+        if job in self.reserved_instances:
+            self.reserved_instances.remove(job)
         self.running_instances.append(job)
 
     def instance_finished(self, job):
