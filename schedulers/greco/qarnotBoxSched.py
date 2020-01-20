@@ -46,7 +46,7 @@ class QarnotBoxSched():
         self.storage_controller = storage_controller    # The StorageController
         self.logger = bs.logger                         # The logger
         self.name = name                                # QBox qguid
-        self.site = site                                # Location of the QBox, either "paris" or "bordeaux"
+        self.site = site                                # Location of the QBox, either "paris" or "bordeaux" or "Reau"
 
         self.dict_qrads = {}     # Maps the qrad_names to QRad object
         self.dict_ids = {}       # Maps the batids of the mobos to the QRad object that contains it
@@ -190,7 +190,7 @@ class QarnotBoxSched():
                     if qm.running_job != -1:
                         job = qm.pop_job()
                         jobs_to_kill.add(job)
-                        self.logger.debug("Asked to kill {} of priority {} because {} too hot ({} < -10)".format(job.id, job.profile_dict["priority"], qr.name, qr.diffTemp))
+                        self.logger.debug("[{}] Asked to kill {} of priority {} because {} too hot ({} < -10)".format(self.bs.time(), job.id, job.profile_dict["priority"], qr.name, qr.diffTemp))
 
             elif  qr.diffTemp < -3:
                 # QRad is too hot to run LOW and BKGD, kill instances if any
@@ -198,7 +198,7 @@ class QarnotBoxSched():
                     if qm.state == QMoboState.RUNLOW or qm.state == QMoboState.RUNBKGD:
                         job = qm.pop_job()
                         jobs_to_kill.add(job)
-                        self.logger.debug("Asked to kill {} of priority {} because {} too hot ({} < -3) for LOW BKGD".format(job.id, job.profile_dict["priority"], qr.name, qr.diffTemp))
+                        self.logger.debug("[{}] Asked to kill {} of priority {} because {} too hot ({} < -3) for LOW BKGD".format(self.bs.time(), job.id, job.profile_dict["priority"], qr.name, qr.diffTemp))
 
             elif qr.diffTemp < -1:
                 # QRad is too hot to run BKGD, kill those CPU burns!
@@ -206,7 +206,7 @@ class QarnotBoxSched():
                     if qm.state == QMoboState.RUNBKGD:
                         job = qm.pop_job()
                         jobs_to_kill.add(job)
-                        self.logger.debug("Asked to kill {} of priority {} because {} too hot ({} < -1) for BKGD".format(job.id, job.profile_dict["priority"], qr.name, qr.diffTemp))
+                        self.logger.debug("[{}] Asked to kill {} of priority {} because {} too hot ({} < -1) for BKGD".format(self.bs.time(), job.id, job.profile_dict["priority"], qr.name, qr.diffTemp))
 
             for qm in qr.dict_mobos.values():
                 if (qr.diffTemp >= 1) and (qm.state < QMoboState.RUNBKGD) and not qm.is_reserved():
@@ -263,7 +263,7 @@ class QarnotBoxSched():
             sub_qtask = SubQTask(qtask_id, priority_group, instances,
                                  self.bs.profiles[batjob.workload][batjob.profile]["datasets"])
             sub_qtask.cluster_task = True
-            self.logger.debug(f"== Adding SubQTask Cluster {qtask_id} in the dict of qb {self.name}")
+            self.logger.debug(f"[{self.bs.time()}] == Adding SubQTask Cluster {qtask_id} in the dict of qb {self.name}")
             self.dict_subqtasks[qtask_id] = sub_qtask
 
         else:
@@ -278,7 +278,7 @@ class QarnotBoxSched():
                 # Create and add the SubQTask to the dict
                 sub_qtask = SubQTask(qtask_id, priority_group, instances.copy(),
                                      self.bs.profiles[instances[0].workload][instances[0].profile]["datasets"])
-                self.logger.debug(f"== Adding SubQTask {qtask_id} in the dict of qb {self.name}")
+                self.logger.debug(f"[{self.bs.time()}] == Adding SubQTask {qtask_id} in the dict of qb {self.name}")
                 self.dict_subqtasks[qtask_id] = sub_qtask
 
         # Then ask for the data staging of the required datasets
@@ -644,7 +644,7 @@ class QarnotBoxSched():
         if len(sub_qtask.running_instances) == 0 and len(sub_qtask.waiting_instances) == 0:
             self.logger.debug("[{}]--- QBox {} executed all dispatched instances of {}, releasing the hardlinks.".format(self.bs.time(), self.name, sub_qtask.id))
             self.storage_controller.onQBoxReleaseHardLinks(self.disk_batid, sub_qtask.id)
-            self.logger.debug(f"== Del SubQTask {sub_qtask.id} in the dict of qb {self.name}")
+            self.logger.debug(f"[{self.bs.time()}] == Del SubQTask {sub_qtask.id} in the dict of qb {self.name}")
             del self.dict_subqtasks[sub_qtask.id]
             if sub_qtask.id in self.dict_reserved_jobs_mobos:
                 del self.dict_reserved_jobs_mobos[sub_qtask.id]
@@ -669,7 +669,7 @@ class QarnotBoxSched():
                         if qm.running_job != -1:
                             job = qm.pop_job()
                             self.jobs_to_kill.append(job)
-                            self.logger.debug("Killing {} on {} ({}) because mobo made unavailable".format(job.id, qm.name, qm.batid))
+                            self.logger.debug(f"[{self.bs.time()}] Killing {job.id} on {qm.name} ({qm.batid}) because mobo made unavailable")
                         qm.turn_off()
                         self.stateChanges[qm.max_pstate].insert(qm.batid)
 
@@ -689,7 +689,7 @@ class QarnotBoxSched():
 
                 elif qm.state == QMoboState.IDLE:
                     # No heating required, turn off this mobo
-                    self.logger.debug("Turning OFF mobo {} {}".format(qm.batid, qm.name))
+                    self.logger.debug(f"[{self.bs.time()}] Turning OFF mobo {qm.batid} {qm.name}")
                     qm.turn_off()
                     self.stateChanges[qm.max_pstate].insert(qm.batid)
                     #self.logger.debug("++++++++ Change state of {} to {} {} (off)".format(qm.batid, qm.max_pstate, qm.pstate))
@@ -706,13 +706,13 @@ class QarnotBoxSched():
                         # Increase speed
                         qm.pstate -= 1
                         self.stateChanges[qm.pstate].insert(qm.batid)
-                        self.logger.debug("++++++++ Change state of {} to {} (increase speed)".format(qm.batid, qm.pstate))
+                        self.logger.debug(f"[{self.bs.time()}] ++++++++ Change state of {qm.batid} to {qm.pstate} (increase speed)")
 
                     elif qr.diffTemp <= -1 and qm.pstate < (qm.max_pstate-1):
                         # Decrease speed
                         qm.pstate += 1
                         self.stateChanges[qm.pstate].insert(qm.batid)
-                        self.logger.debug("++++++++ Change state of {} to {} (decrease speed)".format(qm.batid, qm.pstate))
+                        self.logger.debug(f"[{self.bs.time()}] ++++++++ Change state of {qm.batid} to {qm.pstate} (decrease speed)".format(qm.batid, qm.pstate))
                     # Else we stay in this pstate
 
                 else:

@@ -222,7 +222,7 @@ class StorageController:
         self._nb_transfers_real = 0 # The number of "real" transfers
 
         # Stores the requests that have been staged.
-        # If transfer from CEPH to storage_id i fro dataset_id j
+        # If transfer from CEPH to storage_id i for dataset_id j
         # Then this will have the entry (i, j)
         self.staging_map = set()
 

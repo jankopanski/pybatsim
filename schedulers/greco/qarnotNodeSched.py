@@ -112,7 +112,6 @@ class QarnotNodeSched(BatsimScheduler):
         #self.max_simulation_time = 87100 # 1 day
         self.max_simulation_time = 1211000 # 2 weeks TODO remove this guard?
         self.end_of_simulation_asked = False
-        self.next_print = 43200
 
 
     def onSimulationBegins(self):
@@ -247,9 +246,6 @@ class QarnotNodeSched(BatsimScheduler):
 
 
     def onBeforeEvents(self):
-        if self.bs.time() >= self.next_print:
-            print(self.bs.time(), (math.floor(self.bs.time())/86400.0))
-            self.next_print+=43200
         if self.bs.time() > self.max_simulation_time:
             self.logger.info("[{}] SYS EXIT".format(self.bs.time()))
             sys.exit(1)
@@ -382,7 +378,7 @@ class QarnotNodeSched(BatsimScheduler):
             self.qtasks_queue[qtask_id] = qtask
             self.nb_received_qtasks += 1
 
-            self.logger.debug(f"== Adding QTask {qtask_id} in the dict")
+            self.logger.debug(f"[{self.bs.time()}] == Adding QTask {qtask_id} in the dict")
 
             # Check whether it is a cluster
             if job.requested_resources > 1:
@@ -390,7 +386,7 @@ class QarnotNodeSched(BatsimScheduler):
                 qtask.cluster_task = True
                 qtask.requested_resources = job.requested_resources
                 qtask.execution_time = job.requested_time # This should be equal to real_finish_time - real_start_time, or less if this is a resubmission of the cluster task
-                self.logger.info(f'New cluster {job.id} submitted with execution time {qtask.execution_time}')
+                self.logger.info(f'[{self.bs.time()}] New cluster {job.id} submitted with execution time {qtask.execution_time}')
 
             else:
                 self.nb_received_instances += 1
@@ -447,10 +443,10 @@ class QarnotNodeSched(BatsimScheduler):
         if job.requested_resources > 1:
             # It is a cluster, update its walltime
             time_running = self.bs.time () - job.start_time
-            self.logger.debug("1===== {} {}".format(self.bs.jobs[new_job_id].requested_time, new_job.requested_time))
+            self.logger.debug("[{}] 1===== {} {}".format(self.bs.time(), self.bs.jobs[new_job_id].requested_time, new_job.requested_time))
             new_job.requested_time = job.requested_time - time_running
-            self.logger.debug("2===== {} {}}".format(self.bs.jobs[new_job_id].requested_time, new_job.requested_time))
-            self.logger.debug(f"Resubmitted cluster {job.id} with new walltime {new_job.requested_time} instead of {job.requested_time} after running from {job.start_time} to {self.bs.time()}")
+            self.logger.debug("[{}] 2===== {} {}".format(self.bs.time(), self.bs.jobs[new_job_id].requested_time, new_job.requested_time))
+            self.logger.debug(f"[{self.bs.time()}] Resubmitted cluster {job.id} with new walltime {new_job.requested_time} instead of {job.requested_time} after running from {job.start_time} to {self.bs.time()}")
 
         self.logger.info("[{}] QNode resubmitting {} with new id {}".format(self.bs.time(), job, new_job_id))
         self.onJobSubmission(new_job, resubmit=True)
@@ -500,7 +496,7 @@ class QarnotNodeSched(BatsimScheduler):
                 if self.direct_dispatch_enabled and not qtask.is_cluster(): # Because cluster QTasks do not have multiple instances
                     ''' DIRECT DISPATCH '''
                     direct_job = self.tryDirectDispatch(qtask, qb)
-                    self.logger.debug(f"Sending job completion of {job.id} to {qb.name} with direct job {direct_job}")
+                    self.logger.debug(f"[{self.bs.time()}] Sending job completion of {job.id} to {qb.name} with direct job {direct_job}")
                     qb.onJobCompletion(job, direct_job)
                 else:
                     qb.onJobCompletion(job)
@@ -513,7 +509,7 @@ class QarnotNodeSched(BatsimScheduler):
                     #Check if the QTask is complete
                     if qtask.is_complete():
                         self.logger.info("[{}]    All instances of QTask {} have terminated, removing it from the queue".format(self.bs.time(), qtask.id))
-                        self.logger.debug(f"== Removing {qtask.id} from the dict")
+                        self.logger.debug(f"[{self.bs.time()}] == Removing {qtask.id} from the dict")
                         del self.qtasks_queue[qtask.id]
 
             elif job.job_state == Job.State.COMPLETED_WALLTIME_REACHED:
@@ -528,7 +524,7 @@ class QarnotNodeSched(BatsimScheduler):
 
                 assert qtask.is_complete(), f"Cluster QTask {qtask.id} is not complete after its walltime was reached."
                 self.logger.info(f"[{self.bs.time()}]    Cluster task {qtask.id} has completed, removing it from the queue")
-                self.logger.debug(f"== Removing {qtask.id} from the dict")
+                self.logger.debug(f"[{self.bs.time()}] == Removing {qtask.id} from the dict")
                 del self.qtasks_queue[qtask.id]
             else:
                 # "Regular" instances are not supposed to have a walltime nor fail
@@ -563,7 +559,7 @@ class QarnotNodeSched(BatsimScheduler):
 
     def addJobsToMapping(self, jobs, qb):
         for job in jobs:
-            self.logger.debug(f"Adding {job.id} to mapping on qb {qb.name}")
+            self.logger.debug(f"[{self.bs.time()}] Adding {job.id} to mapping on qb {qb.name}")
             self.jobs_mapping[job.id] = qb
 
 
