@@ -206,23 +206,26 @@ class Batsim(object):
             }
         })
 
-    def register_profiles(self, workload_name, profiles):
-        for profile_name, profile in profiles.items():
-            msg = {
-                "timestamp": self.time(),
-                "type": "REGISTER_PROFILE",
-                "data": {
-                    "workload_name": workload_name,
-                    "profile_name": profile_name,
-                    "profile": profile,
-                }
+    def register_profiles(self, workload_name, profiles_dict):
+        for profile_name, profile in profiles_dict.items():
+            self.register_profile(workload_name, profile_name, profile)
+
+    def register_profile(self, workload_name, profile_name, profile_dict):
+        msg = {
+            "timestamp": self.time(),
+            "type": "REGISTER_PROFILE",
+            "data": {
+                "workload_name": workload_name,
+                "profile_name": profile_name,
+                "profile": profile_dict,
             }
-            self._events_to_send.append(msg)
-            if not workload_name in self.profiles:
-                self.profiles[workload_name] = {}
-                self.logger.debug("A new dynamic workload of name '{}' has been created".format(workload_name))
-            self.logger.debug("Registering profile: {}".format(msg["data"]))
-            self.profiles[workload_name][profile_name] = profile
+        }
+        self._events_to_send.append(msg)
+        if not workload_name in self.profiles:
+            self.profiles[workload_name] = {}
+            self.logger.debug("A new dynamic workload of name '{}' has been created".format(workload_name))
+        self.logger.debug("Registering profile: {}".format(msg["data"]))
+        self.profiles[workload_name][profile_name] = profile_dict
 
     def register_job(
             self,
@@ -302,6 +305,7 @@ class Batsim(object):
             json_dict = event["data"]["job"]
             job = Job.from_json_dict(json_dict)
 
+            # TODO Not possible anymore since Batsim V3.0
             if "profile" in event["data"]:
                 profile = event["data"]["profile"]
             else:
@@ -436,10 +440,11 @@ class Batsim(object):
             if msg is None:
                 self.scheduler.onDeadlock()
                 continue
-        self.logger.info("Message Received from Batsim")
-        #self.logger.info("Message received from Batsim: {}".format(msg))
 
         self._current_time = msg["now"]
+
+        self.logger.info(f"[{self.time()}] Message Received from Batsim")
+        #self.logger.info("Message received from Batsim: {}".format(msg))
 
         if "air_temperatures" in msg:
             self.air_temperatures = msg["air_temperatures"]
