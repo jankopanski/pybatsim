@@ -282,6 +282,15 @@ class QarnotBoxSched():
                 self.dict_subqtasks[qtask_id] = sub_qtask
 
         # Then ask for the data staging of the required datasets
+        self.askForDatasets(sub_qtask)
+
+        # Then schedule the instances
+        if sub_qtask.is_cluster():
+            self.scheduleClusterInstance(sub_qtask)
+        else:
+            self.scheduleInstances(sub_qtask)
+
+    def askForDatasets(self, sub_qtask):
         # Even if all datasets were on disk before, that doesn't mean they are still there
         new_waiting_datasets = []
         for dataset_id in sub_qtask.datasets:
@@ -293,12 +302,6 @@ class QarnotBoxSched():
                 new_waiting_datasets.append(dataset_id)
                 self.waiting_datasets.append(dataset_id)
         sub_qtask.update_waiting_datasets(new_waiting_datasets)
-
-        # Then schedule the instances
-        if sub_qtask.is_cluster():
-            self.scheduleClusterInstance(sub_qtask)
-        else:
-            self.scheduleInstances(sub_qtask)
 
 
     def scheduleInstances(self, sub_qtask):
