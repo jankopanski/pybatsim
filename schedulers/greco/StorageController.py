@@ -239,6 +239,7 @@ class StorageController:
                 self._ceph_id = res["id"]
                 # Parse the dataset file
                 new_storage.load_datasets_from_json(self._input_path+"/datasets.json")
+                new_storage._qb_name = "storage_server" # To have a _qb_name attribute
 
             self.add_storage(new_storage)
 
@@ -431,7 +432,7 @@ class StorageController:
             self.clear_storage(dest, dataset)
 
         # Profile Submit
-        profile_name = "staging" + str(self._next_staging_job_id + 1)
+        profile_name = "staging" + str(self._next_staging_job_id)
         move_profile = {
             profile_name : 
             {
@@ -444,9 +445,9 @@ class StorageController:
         self._bs.register_profiles("dyn-staging", move_profile)
 
         # Job Submit
-        self._next_staging_job_id += 1
-        jid1 = "dyn-staging!" + str(self._next_staging_job_id)
+        jid1 = "dyn-staging!staging" + str(self._next_staging_job_id)
         self._bs.register_job(id=jid1, res=2, walltime=-1, profile_name=profile_name)
+        self._next_staging_job_id += 1
 
         # Job Execution
         job1 = Job(jid1, 0, -1, 1, "", "")
@@ -550,7 +551,7 @@ class StorageController:
 
 
     def onGetStoragesHavingDatasets(self, datasets):
-        """ Returns the list of storages (without CEPH) that already has the required datasets """
+        """ Returns the list of QBox names that already has the required datasets """
 
         # The list of all qboxes with the required dataset
         qboxes_list = []
