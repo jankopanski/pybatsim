@@ -561,12 +561,15 @@ class StorageController:
             # Check if this storage has all the required datasets.
             hasDataset = True
             for dataset_id in datasets:
-                if storage.has_dataset(dataset_id):
+                if not storage.has_dataset(dataset_id):
                     hasDataset = False
                     break
             if hasDataset:
                 # If true, this storage has all the required datasets, add it to the list
                 qboxes_list.append(storage._qb_name)
+
+
+        self._logger.debug(f"[{self._bs.time()}] SC found the required datasets on: {qboxes_list}")
 
         return qboxes_list
 
