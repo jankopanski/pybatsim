@@ -155,6 +155,7 @@ class QMobo:
     def push_job(self, job):
         assert self.running_job == -1, "Job {} placed on mobo {} {} that was already executing job {}".format(self.running_job.id, self.batid, self.name, job.id)
         self.running_job = job
+        self.reserved_job = -1
         self.state = QMoboState.LAUNCHING
 
     def pop_job(self):

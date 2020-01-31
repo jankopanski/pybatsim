@@ -190,7 +190,9 @@ class QarnotBoxSched():
                     if qm.running_job != -1:
                         job = qm.pop_job()
                         jobs_to_kill.add(job)
-                        self.logger.debug("[{}] Asked to kill {} of priority {} because {} too hot ({} < -10)".format(self.bs.time(), job.id, job.profile_dict["priority"], qr.name, qr.diffTemp))
+                        if len(job.allocation) > 1:
+                            self.killCluster(job, qm.batid)
+                        self.logger.debug("[{}] Asked to kill {} of priority {} on mobo {} because {} too hot ({} < -10)".format(self.bs.time(), job.id, job.profile_dict["priority"], qm.batid, qr.name, qr.diffTemp))
 
             elif  qr.diffTemp < -3:
                 # QRad is too hot to run LOW and BKGD, kill instances if any
@@ -198,7 +200,9 @@ class QarnotBoxSched():
                     if qm.state == QMoboState.RUNLOW or qm.state == QMoboState.RUNBKGD:
                         job = qm.pop_job()
                         jobs_to_kill.add(job)
-                        self.logger.debug("[{}] Asked to kill {} of priority {} because {} too hot ({} < -3) for LOW BKGD".format(self.bs.time(), job.id, job.profile_dict["priority"], qr.name, qr.diffTemp))
+                        if len(job.allocation) > 1:
+                            self.killCluster(job, qm.batid)
+                        self.logger.debug("[{}] Asked to kill {} of priority {} on mobo {} because {} too hot ({} < -3) for LOW BKGD".format(self.bs.time(), job.id, job.profile_dict["priority"], qm.batid, qr.name, qr.diffTemp))
 
             elif qr.diffTemp < -1:
                 # QRad is too hot to run BKGD, kill those CPU burns!
@@ -206,7 +210,7 @@ class QarnotBoxSched():
                     if qm.state == QMoboState.RUNBKGD:
                         job = qm.pop_job()
                         jobs_to_kill.add(job)
-                        self.logger.debug("[{}] Asked to kill {} of priority {} because {} too hot ({} < -1) for BKGD".format(self.bs.time(), job.id, job.profile_dict["priority"], qr.name, qr.diffTemp))
+                        self.logger.debug("[{}] Asked to kill {} of priority {} on mobo {} because {} too hot ({} < -1) for BKGD".format(self.bs.time(), job.id, job.profile_dict["priority"], qm.batid, qr.name, qr.diffTemp))
 
             for qm in qr.dict_mobos.values():
                 if (qr.diffTemp >= 1) and (qm.state < QMoboState.RUNBKGD) and not qm.is_reserved():
@@ -236,6 +240,19 @@ class QarnotBoxSched():
 
         self.logger.info("[{}]--- {} reporting the available slots for bkgd/low/high: {}/{}/{}".format(self.bs.time(), self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)))
         return [self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)]
+
+
+    def killCluster(self, job, qm_id):
+        '''
+        If a cluster job have been killed, we need to update the state of all its mobos
+        qm_id is the id of the QMobo where the job have already been popped
+        '''
+        sub_qtask = self.dict_subqtasks[job.qtask_id]
+        assert sub_qtask.is_cluster(), f"Trying to kill cluster {job.id} but it's not a cluster..."
+        for batid in job.allocation:
+            if batid != qm_id:
+                qm = self.dict_ids[batid].dict_mobos[batid]
+                qm.pop_job()
 
 
     def onDispatchedInstance(self, instances, priority_group, qtask_id, is_cluster = False):
