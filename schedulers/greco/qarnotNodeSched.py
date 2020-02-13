@@ -49,7 +49,7 @@ class QarnotNodeSched(BatsimScheduler):
     def __init__(self, options):
         super().__init__(options)
 
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.CRITICAL)
 
         # Make sure the path to the datasets is passed
         assert "input_path" in options, "The path to the input files should be given as a CLI option as follows: [pybatsim command] -o \'{\"input_path\":\"path/to/input/files\"}\'"
