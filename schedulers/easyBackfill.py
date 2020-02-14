@@ -248,11 +248,14 @@ class EasyBackfill(BatsimScheduler):
         self.listWaitingJob = []
 
     def onJobSubmission(self, just_submitted_job):
-        current_time = self.bs.time()
-        self.listWaitingJob.append(just_submitted_job)
-        # if (self.cpu_snapshot.free_processors_available_at(current_time) >=
-        # just_submitted_job.requested_resources):
-        self._schedule_jobs(current_time)
+        if just_submitted_job.requested_resources > self.bs.nb_compute_resources:
+            self.bs.reject_jobs([just_submitted_job]) # This job requests more resources than the machine has
+        else:
+            current_time = self.bs.time()
+            self.listWaitingJob.append(just_submitted_job)
+            # if (self.cpu_snapshot.free_processors_available_at(current_time) >=
+            # just_submitted_job.requested_resources):
+            self._schedule_jobs(current_time)
 
     def onJobCompletion(self, job):
         current_time = self.bs.time()

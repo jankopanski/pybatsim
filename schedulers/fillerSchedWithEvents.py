@@ -58,8 +58,10 @@ class FillerSchedWithEvents(BatsimScheduler):
         #print('')
 
     def onJobSubmission(self, job):
-        self.openJobs.add(job)
-        #self.scheduleJobs()
+        if job.requested_resources > self.bs.nb_compute_resources:
+            self.bs.reject_jobs([job]) # This job requests more resources than the machine has
+        else:
+            self.openJobs.add(job)
 
     def onJobCompletion(self, job):
         # Resources used by the job and that are unavailable should not be added to available resources
