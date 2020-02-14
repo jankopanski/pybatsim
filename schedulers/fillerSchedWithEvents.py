@@ -14,16 +14,14 @@ class FillerSchedWithEvents(BatsimScheduler):
 
 
     def onSimulationBegins(self):
-        self.nb_completed_jobs = 0
-
-        self.jobs_completed = []
-        self.jobs_waiting = []
+        self.jobs_waiting = [] # List of jobs waiting to be scheduled
 
         self.sched_delay = 0.005
 
         self.openJobs = set()
-        self.availableResources = ProcSet((0,self.bs.nb_compute_resources-1))
-        self.unavailableResources = ProcSet()
+        self.availableResources = ProcSet((0,self.bs.nb_compute_resources-1)) # The machines not running resources nor marked unavailable
+        self.unavailableResources = ProcSet() # The resources marked as unavailable by external events
+        self.runningResources = ProcSet() # The resources running jobs
 
 
     def scheduleJobs(self):
@@ -43,6 +41,7 @@ class FillerSchedWithEvents(BatsimScheduler):
                 scheduledJobs.append(job)
 
                 self.availableResources -= job_alloc
+                self.runningResources |= job_alloc
 
                 self.openJobs.remove(job)
 
@@ -67,7 +66,7 @@ class FillerSchedWithEvents(BatsimScheduler):
         # Resources used by the job and that are unavailable should not be added to available resources
         p = job.allocation - self.unavailableResources
         self.availableResources |= p
-        #self.scheduleJobs()
+        self.runningResources -= job.allocation
 
     def onNotifyEventMachineUnavailable(self, machines):
         self.unavailableResources |= machines
@@ -75,10 +74,23 @@ class FillerSchedWithEvents(BatsimScheduler):
 
     def onNotifyEventMachineAvailable(self, machines):
         self.unavailableResources -= machines
-        self.availableResources |= machines
+        p = machines - self.runningResources # Don't mark as available the resources running a job
+        self.availableResources |= p
 
     def onNotifyGenericEvent(self, event_data):
         pass
+
+    def onNoMoreExternalEvents(self):
+        # There are no more external event, reject the jobs that cannot be scheduled due to lack of available resources
+        nb_max_available_resources = self.bs.nb_compute_resources - len(self.unavailableResources)
+        jobs_to_reject = []
+        for job in self.jobs_waiting:
+            if job.requested_resources > nb_max_available_resources:
+                jobs_to_reject.append(job)
+
+        if len(jobs_to_reject) > 0:
+            self.bs.reject_jobs(jobs_to_reject)
+
 
     def onNoMoreEvents(self):
         self.scheduleJobs()
