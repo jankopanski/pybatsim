@@ -543,8 +543,7 @@ class StorageController:
 
     def replicateDatasetOnAllDisks(self, dataset_id):
         '''
-        Used by the FullReplicate version.
-        Simply asks to replicate the given dataset onto all QBox disks.
+        Simply asks to replicate the given dataset onto all disks.
         '''
         for storage_id in self.get_storages().keys():
             self.onQBoxAskDataset(storage_id, dataset_id)

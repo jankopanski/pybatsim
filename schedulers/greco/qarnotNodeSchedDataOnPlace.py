@@ -11,14 +11,14 @@ import math
 This is a variant of the qarnotNodeSched where all datasets are replicated on all QBox disks.
 '''
 
-class QarnotNodeSchedFullReplicate(QarnotNodeSched):
+class QarnotNodeSchedDataOnPlace(QarnotNodeSched):
     def __init__(self, options):
         super().__init__(options)
 
-        self.qbox_sched_name = QarnotBoxSchedFullReplicate
+        self.qbox_sched_name = QarnotBoxSchedDataOnPlace
 
 
-class QarnotBoxSchedFullReplicate(QarnotBoxSched):
+class QarnotBoxSchedDataOnPlace(QarnotBoxSched):
     def __init__(self, name, dict_qrads, site, bs, qn, storage_controller):
         super().__init__(name, dict_qrads, site, bs, qn, storage_controller)
 
