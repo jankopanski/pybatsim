@@ -1,7 +1,7 @@
 from batsim.batsim import BatsimScheduler, Batsim, Job
 from qarnotNodeSched import QarnotNodeSched
 from qarnotNodeSchedLocalityBased import QarnotNodeSchedLocalityBased
-from StorageController import StorageController
+from storageController import StorageController
 from qarnotBoxSched import QarnotBoxSched
 from qarnotUtils import *
 
