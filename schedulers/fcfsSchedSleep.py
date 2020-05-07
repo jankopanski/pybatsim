@@ -146,8 +146,11 @@ class FcfsSchedSleep(BatsimScheduler):
             self.bs.set_resource_state(ProcSet(r1), val)
 
     def onJobSubmission(self, job):
-        self.open_jobs.append(job)
-        self.scheduleJobs()
+        if job.requested_resources > self.bs.nb_compute_resources:
+            self.bs.reject_jobs([job]) # This job requests more resources than the machine has
+        else:
+            self.open_jobs.add(job)
+            self.scheduleJobs()
 
     def onJobCompletion(self, job):
         for res in job.allocation:

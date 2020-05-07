@@ -159,9 +159,15 @@ class Batsim(object):
             if io_jobs is not None and job.id in io_jobs:
                 message["data"]["additional_io_job"] = io_jobs[job.id]
 
+            if hasattr(job, "mapping"):
+                message["data"]["mapping"] = job.mapping
+                self.jobs[job.id].mapping = job.mapping
+
             if hasattr(job, "storage_mapping"):
                 message["data"]["storage_mapping"] = job.storage_mapping
                 self.jobs[job.id].storage_mapping = job.storage_mapping
+
+            self.jobs[job.id].allocation = job.allocation
 
             self._events_to_send.append(message)
             self.nb_jobs_scheduled += 1
@@ -234,6 +240,7 @@ class Batsim(object):
             walltime,
             profile_name,
             subtime=None):
+        """ Returns the registered Job """
 
         if subtime is None:
             subtime = self.time()
@@ -256,17 +263,17 @@ class Batsim(object):
         job = Job.from_json_dict(job_dict)
         job.job_state = Job.State.IN_SUBMISSON
 
-        # Keep a pointer in the job structure
-        assert job.profile in self.profiles[job.workload]
-        job.profile_dict = self.profiles[job.workload][job.profile]
-
-        self.jobs[id] = job
-
         if self.ack_of_dynamic_jobs:
             self.nb_jobs_in_submission += 1
         else:
             self.nb_jobs_submitted += 1
             self.nb_jobs_submitted_from_scheduler += 1
+
+        # Keep a pointer of the profile in the job structure
+        assert job.profile in self.profiles[job.workload]
+        job.profile_dict = self.profiles[job.workload][job.profile]
+
+        self.jobs[id] = job
         return job
 
     def set_resource_state(self, resources, state):
@@ -346,7 +353,6 @@ class Batsim(object):
                 }
             }
         )
-
 
     def notify_resources_added(self, resources):
         self._events_to_send.append(
@@ -847,6 +853,9 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onNotifyEventOutsideTemperatureChanged(self, site:str, new_temperature:float):
+        raise NotImplementedError()
+
+    def onNotifyGenericEvent(self, event_data):
         raise NotImplementedError()
 
     def onNotifyGenericEvent(self, event_data):
