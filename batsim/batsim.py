@@ -251,14 +251,21 @@ class Batsim(object):
             }
         }
         self._events_to_send.append(msg)
-        self.jobs[id] = Job.from_json_dict(job_dict)
-        self.jobs[id].job_state = Job.State.IN_SUBMISSON
+        job = Job.from_json_dict(job_dict)
+        job.job_state = Job.State.IN_SUBMISSON
+        
         if self.ack_of_dynamic_jobs:
             self.nb_jobs_in_submission += 1
         else:
             self.nb_jobs_submitted += 1
             self.nb_jobs_submitted_from_scheduler += 1
-        return self.jobs[id]
+
+        # Keep a pointer of the profile in the job structure
+        assert job.profile in self.profiles[job.workload]
+        job.profile_dict = self.profiles[job.workload][job.profile]
+
+        self.jobs[id] = job
+        return job
 
     def set_resource_state(self, resources, state):
         """ args:resources: is a ProcSet containing a list of resources.
