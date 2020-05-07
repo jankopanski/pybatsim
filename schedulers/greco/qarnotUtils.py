@@ -37,7 +37,6 @@ class QTask:
             self.id, self.nb_received_instances, len(self.waiting_instances), self.nb_dispatched_instances, self.nb_terminated_instances, self.nb_killed_instances))
 
     def is_complete(self):
-        #TODO make sure all instances of a task arrives at the same time in the workload
         return (len(self.waiting_instances) == 0) and (self.nb_received_instances == self.nb_terminated_instances)
 
     def instance_rejected(self, job):

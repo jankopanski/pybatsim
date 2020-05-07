@@ -36,7 +36,7 @@ class QarnotBoxSchedStatic(QarnotBoxSched):
     def onDispatchedInstancesStatic(self, instances, qtask_id):
         if qtask_id in self.dict_subqtasks:
             sub_qtask = self.dict_subqtasks[qtask_id]
-            sub_qtask.waiting_instances.extend(instances.copy()) #TODO maybe don't need this copy since we use extend
+            sub_qtask.waiting_instances.extend(instances.copy())
         else:
             # This is a QTask "unknown" to the QBox.
             # Create and add the SubQTask to the dict
@@ -77,7 +77,7 @@ class QarnotBoxSchedStatic(QarnotBoxSched):
                     n-= 1
                     if n == 0:
                         # All SubQTasks waiting for this dataset were found, stop
-                        assert dataset_id not in self.waiting_datasets # TODO remove this at some point?
+                        assert dataset_id not in self.waiting_datasets
                         break
 
 

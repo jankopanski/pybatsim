@@ -59,9 +59,7 @@ class QarnotNodeSched(BatsimScheduler):
         if "update_period" in options:
             self.update_period = options["update_period"]
         else:
-            #self.update_period = 30 # The scheduler will be woken up by Batsim every 30 seconds
-            #self.update_period = 600 # TODO every 10 minutes for testing
-            self.update_period = 150 # TODO every 2.5 minutes for testing
+            self.update_period = 150 # The scheduler will be woken up by Batsim every 2.5 minutes
 
         if "output_path" in options:
             self.output_filename = options["output_path"] + "/out_pybatsim.csv"
@@ -108,8 +106,6 @@ class QarnotNodeSched(BatsimScheduler):
         self.nb_received_instances = 0
         self.nb_received_clusters = 0
 
-        #self.max_simulation_time = 87100 # 1 day
-        self.max_simulation_time = 1211000 # 2 weeks TODO remove this guard?
         self.end_of_simulation_asked = False
 
 
@@ -245,10 +241,6 @@ class QarnotNodeSched(BatsimScheduler):
 
 
     def onBeforeEvents(self):
-        if self.bs.time() > self.max_simulation_time:
-            self.logger.info("[{}] SYS EXIT".format(self.bs.time()))
-            sys.exit(1)
-
         self.logger.info("\n")
         for qb in self.dict_qboxes.values():
             qb.onBeforeEvents()
@@ -328,7 +320,7 @@ class QarnotNodeSched(BatsimScheduler):
             self.bs.notify_registration_finished()
             self.end_of_simulation_asked = True
         else:
-            pass # TODO need to handle jobs already running somewhere here (with dynamic jobs?)
+            pass
 
     def killOrRejectAllJobs(self):
         self.logger.info(f"[{self.bs.time()}] Killing all running jobs and rejecting all waiting ones.")
@@ -402,7 +394,6 @@ class QarnotNodeSched(BatsimScheduler):
         qtask.instance_submitted(job, resubmit)
 
         self.do_dispatch = True
-        #TODO maybe we'll need to disable this dispatch, same reason as when a job completes
 
 
     def doDatasetReplication(self, qtask):
@@ -502,9 +493,6 @@ class QarnotNodeSched(BatsimScheduler):
                 else:
                     qb.onJobCompletion(job)
                     # A slot should be available, do a general dispatch
-                    # TODO actually no, because update of available slots is not done between now and the do_dispatch
-                    # TODO If we run simulations with update_period of more than 30 seconds we need to update the slots here
-                    #            when an instance completes
                     self.do_dispatch = True
 
                     #Check if the QTask is complete
@@ -543,11 +531,9 @@ class QarnotNodeSched(BatsimScheduler):
 
     def onJobsKilled(self, job):
         pass
-        #TODO pass?
 
 
     def sortAvailableMobos(self, priority):
-        #self.lists_available_mobos.sort(key=lambda tup:tup[0])
         if priority == "bkgd":
             self.lists_available_mobos.sort(key=lambda tup:(tup[0],tup[1]))
         elif priority == "low":

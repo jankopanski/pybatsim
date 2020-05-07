@@ -29,9 +29,6 @@ List of available mobos:
 
 When a task of higher priority is sent to a mobo that is already running something,
 wait for all the datasets to arrive before stopping the execution of the current task.
-
-#TODO need to add a "warmup" time for booting the mobo when a new task is executed on it
-
 '''
 
 class QarnotBoxSched():
@@ -55,7 +52,6 @@ class QarnotBoxSched():
         self.mobosAvailable = ProcSet()       # Whether the mobos are available or not (from the QRad hotness and external events point of view)
         self.mobosUnavailable = ProcSet()     # Mobos unavailable due to the QRad being too warm (or from external events)
 
-        # TODO maybe we can directly use lists of QRads, may be easier to sort by temperature and get the coolest/warmest when scheduling an instance
         self.availBkgd = ProcSet()
         self.availLow = ProcSet()
         self.availHigh = ProcSet()
@@ -288,7 +284,7 @@ class QarnotBoxSched():
             if qtask_id in self.dict_subqtasks:
                 # Some instances of this QTask have already been received by this QBox
                 sub_qtask = self.dict_subqtasks[qtask_id]
-                sub_qtask.waiting_instances.extend(instances.copy()) #TODO maybe don't need this copy since we do extend
+                sub_qtask.waiting_instances.extend(instances.copy())
             else:
                 # This is a QTask "unknown" to the QBox.
                 # Create and add the SubQTask to the dict
@@ -400,7 +396,7 @@ class QarnotBoxSched():
         self.logger.info("[{}]--- {} has available slots for bkgd/low/high: {}/{}/{}".format(self.bs.time(), self.name, len(self.availBkgd), len(self.availLow), len(self.availHigh)))
 
         assert len(sub_qtask.waiting_instances) > 0, "QBox wants to reject 0 instances to the QNode..."
-        self.qn.onQBoxRejectedInstances(sub_qtask.waiting_instances.copy(), self.name) # TODO maybe we don't need to copy this
+        self.qn.onQBoxRejectedInstances(sub_qtask.waiting_instances.copy(), self.name)
         sub_qtask.waiting_instances = []
 
 
@@ -519,7 +515,7 @@ class QarnotBoxSched():
                     n-= 1
                     if n == 0:
                         # All SubQTasks waiting for this dataset were found, stop
-                        assert dataset_id not in self.waiting_datasets # TODO remove this at some point?
+                        assert dataset_id not in self.waiting_datasets
                         break
 
             for entry in entries_to_remove:
@@ -596,8 +592,7 @@ class QarnotBoxSched():
         sub_qtask = self.dict_subqtasks[old_job.qtask_id]
         if sub_qtask.is_cluster():
             # Need to remove all reservations
-            # TODO verify if all this works...
-            # TODO as we do not have LOW priority cluster tasks for now it should no cause problem
+            # as we do not have LOW priority cluster tasks for now it should no cause problem
             del self.dict_reserved_jobs_mobos[old_job.qtask_id]
 
         else:
@@ -650,7 +645,6 @@ class QarnotBoxSched():
         sub_qtask = self.dict_subqtasks[job.qtask_id]
         sub_qtask.instance_finished(job)
         self.checkCleanSubQTask(sub_qtask)
-        #TODO only this?
 
 
     def checkCleanSubQTask(self, sub_qtask):
@@ -668,7 +662,7 @@ class QarnotBoxSched():
 
 
     def doFrequencyRegulation(self):
-        # TODO Need to check for all mobos if there is one IDLE.
+        # Need to check for all mobos if there is one IDLE.
         # If so, put CPU burn if heating required or turn it off and ask for pstate change
         # For mobos that are still computing something, need to check if a change in pstate is needed
 
