@@ -137,36 +137,48 @@ class Batsim(object):
             )
             self.nb_jobs_scheduled += 1
 
+    def execute_job(self, job, io_job = None):
+        """ ergs.job: Job to execute
+            job.allocation MUST be not None and should be a non-empty ProcSet
+        """
+        assert job.allocation is not None
+        message = {
+            "timestamp": self.time(),
+            "type": "EXECUTE_JOB",
+            "data": {
+                    "job_id": job.id,
+                    "alloc": str(job.allocation)
+            }
+        }
+
+        self.jobs[job.id].allocation = job.allocation
+        self.jobs[job.id].state = Job.State.RUNNING
+
+        if io_job is not None:
+            message["data"]["additional_io_job"] = io_job
+
+        if hasattr(job, "mapping"):
+            message["data"]["mapping"] = job.mapping
+            self.jobs[job.id].mapping = job.mapping
+
+        if hasattr(job, "storage_mapping"):
+            message["data"]["storage_mapping"] = job.storage_mapping
+            self.jobs[job.id].storage_mapping = job.storage_mapping
+
+        self.jobs[job.id].allocation = job.allocation
+
+        self._events_to_send.append(message)
+        self.nb_jobs_scheduled += 1
+
     def execute_jobs(self, jobs, io_jobs=None):
         """ args:jobs: list of jobs to execute
-            job.allocation MUST be not None and should be a non-empty ProcSet"""
-
+            job.allocation MUST be not None and should be a non-empty ProcSet
+        """
         for job in jobs:
-            assert job.allocation is not None
-            message = {
-                "timestamp": self.time(),
-                "type": "EXECUTE_JOB",
-                "data": {
-                        "job_id": job.id,
-                        "alloc": str(job.allocation)
-                }
-            }
-            if io_jobs is not None and job.id in io_jobs:
-                message["data"]["additional_io_job"] = io_jobs[job.id]
-
-            if hasattr(job, "mapping"):
-                message["data"]["mapping"] = job.mapping
-                self.jobs[job.id].mapping = job.mapping
-
-            if hasattr(job, "storage_mapping"):
-                message["data"]["storage_mapping"] = job.storage_mapping
-                self.jobs[job.id].storage_mapping = job.storage_mapping
-
-            self.jobs[job.id].allocation = job.allocation
-
-            self._events_to_send.append(message)
-            self.nb_jobs_scheduled += 1
-
+            if io_jobs is not None:
+                self.execute_job(job, io_jobs[job.id])
+            else:
+                self.execute_job(job)
 
     def reject_jobs(self, jobs):
         """Reject the given jobs."""
