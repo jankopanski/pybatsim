@@ -221,6 +221,7 @@ class StorageController:
         self.nb_transfers_zero = 0 # The number of times a dataset was already present on storage when asked to transfer it
         self.nb_transfers_real = 0 # The number of "real" transfers (i.e., when the dataset was not already present on storage)
 
+        assert self.bs.dynamic_job_registration_enabled, "Dynamic job registration must be enabled to use the Storage Controller"
 
         for res in storage_resources:
             new_storage = Storage(res["id"], res["name"], float(res["properties"]["size"]))
