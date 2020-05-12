@@ -298,8 +298,8 @@ class StorageController:
             {
                 'type' : 'data_staging',
                 'nb_bytes' : dataset.get_size(),
-                'from' : source.get_name(),
-                'to' : dest.get_name()
+                'from' : "source",
+                'to' : "dest"
             },
         }
         self.bs.register_profiles("dyn-storage-controller", move_profile)
@@ -315,14 +315,14 @@ class StorageController:
         # Execute the Job
         new_job.allocation = ProcSet(source_id, dest_id)
         new_job.storage_mapping = {
-            source.get_name() : source_id,
-            dest.get_name() : dest_id
+            "source" : source_id,
+            "dest" : dest_id
         }
         self.bs.execute_job(new_job)
         self.current_transfers[job_id] = DataTransfer(source_id, dest_id, dataset.get_id())
 
-        self.logger.info(f"[ {self.bs.time()} ] Storage Controller staging job for dataset {dataset.get_id()} from {source_id} to {dest_id} started")
-
+        self.logger.info(f"[ {self.bs.time()} ] Storage Controller staging job for dataset {dataset.get_id()} "
+                         f"from {source_id} to {dest_id} started")
 
 
     def ask_data_transfer(self, dataset_id, source_id, dest_id):

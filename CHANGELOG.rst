@@ -21,6 +21,7 @@ Additions
 - `storage_mapping` of a job is not attached to an `EXECUTE_JOB` event.
 - `register_job` function now returns the created Job object.
 - Added the `StorageController` permitting to easily manage `storage` resources and manipulate data between them with `data_staging` jobs.
+  To be used, the StorageController object must be instanciated by the scheduler after the `SIMULATION_BEGINS` event.
 
 Miscellaneous
 ~~~~~~~~~~~~~
