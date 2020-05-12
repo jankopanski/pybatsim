@@ -515,7 +515,11 @@ class Batsim(object):
                     self.nb_jobs_submitted_from_batsim += 1
                 self.jobs[job_id] = job
 
-                self.scheduler.onJobSubmission(job)
+                if (self.use_storage_controller) and (job.workload == "dyn-storage-controller"):
+                    # This job comes from the StorageController, it' just an ack so forget about it
+                    pass
+                else:
+                    self.scheduler.onJobSubmission(job)
 
             elif event_type == "JOB_KILLED":
                 # get progress
