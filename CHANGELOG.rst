@@ -11,15 +11,21 @@ The format is based on `Keep a Changelog`_.
 Unreleased
 ----------
 
-- `Commits since v3.0.0 <https://gitlab.inria.fr/batsim/pybatsim/compare/v3.0.0...master>`_
+- `Commits since v3.0.0 <https://gitlab.inria.fr/batsim/pybatsim/compare/v3.1.0...master>`_
 - ``nix-env -f https://github.com/oar-team/kapack/archive/master.tar.gz -iA pybatsim_dev``
 
 Additions
 ~~~~~~~~~
 
-- Added the handling of `machine_available` and `machine_unavailable` events.
+- Added the handling of `machine_available` and `machine_unavailable` events, as well as the unknown external events.
 - `storage_mapping` of a job is not attached to an `EXECUTE_JOB` event.
-- `register_job` function now returns the created Job.
+- `register_job` function now returns the created Job object.
+
+Miscellaneous
+~~~~~~~~~~~~~
+
+- Example schedulers in the `schedulers` folder are now up-to-date, except from those in the `unMaintained` sub-folder.
+
 
 ........................................................................................................................
 
