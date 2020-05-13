@@ -305,11 +305,13 @@ class QarnotBoxSched():
         # Even if all datasets were on disk before, that doesn't mean they are still there
         new_waiting_datasets = []
         for dataset_id in sub_qtask.datasets:
-            if self.storage_controller.onQBoxAskDataset(self.disk_batid, dataset_id):
+
+            if self.storage_controller.has_dataset_on_storage(dataset_id, self.disk_batid):
                 # The dataset is already on disk, ask for a hardlink
                 self.storage_controller.onQBoxAskHardLink(self.disk_batid, dataset_id, sub_qtask.id)
             else:
-                # The dataset is not on disk yet, put it in the lists of waiting datasets
+                # The dataset is not on disk yet, ask it and put it in the lists of waiting datasets
+                self.storage_controller.onQBoxAskDatasetOnStorage(self.disk_batid, dataset_id)
                 new_waiting_datasets.append(dataset_id)
                 self.waiting_datasets.append(dataset_id)
         sub_qtask.update_waiting_datasets(new_waiting_datasets)
@@ -655,7 +657,7 @@ class QarnotBoxSched():
 
         if len(sub_qtask.running_instances) == 0 and len(sub_qtask.waiting_instances) == 0:
             self.logger.debug("[{}]--- QBox {} executed all dispatched instances of {}, releasing the hardlinks.".format(self.bs.time(), self.name, sub_qtask.id))
-            self.storage_controller.onQBoxReleaseHardLinks(self.disk_batid, sub_qtask.id)
+            self.storage_controller.onQBoxReleaseAllHardLinks(self.disk_batid, sub_qtask.id)
             del self.dict_subqtasks[sub_qtask.id]
             if sub_qtask.id in self.dict_reserved_jobs_mobos:
                 del self.dict_reserved_jobs_mobos[sub_qtask.id]

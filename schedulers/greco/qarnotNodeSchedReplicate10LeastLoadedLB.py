@@ -1,7 +1,7 @@
 from batsim.batsim import BatsimScheduler, Batsim, Job
-from qarnotNodeSched import QarnotNodeSched
+#from qarnotNodeSched import QarnotNodeSched
 from qarnotNodeSchedLocalityBased import QarnotNodeSchedLocalityBased
-from storageController import StorageController
+#from qarnotStorageController import QarnotStorageController
 from qarnotBoxSched import QarnotBoxSched
 from qarnotUtils import *
 
@@ -27,7 +27,7 @@ class QarnotNodeSchedReplicate10LeastLoadedLB(QarnotNodeSchedLocalityBased):
 
 
     def doDatasetReplication(self, qtask):
-        # Replicate on 3 least loaded disks
+        # Replicate on 10 least loaded disks
         storage_ids = self.storage_controller.getNMostEmptyStorages(self.nb_least_loaded)
         for dataset_id in qtask.datasets:
             self.storage_controller.replicateDatasetOnStorages(dataset_id, storage_ids)

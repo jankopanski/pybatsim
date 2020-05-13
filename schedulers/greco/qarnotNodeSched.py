@@ -1,5 +1,5 @@
 from batsim.batsim import BatsimScheduler, Batsim, Job
-from storageController import StorageController
+from qarnotStorageController import QarnotStorageController
 from qarnotUtils import *
 from qarnotBoxSched import QarnotBoxSched
 
@@ -49,7 +49,8 @@ class QarnotNodeSched(BatsimScheduler):
     def __init__(self, options):
         super().__init__(options)
 
-        self.logger.setLevel(logging.CRITICAL)
+        #self.logger.setLevel(logging.CRITICAL)
+        self.logger.setLevel(logging.INFO)
 
         # Make sure the path to the datasets is passed
         assert "input_path" in options, "The path to the input files should be given as a CLI option as follows: [pybatsim command] -o \'{\"input_path\":\"path/to/input/files\"}\'"
@@ -80,7 +81,7 @@ class QarnotNodeSched(BatsimScheduler):
         self.numeric_ids = {} # Maps the Qmobo name to its batid
 
         self.qbox_sched_name = QarnotBoxSched
-        self.storage_controller_name = StorageController
+        self.storage_controller_name = QarnotStorageController
 
         # Dispatcher
         self.qtasks_queue = {}     # Maps the QTask id to the QTask object that is waiting to be scheduled
@@ -139,7 +140,7 @@ class QarnotNodeSched(BatsimScheduler):
         print("Number of received clusters:", self.nb_received_clusters)
         print("Number of rejected instances by QBoxes during dispatch:", self.nb_rejected_jobs_by_qboxes)
         print("Number of burn jobs created:", self.next_burn_job_id)
-        print("Number of staging jobs created:", self.storage_controller._next_staging_job_id)
+        print("Number of staging jobs created:", self.storage_controller.next_staging_job_id)
         print("Number of killed jobs:", self.nb_killed_jobs)
         print("Update_period was:", self.update_period)
 
@@ -164,7 +165,7 @@ class QarnotNodeSched(BatsimScheduler):
                 'nb_received_clusters': self.nb_received_clusters,
                 'nb_rejected_instances_during_dispatch': self.nb_rejected_jobs_by_qboxes,
                 'nb_burn_jobs_created': self.next_burn_job_id,
-                'nb_staging_jobs_created': self.storage_controller._next_staging_job_id,
+                'nb_staging_jobs_created': self.storage_controller.next_staging_job_id,
                 'nb_killed_jobs': self.nb_killed_jobs,
                 'nb_transfers_zero' : nb_transfers_zero,
                 'nb_transfers_real' : nb_transfers_real,
@@ -337,7 +338,7 @@ class QarnotNodeSched(BatsimScheduler):
             if len(qtask.waiting_instances) > 0:
                 to_reject.extend(qtask.waiting_instances)
 
-        to_kill.extend(self.storage_controller.onKillAllStagingJobs())
+        self.storage_controller.stop_all_data_transfers()
 
         if len(to_reject) > 0:
             self.logger.info(f"[{self.bs.time()}] Rejecting {len(to_reject)} jobs")
@@ -352,6 +353,11 @@ class QarnotNodeSched(BatsimScheduler):
 
 
     def onJobSubmission(self, job, resubmit=False):
+        self.logger.info(f"Received JOB_SUBMITTED for job {job.id}")
+
+        if job.workload == "dyn-burn":
+            return
+
         qtask_id = (job.id.split('_')[0]).split('#')[0] # To remove the instance number and resubmission number, if any
         job.qtask_id = qtask_id
 
@@ -457,15 +463,6 @@ class QarnotNodeSched(BatsimScheduler):
         if job.workload == "dyn-burn":
             assert job.job_state != Job.State.COMPLETED_SUCCESSFULLY, "CPU burn job on machine {} finished, this should never happen".format(str(job.allocation))
             # If the job was killed, don't do anything
-
-        elif job.workload == "dyn-staging":
-            if job.job_state == Job.State.COMPLETED_SUCCESSFULLY:
-                self.storage_controller.onDataStagingCompletion(job)
-            elif job.job_state == Job.State.COMPLETED_KILLED:
-                self.storage_controller.onDataStagingKilled(job)
-            else:
-                assert False, "Data staging job {} reached the state {}, this should not happen.".format(job.id, job.job_state)
-
         else:
             # This should either be a job from a static workflow or from "dyn-resubmit"
             # (or another name of worklow for re-submitted instances that were previously preempted)
