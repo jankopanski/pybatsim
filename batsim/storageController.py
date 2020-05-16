@@ -44,7 +44,9 @@ class Storage:
         # Each element of the list should be a dict of the form:
         # {"id" : "the_dataset_id", "size" : the_dataset_size_in_bytes}
         for elt in dataset_list:
-            self.add_dataset(Dataset(elt["id"], elt["size"]), timestamp)
+            if not (self.add_dataset(Dataset(elt["id"], elt["size"]), timestamp)):
+                # There is not enough space in the Storage
+                assert False, f"Not enough storage capacity for {self.name} ({self.id}), could not load the entire list of datasets"
 
     def get_id(self):
         return self.id
