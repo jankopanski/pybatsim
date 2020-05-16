@@ -133,14 +133,13 @@ class QarnotBoxSched():
         # The QRad became too hot (from external event)
         # Then mark this machine as unavailable
         # If instances were running on these machines, they will be killed during the frequency regulation
-        self.logger.info(f"[{self.bs.time()}] New unavailable mobos: {machines} to be removed to {self.mobosAvailable}")
+        self.logger.debug(f"[{self.bs.time()}] New unavailable mobos: {machines} to be removed to {self.mobosAvailable}")
         self.mobosAvailable.difference_update(machines)
         self.mobosUnavailable.insert(machines)
-        # TODO need to kill the instance that was running on this mobo and re-submit it.
 
     def onNotifyMachineAvailable(self, machines):
         # Put the machine back available
-        self.logger.info(f"[{self.bs.time()}] New available mobos: {machines} to be added to {self.mobosAvailable}")
+        self.logger.debug(f"[{self.bs.time()}] New available mobos: {machines} to be added to {self.mobosAvailable}")
         self.mobosAvailable.insert(machines)
         self.mobosUnavailable.difference_update(machines)
 
@@ -668,8 +667,9 @@ class QarnotBoxSched():
         # If so, put CPU burn if heating required or turn it off and ask for pstate change
         # For mobos that are still computing something, need to check if a change in pstate is needed
 
-
-        #TODO We also should retrieve the CPU temperature and check if it's lower than 90 degrees, and lower the speed or shut down the CPU if it's above...
+        #TODO We also should retrieve the CPU temperature and check if it's lower than 90 degrees, and lower the speed or shut down the CPU if it's above
+        # In fact, we are not doing this because the simulated platforms not only contain Rads but also Omars,
+        # which can *in theory* go above 90 degrees according to how we model the temperature
 
         to_execute = set()
         for qr in self.dict_qrads.values():
