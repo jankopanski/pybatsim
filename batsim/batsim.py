@@ -66,6 +66,7 @@ class Batsim(object):
 
         self.no_more_static_jobs = False
         self.no_more_external_events = False
+        self.use_storage_controller = False
 
         self.scheduler.bs = self
         # import pdb; pdb.set_trace()
@@ -138,40 +139,48 @@ class Batsim(object):
             )
             self.nb_jobs_scheduled += 1
 
-    def execute_jobs(self, jobs, io_jobs=None):
-        """ args:jobs: list of jobs to execute 
-            job.allocation MUST be not None and should be a non-empty ProcSet"""
-
-        for job in jobs:
-            assert job.allocation is not None
-            message = {
-                "timestamp": self.time(),
-                "type": "EXECUTE_JOB",
-                "data": {
-                        "job_id": job.id,
-                        "alloc": str(job.allocation)
-                }
+    def execute_job(self, job, io_job = None):
+        """ ergs.job: Job to execute
+            job.allocation MUST be not None and should be a non-empty ProcSet
+        """
+        assert job.allocation is not None
+        message = {
+            "timestamp": self.time(),
+            "type": "EXECUTE_JOB",
+            "data": {
+                    "job_id": job.id,
+                    "alloc": str(job.allocation)
             }
+        }
 
-            self.jobs[job.id].allocation = job.allocation
-            self.jobs[job.id].state = Job.State.RUNNING
+        self.jobs[job.id].allocation = job.allocation
+        self.jobs[job.id].state = Job.State.RUNNING
 
-            if io_jobs is not None and job.id in io_jobs:
-                message["data"]["additional_io_job"] = io_jobs[job.id]
+        if io_job is not None:
+            message["data"]["additional_io_job"] = io_job
 
-            if hasattr(job, "mapping"):
-                message["data"]["mapping"] = job.mapping
-                self.jobs[job.id].mapping = job.mapping
+        if hasattr(job, "mapping"):
+            message["data"]["mapping"] = job.mapping
+            self.jobs[job.id].mapping = job.mapping
 
-            if hasattr(job, "storage_mapping"):
-                message["data"]["storage_mapping"] = job.storage_mapping
-                self.jobs[job.id].storage_mapping = job.storage_mapping
+        if hasattr(job, "storage_mapping"):
+            message["data"]["storage_mapping"] = job.storage_mapping
+            self.jobs[job.id].storage_mapping = job.storage_mapping
 
-            self.jobs[job.id].allocation = job.allocation
+        self.jobs[job.id].allocation = job.allocation
 
-            self._events_to_send.append(message)
-            self.nb_jobs_scheduled += 1
+        self._events_to_send.append(message)
+        self.nb_jobs_scheduled += 1
 
+    def execute_jobs(self, jobs, io_jobs=None):
+        """ args:jobs: list of jobs to execute
+            job.allocation MUST be not None and should be a non-empty ProcSet
+        """
+        for job in jobs:
+            if io_jobs is not None:
+                self.execute_job(job, io_jobs[job.id])
+            else:
+                self.execute_job(job)
 
     def reject_jobs(self, jobs):
         """Reject the given jobs."""
@@ -555,7 +564,11 @@ class Batsim(object):
                     self.nb_jobs_submitted_from_batsim += 1
                 self.jobs[job_id] = job
 
-                self.scheduler.onJobSubmission(job)
+                if (self.use_storage_controller) and (job.workload == "dyn-storage-controller"):
+                    # This job comes from the StorageController, it' just an ack so forget about it
+                    pass
+                else:
+                    self.scheduler.onJobSubmission(job)
 
             elif event_type == "JOB_KILLED":
                 # get progress
@@ -583,7 +596,6 @@ class Batsim(object):
                     j.job_state = Job.State.UNKNOWN
                 j.return_code = event["data"]["return_code"]
 
-                self.scheduler.onJobCompletion(j)
                 if j.job_state == Job.State.COMPLETED_WALLTIME_REACHED:
                     self.nb_jobs_timeout += 1
                 elif j.job_state == Job.State.COMPLETED_FAILED:
@@ -593,6 +605,12 @@ class Batsim(object):
                 elif j.job_state == Job.State.COMPLETED_KILLED:
                     self.nb_jobs_killed += 1
                 self.nb_jobs_completed += 1
+
+                if (self.use_storage_controller) and (j.workload == "dyn-storage-controller"):
+                    # This job comes from the Storage Controller
+                    self.storage_controller.data_staging_completed(j)
+                else:
+                    self.scheduler.onJobCompletion(j)
 
             elif event_type == "FROM_JOB_MSG":
                 job_id = event_data["job_id"]
@@ -859,6 +877,12 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onNotifyGenericEvent(self, event_data):
+        raise NotImplementedError()
+
+    def onDatasetArrivedOnStorage(self, dataset_id, source_id, dest_id): # Called by the Storage Controller, if any
+        raise NotImplementedError()
+
+    def onDataTransferNotTerminated(self, dataset_id, source_id, dest_id): # Called by the Storage Controller, if any
         raise NotImplementedError()
 
     def onBeforeEvents(self):

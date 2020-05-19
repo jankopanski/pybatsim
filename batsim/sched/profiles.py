@@ -183,7 +183,7 @@ class Profiles(metaclass=ABCMeta):
     class Parallel(Profile):
         """Implementation of the MsgParallel profile."""
 
-        type = "msg_par"
+        type = "parallel"
 
         def __init__(self, nbres=0, cpu=[], com=[], **kwargs):
             super().__init__(**kwargs)
@@ -209,7 +209,7 @@ class Profiles(metaclass=ABCMeta):
     class ParallelHomogeneous(Profile):
         """Implementation of the MsgParallelHomogeneous profile."""
 
-        type = "msg_par_hg"
+        type = "parallel_homogeneous"
 
         def __init__(self, cpu=0, com=0, **kwargs):
             super().__init__(**kwargs)
@@ -234,7 +234,7 @@ class Profiles(metaclass=ABCMeta):
     class ParallelHomogeneousTotal(ParallelHomogeneous):
         """Implementation of the MsgParallelHomogeneousTotal profile."""
 
-        type = "msg_par_hg_tot"
+        type = "parallel_homogeneous_total"
 
 
     class Smpi(Profile):
@@ -296,7 +296,7 @@ class Profiles(metaclass=ABCMeta):
     class ParallelPFS(Profile):
         """Implementation of the MsgParallelHomogeneousPFSMultipleTiers profile."""
 
-        type = "msg_par_hg_pfs"
+        type = "parallel_homogeneous_pfs"
 
         def __init__(self, size_read, size_write,
                      storage="pfs",
