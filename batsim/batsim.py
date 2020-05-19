@@ -66,6 +66,7 @@ class Batsim(object):
 
         self.no_more_static_jobs = False
         self.no_more_external_events = False
+        self.use_storage_controller = False
 
         self.scheduler.bs = self
         # import pdb; pdb.set_trace()
@@ -514,7 +515,11 @@ class Batsim(object):
                     self.nb_jobs_submitted_from_batsim += 1
                 self.jobs[job_id] = job
 
-                self.scheduler.onJobSubmission(job)
+                if (self.use_storage_controller) and (job.workload == "dyn-storage-controller"):
+                    # This job comes from the StorageController, it' just an ack so forget about it
+                    pass
+                else:
+                    self.scheduler.onJobSubmission(job)
 
             elif event_type == "JOB_KILLED":
                 # get progress
@@ -542,7 +547,6 @@ class Batsim(object):
                     j.job_state = Job.State.UNKNOWN
                 j.return_code = event["data"]["return_code"]
 
-                self.scheduler.onJobCompletion(j)
                 if j.job_state == Job.State.COMPLETED_WALLTIME_REACHED:
                     self.nb_jobs_timeout += 1
                 elif j.job_state == Job.State.COMPLETED_FAILED:
@@ -552,6 +556,12 @@ class Batsim(object):
                 elif j.job_state == Job.State.COMPLETED_KILLED:
                     self.nb_jobs_killed += 1
                 self.nb_jobs_completed += 1
+
+                if (self.use_storage_controller) and (j.workload == "dyn-storage-controller"):
+                    # This job comes from the Storage Controller
+                    self.storage_controller.data_staging_completed(j)
+                else:
+                    self.scheduler.onJobCompletion(j)
 
             elif event_type == "FROM_JOB_MSG":
                 job_id = event_data["job_id"]
@@ -793,6 +803,12 @@ class BatsimScheduler(object):
         raise NotImplementedError()
 
     def onNotifyGenericEvent(self, event_data):
+        raise NotImplementedError()
+
+    def onDatasetArrivedOnStorage(self, dataset_id, source_id, dest_id): # Called by the Storage Controller, if any
+        raise NotImplementedError()
+
+    def onDataTransferNotTerminated(self, dataset_id, source_id, dest_id): # Called by the Storage Controller, if any
         raise NotImplementedError()
 
     def onBeforeEvents(self):
