@@ -33,11 +33,10 @@ class Storage:
 
         self.datasets = dict()                         # Dict of dataset_id -> Dataset object
         self.dataset_timestamps = dict()               # Dict of dataset_id -> Dataset timestamp
-        # The timestamp corresponds to the last time the Dataset has been added or a hard link was added
+        # The timestamp corresponds to the last time the Dataset has been requested or a tag was added
 
-        self.hard_links = defaultdict(set)            # Dict of dataset_id -> set of job_id
-        # A hard link on a Dataset means that a certain job is dependant of this Dataset
-        # The Dataset must not be removed from the Storage if it has hard links
+        self.dataset_tags = defaultdict(set)           # Dict of dataset_id -> set of tags
+        # A tagged dataset cannot be removed from the storage
 
     def load_datasets_from_list(self, dataset_list, timestamp):
         # Function to populate a Storage at a given timestamp
@@ -102,14 +101,14 @@ class Storage:
     def delete_dataset_from_id(self, dataset_id):
         """ Delete the Dataset on Storage corresponding to the dataset_id
         When deleting a Dataset, its size is added to remaining storage space on Storage.
-        Returns False if the Dataset was not present in this Storage or if it still had hard links
+        Returns False if the Dataset was not present in this Storage or if it still had tags
         Returns True if the Dataset was correctly removed.
         """
         if not self.has_dataset(dataset_id):
             return False # The Dataset is not present
 
-        if len(self.hard_links[dataset_id]) > 0:
-            # There are still hard links for this Dataset
+        if len(self.dataset_tags[dataset_id]) > 0:
+            # There are still tags for this Dataset
             return False
 
         dataset = self.datasets.pop(dataset_id)
@@ -139,7 +138,7 @@ class Storage:
     def make_space(self, asked_space):
         """ Tries to evict datasets from storage until enough space is available for asked_space
         The default implementation is the LRU policy: the Least Recently Used dataset
-        which has no hard link in the storage is designed to be evicted.
+        which has no tag in the storage is designed to be evicted.
         The process is repeated until enough space was made.
 
         This method can be changed to implement other evicting strategies as needed.
@@ -157,8 +156,8 @@ class Storage:
         while (space_to_make > 0) and (i < len(timestamps)):
             dataset_id, _ = timestamps[i]
 
-            if len(self.hard_links[dataset_id]) == 0:
-                # This dataset has no hard link, we can evict it
+            if len(self.dataset_tags[dataset_id]) == 0:
+                # This dataset has no tag, we can evict it
                 to_evict.append(dataset_id)
                 space_to_make -= self.get_dataset_from_id(dataset_id).get_size()
 
@@ -175,31 +174,27 @@ class Storage:
             return False
 
 
-    def add_hard_link(self, dataset_id, job_id, timestamp):
-        """ Adds a hard link from the given job_id to the dataset
-        and updates the timestamp of the Dataset
+    def add_tag_on_dataset(self, dataset_id, tag_name, timestamp):
+        """ Adds a tag on the dataset and updates the timestamp of the Dataset
         Returns False if the Dataset is not present in the Storage
-        Returns True if the hard link is added
+        Returns True if the tag is correctly added
         """
         if not self.has_dataset(dataset_id):
             return False
 
-        self.hard_links[dataset_id].add(job_id)
+        self.dataset_tags[dataset_id].add(tag_name)
         self.dataset_timestamps[dataset_id] = timestamp
         return True
 
-    def remove_hard_link(self, dataset_id, job_id):
-        """
-        Removes the hard link from the given job_id to the dataset
-        """
-        if job_id in self.hard_links[dataset_id]:
-            self.hard_links[dataset_id].remove(job_id)
+    def remove_tag_on_dataset(self, dataset_id, tag_name):
+        """ Removes the tag on the dataset """
+        if tag_name in self.dataset_tags[dataset_id]:
+            self.dataset_tags[dataset_id].remove(tag_name)
 
-
-    def remove_all_hard_links(self, job_id):
-        """ Removes all hard links for this job """
-        for dataset_id in self.hard_links.keys():
-            self.remove_hard_link(dataset_id, job_id)
+    def remove_tag_on_all_datasets(self, tag_name):
+        """ Removes the tag on all datasets of this storage """
+        for dataset_id in self.dataset_tags.keys():
+            self.remove_tag_on_dataset(dataset_id, tag_name)
 # End of class Storage
 
 
@@ -333,7 +328,7 @@ class StorageController:
         If not enough space in destination, free space is made by deleting datasets with the clearing strategy (default is LRU)
         Returns True if the dataset is already present on dest or is currently being transferred to dest
         Returns False if dataset is not in source, if source or dest Storages do not exist,
-        or dest does not have enough available space after clearing (this can happen due to hard links on datasets in the destination Storage)
+        or dest does not have enough available space after clearing (this can happen due to tags on datasets in the destination Storage)
         An assertion fails if the dataset does not fit in the whole destination Storage
         """
         self.logger.debug(f"StorageController: Request for dataset {dataset_id} to transfer from {source_id} to {dest_id}")
