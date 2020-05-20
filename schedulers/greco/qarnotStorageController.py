@@ -54,7 +54,7 @@ class QarnotStorageController(StorageController):
         assert storage != None, f"Requesting a hard link for {job_id} on a non-existent storage (id {storage_id})"
         assert storage.has_dataset(dataset_id), f"Requesting a hard link for {job_id} on dataset {dataset_id} that is not in storage {storage.get_name()} (id {storage_id})"
 
-        storage.add_hard_link(dataset_id, job_id, self.bs.time())
+        storage.add_tag_on_dataset(dataset_id, job_id, self.bs.time())
         self.logger.debug(f"[{self.bs.time()}] StorageController added a hard link for {job_id} to {dataset_id} on storage id {storage_id}.")
 
 
@@ -67,7 +67,7 @@ class QarnotStorageController(StorageController):
         assert storage != None, f"Requesting the release of a hard link for {job_id} on a non-existent storage (id {storage_id})"
         assert storage.has_dataset(dataset_id), f"Requesting the release of a hard link for {job_id} on dataset {dataset_id} that is not in storage {storage.get_name()} (if {storage_id})"
 
-        storage.remove_hard_link(dataset_id, job_id)
+        storage.remove_tag_on_dataset(dataset_id, job_id)
 
 
     def onQBoxReleaseAllHardLinks(self, storage_id, job_id):
@@ -77,7 +77,7 @@ class QarnotStorageController(StorageController):
         storage = self.get_storage(storage_id)
         assert storage != None, f"Requesting the release of all hard links of {job_id} on a non-existent storage (id {storage_id})"
         
-        storage.remove_all_hard_links(job_id)
+        storage.remove_tag_on_all_datasets(job_id)
 
 
 
