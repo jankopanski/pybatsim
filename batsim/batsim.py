@@ -181,18 +181,26 @@ class Batsim(object):
             else:
                 self.execute_job(job)
 
-    def reject_jobs(self, jobs):
-        """Reject the given jobs."""
-        assert len(jobs) > 0, "The list of jobs to reject is empty"
-        for job in jobs:
+    def reject_jobs_by_id(self, job_ids):
+        """ Reject the given jobs."""
+        assert len(job_ids) > 0, "The list of jobs to reject is empty"
+        for job_id in job_ids:
             self._events_to_send.append({
                 "timestamp": self.time(),
                 "type": "REJECT_JOB",
                 "data": {
-                        "job_id": job.id,
+                    "job_id": job_id
                 }
             })
-            self.nb_jobs_rejected += 1
+            self.jobs[job_id].state = Job.State.REJECTED
+        self.nb_jobs_rejected += len(job_ids)
+
+    def reject_jobs(self, jobs):
+        """Reject the given jobs."""
+        assert len(jobs) > 0, "The list of jobs to reject is empty"
+        job_ids = [x.id for x in jobs]
+        self.reject_jobs_by_id(job_ids)
+
 
     def change_job_state(self, job, state):
         """Change the state of a job."""
