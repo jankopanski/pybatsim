@@ -266,7 +266,8 @@ class QarnotBoxSched():
 
             # First check if there is enough available mobos
             nb_requested_res = instances[0].requested_resources
-            if (priority_group == PriorityGroup.HIGH) and (len(self.mobosAvailable) < nb_requested_res) or \
+            #if (priority_group == PriorityGroup.HIGH) and (len(self.mobosAvailable) < nb_requested_res) or \
+            if (priority_group == PriorityGroup.HIGH) and ( (len(self.availBkgd) + len(self.availLow) + len(self.availHigh)) < nb_requested_res) or \
                (priority_group < PriorityGroup.HIGH) and ( (len(self.availBkgd) + len(self.availLow)) < nb_requested_res):
                 self.logger.info(f"[{self.bs.time()}]--- {self.name} does not have available mobos for cluster taks {qtask_id}, rejecting it.")
                 self.qn.onQBoxRejectedInstances(instances, self.name)
@@ -420,7 +421,7 @@ class QarnotBoxSched():
             for qr in qr_list:
                 for batid in (qr.pset_mobos & available_slots): # Available mobos of this QRad
                     qm = qr.dict_mobos[batid]
-                    if (qm.state <= QMoboState.RUNBKGD) and not qm.is_reserved_high():
+                    if (qm.state <= QMoboState.RUNLOW) and not qm.is_reserved_high():
                         allocation.insert(batid)
                         remaining_requested_res-=1
                         if remaining_requested_res == 0:

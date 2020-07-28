@@ -7,6 +7,7 @@ class QarnotStorageController(StorageController):
     def __init__(self, storage_resources, bs, sched, options):
         super().__init__(storage_resources, bs, sched, options)
         
+        self.qn = sched
         # Maps a Batsim index of storage to the QBox Scheduler object
         # Will be filled during call of onQBoxRegistration
         self.mappingQBoxes = {}
