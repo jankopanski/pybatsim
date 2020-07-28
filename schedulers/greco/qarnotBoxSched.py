@@ -262,6 +262,7 @@ class QarnotBoxSched():
         if is_cluster:
             # This is a cluster task requiring multiple resources
             self.logger.info("[{}]--- {} received a cluster task {} for the priority group {}".format(self.bs.time(), self.name, qtask_id, priority_group))
+            self.logger.info(f"Cluster needs {instances[0].requested_resources} slots and QB has {len(self.mobosAvailable)} {len(self.availBkgd)} {len(self.availLow)} {len(self.availHigh)} available slots")
             assert qtask_id not in self.dict_subqtasks, f"{self.name} received a cluster task {qtask_id} but other instances of this cluster were received previously, aborting."
 
             # First check if there is enough available mobos
@@ -347,6 +348,10 @@ class QarnotBoxSched():
                             self.reserveInstance(qm, job)
                             sub_qtask.mark_reserved_instance(job)
                             self.logger.info("[{}] Adding reservation for {} on {} ({})".format(self.bs.time(), job.id, qm.name, qm.batid))
+                        # The instance will start or reserve the qm, remove this qm from the available slots
+                        self.availBkgd.difference_update(qm.batid)
+                        self.availLow.difference_update(qm.batid)
+                        self.availHigh.difference_update(qm.batid)
                         n-=1
                         if n == 0:
                             return # All instances have been scheduled
@@ -365,6 +370,10 @@ class QarnotBoxSched():
                     self.reserveInstance(qm, job)
                     sub_qtask.mark_reserved_instance(job)
                     self.logger.info("[{}] Adding reservation for {} on {} ({})".format(self.bs.time(), job.id, qm.name, qm.batid))
+                # The instance will start or reserve the qm, remove this qm from the available slots
+                self.availBkgd.difference_update(qm.batid)
+                self.availLow.difference_update(qm.batid)
+                self.availHigh.difference_update(qm.batid)
                 n-=1
                 if n == 0:
                     return # All instances have been scheduled
@@ -388,6 +397,10 @@ class QarnotBoxSched():
                             self.reserveInstance(qm, job)
                             sub_qtask.mark_reserved_instance(job)
                             self.logger.info("[{}] Adding reservation for {} on {} ({})".format(self.bs.time(), job.id, qm.name, qm.batid))
+                        # The instance will start or reserve the qm, remove this qm from the available slots
+                        self.availBkgd.difference_update(qm.batid)
+                        self.availLow.difference_update(qm.batid)
+                        self.availHigh.difference_update(qm.batid)
                         n-=1
                         if n == 0:
                             return # All instances have been scheduled
@@ -417,6 +430,11 @@ class QarnotBoxSched():
             # Sort the QRads by coolest first and assign all available mobos to the cluster
             available_slots = self.availBkgd | self.availLow | self.availHigh
             available_slots.difference_update(self.mobosUnavailable)
+            self.logger.info(f"avail HIGH {self.availHigh}")
+            self.logger.info(f"avail LOW {self.availLow}")
+            self.logger.info(f"avail BKGD {self.availBkgd}")
+            self.logger.info(f"avail {available_slots}")
+
             qr_list = sorted(self.dict_qrads.values(), key=lambda qr:-qr.diffTemp)
             for qr in qr_list:
                 for batid in (qr.pset_mobos & available_slots): # Available mobos of this QRad
@@ -426,6 +444,11 @@ class QarnotBoxSched():
                         remaining_requested_res-=1
                         if remaining_requested_res == 0:
                             break
+                    '''else:
+                        if (qm.state > QMoboState.RUNBKGD):
+                            self.logger.info(f"Did not take qm {qm.batid} because it runs > RUNBKGD")
+                        elif qm.is_reserved_high():
+                            self.logger.info(f"Did not take qm {qm.batid} because it is reserved for high ({qm.reserved_job})")'''
 
                 if remaining_requested_res == 0:
                     break
@@ -447,7 +470,7 @@ class QarnotBoxSched():
                 if remaining_requested_res == 0:
                     break
             # End for qr in qr_list
-
+        self.logger.info(f"Found allocation: {allocation}")
         assert len(allocation) == job.requested_resources, f"Found only {len(allocation)} available mobos for cluster {sub_qtask.id} out of {job.requested_resources}."
 
         if sub_qtask.waiting_datasets == []:
@@ -462,6 +485,11 @@ class QarnotBoxSched():
                 self.reserveInstance(qm, job)
             sub_qtask.mark_reserved_instance(job)
             self.logger.info("[{}] Adding reservation for cluster {} on {} mobos ({})".format(self.bs.time(), sub_qtask.id, len(allocation), str(allocation)))
+
+        # The cluster will start or reserve the QMobos of the allocation, remove them from the available slots
+        self.availBkgd.difference_update(allocation)
+        self.availLow.difference_update(allocation)
+        self.availHigh.difference_update(allocation)
 
 
 
