@@ -438,15 +438,13 @@ class QarnotNodeSched(BatsimScheduler):
         #self.logger.info(f"\n[{self.bs.time()}] Profiles:\n{self.bs.profiles[job.workload].keys()}")
         copy_profile = self.bs.profiles[job.workload][job.profile]
         self.bs.register_profile(job.workload, new_profile_id, copy_profile)
-        new_job = self.bs.register_job(new_job_id, job.requested_resources, job.requested_time, new_profile_id)
+
+        # If it's a cluster, update its waltime
+        requested_time = job.requested_time if (job.requested_resources == 1) else (job.requested_time - self.bs.time() + job.start_time)
+        new_job = self.bs.register_job(new_job_id, job.requested_resources, requested_time, new_profile_id)
         new_job.metadata = metadata
 
-        if job.requested_resources > 1:
-            # It is a cluster, update its walltime
-            time_running = self.bs.time () - job.start_time
-            new_job.requested_time = job.requested_time - time_running
-
-        self.logger.info("[{}] QNode resubmitting {} with new id {}".format(self.bs.time(), job, new_job_id))
+        self.logger.info("[{}] QNode resubmitting new job {} ".format(self.bs.time(), new_job))
         self.onJobSubmission(new_job, resubmit=True)
 
 

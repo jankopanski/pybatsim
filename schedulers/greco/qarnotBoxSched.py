@@ -430,10 +430,10 @@ class QarnotBoxSched():
             # Sort the QRads by coolest first and assign all available mobos to the cluster
             available_slots = self.availBkgd | self.availLow | self.availHigh
             available_slots.difference_update(self.mobosUnavailable)
-            self.logger.info(f"avail HIGH {self.availHigh}")
-            self.logger.info(f"avail LOW {self.availLow}")
-            self.logger.info(f"avail BKGD {self.availBkgd}")
-            self.logger.info(f"avail {available_slots}")
+            #self.logger.info(f"avail HIGH {self.availHigh}")
+            #self.logger.info(f"avail LOW {self.availLow}")
+            #self.logger.info(f"avail BKGD {self.availBkgd}")
+            #self.logger.info(f"avail {available_slots}")
 
             qr_list = sorted(self.dict_qrads.values(), key=lambda qr:-qr.diffTemp)
             for qr in qr_list:
@@ -567,6 +567,8 @@ class QarnotBoxSched():
             if qm.running_job != -1:
                 self.logger.debug(f"[{self.bs.time()}]------ Mobo {qm.name} {qm.batid} killed Job {qm.running_job.id} because a cluster arrived")
                 old_job = qm.pop_job()
+                if old_job.requested_resources > 1:
+                    self.killCluster(old_job, qm.batid)
                 self.jobs_to_kill.append(old_job)
                 self.burning_jobs.discard(old_job)
 
@@ -593,6 +595,8 @@ class QarnotBoxSched():
             # A job is running
             self.logger.debug("[{}]------- Mobo {} killed Job {} because another instance arrived".format(self.bs.time(), qm.name, qm.running_job.id))
             old_job = qm.pop_job()
+            if old_job.requested_resources > 1:
+                self.killCluster(old_job, qm.batid)
 
             self.jobs_to_kill.append(old_job)
             self.burning_jobs.discard(old_job)
@@ -710,6 +714,8 @@ class QarnotBoxSched():
                     if qm.state != QMoboState.OFF:# and qm.pstate != qm.max_pstate:
                         if qm.running_job != -1:
                             job = qm.pop_job()
+                            if job.requested_resources > 1:
+                                self.killCluster(job, qm.batid)
                             self.jobs_to_kill.append(job)
                             self.logger.debug(f"[{self.bs.time()}] FR: Killing {job.id} on {qm.name} ({qm.batid}) because mobo made unavailable")
                         qm.turn_off()
