@@ -11,17 +11,32 @@ The format is based on `Keep a Changelog`_.
 Unreleased
 ----------
 
-- `Commits since v3.0.0 <https://gitlab.inria.fr/batsim/pybatsim/compare/v3.1.0...master>`_
+- `Commits since v3.2.0 <https://gitlab.inria.fr/batsim/pybatsim/compare/v3.2.0...master>`_
 - ``nix-env -f https://github.com/oar-team/kapack/archive/master.tar.gz -iA pybatsim_dev``
+
+
+........................................................................................................................
+
+v3.2.0
+------
+
+- Release date: 2020-07-30
+- `Commits since v3.1.0 <https://gitlab.inria.fr/batsim/pybatsim/compare/v3.1.0...v3.2.0>`_
+- ``nix-env -f https://github.com/oar-team/kapack/archive/master.tar.gz -iA pybatsim320``
+- Recommended Batsim version: `v4.0.0 <https://gitlab.inria.fr/batsim/batsim/tags/v4.0.0>`_
+
+This version is synchronized with Batsim v4.0.0.
+See `Batsim changelog <https://batsim.readthedocs.io/en/latest/changelog.html#v4-0-0>`_ for more details.
 
 Additions
 ~~~~~~~~~
 
 - Added the handling of `machine_available` and `machine_unavailable` events, as well as the unknown external events.
-- `storage_mapping` of a job is not attached to an `EXECUTE_JOB` event.
-- `register_job` function now returns the created Job object.
+- The `storage_mapping` of a job is now attached to an `EXECUTE_JOB` event.
+- The `register_job` function now returns the created Job object.
 - Added the `StorageController` permitting to easily manage `storage` resources and manipulate data between them with `data_staging` jobs.
   To be used, the StorageController object must be instanciated by the scheduler after the `SIMULATION_BEGINS` event.
+- Added the `reject_jobs_by_ids` function to reject jobs by giving a list of job ids, as opposed to `reject_jobs` which expects a list of Job objects.
 
 Miscellaneous
 ~~~~~~~~~~~~~
