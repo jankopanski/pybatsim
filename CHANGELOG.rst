@@ -12,7 +12,7 @@ Unreleased
 ----------
 
 - `Commits since v3.2.0 <https://gitlab.inria.fr/batsim/pybatsim/compare/v3.2.0...master>`_
-- ``nix-env -f https://github.com/oar-team/kapack/archive/master.tar.gz -iA pybatsim_dev``
+- ``nix-env -f https://github.com/oar-team/nur-kapack/archive/master.tar.gz -iA pybatsim-master``
 
 
 ........................................................................................................................
@@ -22,7 +22,7 @@ v3.2.0
 
 - Release date: 2020-07-30
 - `Commits since v3.1.0 <https://gitlab.inria.fr/batsim/pybatsim/compare/v3.1.0...v3.2.0>`_
-- ``nix-env -f https://github.com/oar-team/kapack/archive/master.tar.gz -iA pybatsim320``
+- ``nix-env -f https://github.com/oar-team/nur-kapack/archive/master.tar.gz -iA pybatsim320``
 - Recommended Batsim version: `v4.0.0 <https://gitlab.inria.fr/batsim/batsim/tags/v4.0.0>`_
 
 This version is synchronized with Batsim v4.0.0.
