@@ -211,15 +211,17 @@ class Profiles(metaclass=ABCMeta):
 
         type = "parallel_homogeneous"
 
-        def __init__(self, cpu=0, com=0, **kwargs):
+        def __init__(self, cpu=0, com=0, bb=0, **kwargs):
             super().__init__(**kwargs)
             self.cpu = cpu
             self.com = com
+            self.bb = bb
 
         @classmethod
         def from_dict(cls, dct, name=None):
             return cls(cpu=dct["cpu"],
                        com=dct["com"],
+                       bb=dct.get('bb', 0),
                        ret=dct.get("ret", 0),
                        name=name)
 
