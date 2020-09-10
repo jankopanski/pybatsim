@@ -7,6 +7,7 @@
 
 """
 from batsim.batsim import Job as BatsimJob, Batsim
+from procset import ProcSet
 
 from .utils import ObserveList, filter_list, ListView
 from .alloc import Allocation
@@ -557,9 +558,12 @@ class Job:
             resources=alloc,
             type="start_job")
 
+        # Set up batsim job allocation
+        self._batsim_job.allocation = ProcSet(*alloc)
+
         # Start the jobs
-        self._scheduler._batsim.start_jobs(
-            [self._batsim_job], {self.id: alloc})
+        assert self._batsim_job.allocation is not None, 'Batsim job allocation is not set.'
+        self._scheduler._batsim.execute_job(self._batsim_job)
 
         self._scheduler.info(
             "Scheduled job ({job})",
