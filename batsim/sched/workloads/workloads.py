@@ -218,14 +218,17 @@ class JobDescription:
             profile_name=self.profile.name,
             type="job_description_submit")
 
+        submitted_profiles = set(self.workload.get_profiles(jobs=self.workload.submitted_jobs))
+
         # Freeze the profiles at the time of submission
         self._additional_profiles = self.get_additional_profiles()
         additional_profiles = {p.name: p.to_dict()
-                               for p in self._additional_profiles}
+                               for p in self._additional_profiles if p not in submitted_profiles}
 
-        scheduler._batsim.register_profiles(
-            self.workload.name,
-            {self.profile.name : self.profile.to_dict()})
+        if self.profile not in submitted_profiles:
+            scheduler._batsim.register_profiles(
+                self.workload.name,
+                {self.profile.name : self.profile.to_dict()})
         scheduler._batsim.register_job(
             str(self.id),
             self.res,
@@ -251,7 +254,7 @@ class JobDescription:
                     "Workload name is ambiguous: {}".format(
                         self.workload.name))
         except KeyError:
-            assert false, "Job is not correctly assigned to a workload"
+            assert False, "Job is not correctly assigned to a workload"
 
 
 class WorkloadDescription:
