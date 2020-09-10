@@ -320,7 +320,7 @@ class Profiles(metaclass=ABCMeta):
             return {
                 "type": self.type,
                 "bytes_to_read": self.size_read,
-                "bytes_to_write_write": self.size_write,
+                "bytes_to_write": self.size_write,
                 "storage": self.storage,
                 "ret": self.ret,
             }
@@ -330,29 +330,25 @@ class Profiles(metaclass=ABCMeta):
 
         type = "data_staging"
 
-        class Direction(Enum):
-            LCST_TO_HPST = 1
-            HPST_TO_LCST = 2
-
-        def __init__(self, size,
-                     direction=Direction.LCST_TO_HPST,
-                     **kwargs):
+        def __init__(self, size, **kwargs):
+            """
+            :param size: number of bytes to transfer
+            """
             super().__init__(**kwargs)
             self.size = size
-            self.direction = direction
 
         @classmethod
         def from_dict(cls, dct, name=None):
-            return cls(size=dct["size"],
-                       direction=cls.Direction[dct["direction"].upper()],
+            return cls(size=dct["nb_bytes"],
                        ret=dct.get("ret", 0),
                        name=name)
 
         def to_dict(self, embed_references=False):
             return {
                 "type": self.type,
-                "size": self.size,
-                "direction": self.direction.name.lower(),
+                "nb_bytes": self.size,
+                "from": "source",
+                "to": "destination",
                 "ret": self.ret,
             }
 
