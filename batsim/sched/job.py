@@ -144,6 +144,7 @@ class Job:
     @comment.setter
     def comment(self, value):
         self._comment = value
+        self._scheduler._batsim.set_job_metadata(self.id, value)
 
     @property
     def dependencies(self):
