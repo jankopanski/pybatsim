@@ -416,7 +416,7 @@ class WorkloadDescription:
                     considered.
         """
         # Recursively collect all profiles
-        def expand_profiles(ps, visited=[], result=[]):
+        def expand_profiles(ps, visited, result):
             sub_profiles = []
             for profile in ps:
                 # id(profile) is necessary since profiles are considered as equal if their json
@@ -424,7 +424,7 @@ class WorkloadDescription:
                 # matter).
                 if id(profile) not in visited:
                     sub_profiles += profile.get_additional_profiles()
-                    visited.append(id(profile))
+                    visited.add(id(profile))
                     result.append(profile)
             if sub_profiles:
                 sub_profiles += expand_profiles(sub_profiles, visited, result)
@@ -433,8 +433,8 @@ class WorkloadDescription:
         if jobs is None:
             jobs = self.jobs
 
-        return expand_profiles([profile for job in jobs
-                                for profile in job.get_profiles()])
+        return expand_profiles(
+            (profile for job in jobs for profile in job.get_profiles()), set(), [])
 
     def reduce_profiles(self):
         """Reduce the profile instances in this workload.
